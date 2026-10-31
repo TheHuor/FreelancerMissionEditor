@@ -16,7 +16,7 @@
       <StackPanel>
         <Grid Margin="0,4,0,24">
           <Grid.ColumnDefinitions><ColumnDefinition Width="88"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-          <Image Source="Assets/MissionEditor.png" Width="68" Height="68" HorizontalAlignment="Left" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="Mission Editor"/>
+          <Image Source="/MissionEditor.App;component/Assets/MissionEditor.png" Width="68" Height="68" HorizontalAlignment="Left" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="Mission Editor"/>
           <StackPanel Grid.Column="1" VerticalAlignment="Center">
             <TextBlock Text="Mission Editor" FontSize="28" FontWeight="SemiBold"/>
             <TextBlock Text="Für Freelancer und Crossfire" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,10"/>

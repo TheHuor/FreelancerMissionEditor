@@ -151,6 +151,10 @@ Ziel, `Cnd_WatchTrigger` vom beobachteten Trigger zum Beobachter.
 | `src/MissionEditor.Mcp` | MCP-Server für externe KI-Agenten (stdio) |
 | `tests/MissionEditor.Tests` | xUnit-Tests für den Kern |
 | `tests/MissionEditor.Mcp.Tests` | xUnit-Tests für den MCP-Server, inklusive echtem Stdio-Client |
+| `tests/MissionEditor.App.SmokeChecks` | Separat ausführbare WPF-Smoke-Checks; werden mit der Solution gebaut |
+
+Die fachliche Ordneraufteilung und die Prüfkommandos beschreibt
+[Projektstruktur](docs/project-structure.md).
 
 Neue Prüfungen implementieren `IMissionCheck` und werden in `MissionChecker.AllChecks` eingetragen.
 
