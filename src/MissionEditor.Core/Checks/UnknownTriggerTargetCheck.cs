@@ -36,62 +36,22 @@ public sealed class UnknownTriggerTargetCheck : IMissionCheck
                     _ => "der Spielstand setzt an keinem Trigger fort",
                 };
                 string message = $"{TriggerReference.KeyOf(reference.Kind)} auf unbekannten Trigger '{reference.TargetName}' – {effect}.";
-                IReadOnlyList<string> suggestions = FindClosest(reference.TargetName, names);
+                IReadOnlyList<string> suggestions = NameSimilarity.FindClosest(reference.TargetName, names);
                 if (suggestions.Count > 0)
                     message += $" Gemeint vielleicht {string.Join(" oder ", suggestions.Select(name => $"'{name}'"))}?";
                 if (trigger.IsShadowed)
                     message += " (Der Trigger ist doppelt definiert und wird ohnehin ignoriert.)";
-                yield return new Finding(severity, Id, reference.Line.Number, trigger.Nickname, message);
+                string hint = reference.Kind switch
+                {
+                    TriggerReferenceKind.Activate => "Act_ActTrig auf einen Namen ohne [Trigger] ist im Spiel ein stiller No-op – es gibt keine Fehlermeldung, der Ablauf geht dort einfach nicht weiter.",
+                    TriggerReferenceKind.Deactivate => "Act_DeactTrig auf einen Namen ohne [Trigger] ist harmlos, aber meist ein Tippfehler oder ein Überbleibsel eines gelöschten Triggers.",
+                    TriggerReferenceKind.Watch => "Cnd_WatchTrigger wartet dann für immer; der Trigger löst nie aus.",
+                    _ => "Beim Laden dieses Spielstands wird kein Trigger aktiviert – die Mission steht still.",
+                };
+                hint += " Trigger-Namen vergleicht die Engine ohne Groß-/Kleinschreibung. Abhilfe: Namen korrigieren oder den fehlenden [Trigger] anlegen"
+                    + (reference.Kind == TriggerReferenceKind.Deactivate ? " bzw. die Zeile entfernen." : ".");
+                yield return new Finding(severity, Id, reference.Line.Number, trigger.Nickname, message, hint);
             }
         }
-    }
-
-    // The nicknames with the smallest edit distance (at most three), or none if all are too far off.
-    private static IReadOnlyList<string> FindClosest(string name, string[] candidates)
-    {
-        const int MaxSuggestions = 3;
-        var best = new List<string>();
-        int bestDistance = Math.Min(3, Math.Max(2, name.Length / 5));
-        string lowerName = name.ToLowerInvariant();
-        foreach (string candidate in candidates)
-        {
-            if (Math.Abs(candidate.Length - name.Length) > bestDistance)
-                continue;
-            int distance = Levenshtein(lowerName, candidate.ToLowerInvariant(), bestDistance + 1);
-            if (distance > bestDistance)
-                continue;
-            if (distance < bestDistance)
-            {
-                bestDistance = distance;
-                best.Clear();
-            }
-            if (best.Count < MaxSuggestions)
-                best.Add(candidate);
-        }
-        return best;
-    }
-
-    // Edit distance, cut short once every value of a row reaches the limit.
-    private static int Levenshtein(string first, string second, int limit)
-    {
-        var previous = new int[second.Length + 1];
-        var current = new int[second.Length + 1];
-        for (int j = 0; j <= second.Length; j++)
-            previous[j] = j;
-        for (int i = 1; i <= first.Length; i++)
-        {
-            current[0] = i;
-            int rowMinimum = i;
-            for (int j = 1; j <= second.Length; j++)
-            {
-                int cost = first[i - 1] == second[j - 1] ? 0 : 1;
-                current[j] = Math.Min(Math.Min(current[j - 1] + 1, previous[j] + 1), previous[j - 1] + cost);
-                rowMinimum = Math.Min(rowMinimum, current[j]);
-            }
-            if (rowMinimum >= limit)
-                return limit;
-            (previous, current) = (current, previous);
-        }
-        return previous[second.Length];
     }
 }

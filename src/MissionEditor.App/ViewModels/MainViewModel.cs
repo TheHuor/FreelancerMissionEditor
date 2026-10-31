@@ -104,9 +104,24 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    /// <summary>The section text of the selected trigger.</summary>
-    public string SelectedSectionText => SelectedTrigger?.Node.Trigger?.Section.GetText()
-        ?? (SelectedTrigger is null ? string.Empty : $"; '{SelectedTrigger.Name}' wird referenziert, aber kein [Trigger] definiert ihn.");
+    /// <summary>The section lines of the selected trigger, with findings marked.</summary>
+    public IReadOnlyList<SectionLineItem> SelectedSectionLines
+    {
+        get
+        {
+            if (SelectedTrigger is null)
+                return [];
+            if (SelectedTrigger.Node.Trigger is not { } trigger)
+                return [new SectionLineItem(0, $"; '{SelectedTrigger.Name}' wird referenziert, aber kein [Trigger] definiert ihn.", [])];
+            var findingsByLine = SelectedTrigger.Findings.ToLookup(finding => finding.LineNumber);
+            IniSection section = trigger.Section;
+            List<IniLine> lines = [section.Header, .. section.Lines];
+            // Trailing blank lines belong to the section in the file but not in the preview.
+            while (lines.Count > 1 && lines[^1].Kind == IniLineKind.Blank)
+                lines.RemoveAt(lines.Count - 1);
+            return lines.Select(line => new SectionLineItem(line.Number, line.Text, findingsByLine[line.Number].ToList())).ToList();
+        }
+    }
 
     /// <summary>Header text of the details pane.</summary>
     public string SelectedSummary
@@ -337,7 +352,7 @@ public sealed class MainViewModel : ObservableObject
             foreach (ReferenceItem reference in ReferenceItem.ForNode(SelectedTrigger.Node).OrderBy(item => item.LineNumber))
                 References.Add(reference);
         }
-        OnPropertyChanged(nameof(SelectedSectionText));
+        OnPropertyChanged(nameof(SelectedSectionLines));
         OnPropertyChanged(nameof(SelectedFindings));
         OnPropertyChanged(nameof(SelectedSummary));
         UpdateLayout();

@@ -137,6 +137,15 @@ public partial class MainWindow : Window
             ShowInFindingsGrid(finding);
     }
 
+    private void OnSectionPreviewKeyDown(object sender, KeyEventArgs args)
+    {
+        if (args.Key != Key.C || Keyboard.Modifiers != ModifierKeys.Control || SectionPreview.SelectedItems.Count == 0)
+            return;
+        IEnumerable<string> lines = SectionPreview.SelectedItems.Cast<SectionLineItem>().OrderBy(line => line.Number).Select(line => line.Text);
+        Clipboard.SetText(string.Join(Environment.NewLine, lines));
+        args.Handled = true;
+    }
+
     private void ShowInFindingsGrid(FindingItem finding)
     {
         if (finding.Severity < ViewModel.MinimumSeverity)

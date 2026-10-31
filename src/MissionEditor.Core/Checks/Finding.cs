@@ -19,7 +19,8 @@ public enum FindingSeverity
 /// <param name="LineNumber">The line it refers to (1-based).</param>
 /// <param name="Subject">The trigger or object nickname it concerns, if any.</param>
 /// <param name="Message">The message for the user (German).</param>
-public sealed record Finding(FindingSeverity Severity, string CheckId, int LineNumber, string? Subject, string Message);
+/// <param name="Hint">Why it matters and how to fix it (German), if there is advice to give.</param>
+public sealed record Finding(FindingSeverity Severity, string CheckId, int LineNumber, string? Subject, string Message, string? Hint = null);
 
 /// <summary>A check over a mission script.</summary>
 public interface IMissionCheck

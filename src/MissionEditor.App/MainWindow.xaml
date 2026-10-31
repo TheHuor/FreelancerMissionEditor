@@ -170,11 +170,15 @@
               <Border x:Name="Box" Background="#FFF3E0" BorderBrush="#E65100" BorderThickness="3,0,0,0"
                       Padding="6,3" Margin="0,0,0,3" Cursor="Hand" MouseLeftButtonUp="OnDetailFindingClicked"
                       ToolTip="Klicken: in der Prüfliste zeigen">
-                <TextBlock TextWrapping="Wrap">
-                  <Run Text="{Binding SeverityText, Mode=OneWay}" FontWeight="SemiBold" />
-                  <Run Text="{Binding LineNumber, Mode=OneWay, StringFormat={}Zeile {0}:}" Foreground="Gray" />
-                  <Run Text="{Binding Message, Mode=OneWay}" />
-                </TextBlock>
+                <StackPanel>
+                  <TextBlock TextWrapping="Wrap">
+                    <Run Text="{Binding SeverityText, Mode=OneWay}" FontWeight="SemiBold" />
+                    <Run Text="{Binding LineNumber, Mode=OneWay, StringFormat={}Zeile {0}:}" Foreground="Gray" />
+                    <Run Text="{Binding Message, Mode=OneWay}" />
+                  </TextBlock>
+                  <TextBlock Text="{Binding Hint}" TextWrapping="Wrap" Foreground="#555" FontSize="11.5" Margin="0,3,0,0"
+                             Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
               </Border>
               <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding SeverityText}" Value="Fehler">
@@ -206,8 +210,42 @@
           </ListView.View>
         </ListView>
         <GridSplitter Grid.Row="4" HorizontalAlignment="Stretch" />
-        <TextBox Grid.Row="5" Text="{Binding SelectedSectionText, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas"
-                 HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" />
+        <ListBox x:Name="SectionPreview" Grid.Row="5" ItemsSource="{Binding SelectedSectionLines}" SelectionMode="Extended"
+                 FontFamily="Consolas" HorizontalContentAlignment="Stretch" KeyDown="OnSectionPreviewKeyDown"
+                 ToolTip="Strg+C kopiert die markierten Zeilen" ToolTipService.InitialShowDelay="2000">
+          <ListBox.ItemContainerStyle>
+            <Style TargetType="ListBoxItem">
+              <Setter Property="Padding" Value="0" />
+              <Setter Property="Margin" Value="0" />
+            </Style>
+          </ListBox.ItemContainerStyle>
+          <ListBox.ItemTemplate>
+            <DataTemplate DataType="viewModels:SectionLineItem">
+              <Border x:Name="Row" Background="Transparent" BorderThickness="3,0,0,0" BorderBrush="Transparent"
+                      ToolTip="{Binding ToolTip}">
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Left" Width="48" Text="{Binding NumberText}" Foreground="#9E9E9E"
+                             TextAlignment="Right" Margin="0,0,6,0" />
+                  <TextBlock x:Name="Sign" DockPanel.Dock="Left" Width="16" Text="⚠" Foreground="#E65100"
+                             FontFamily="Segoe UI Symbol" Visibility="Hidden" />
+                  <TextBlock Text="{Binding Text}" />
+                </DockPanel>
+              </Border>
+              <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding HasFindings}" Value="True">
+                  <Setter TargetName="Row" Property="Background" Value="#FFF3E0" />
+                  <Setter TargetName="Row" Property="BorderBrush" Value="#E65100" />
+                  <Setter TargetName="Sign" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding HasError}" Value="True">
+                  <Setter TargetName="Row" Property="Background" Value="#FFEBEE" />
+                  <Setter TargetName="Row" Property="BorderBrush" Value="Firebrick" />
+                  <Setter TargetName="Sign" Property="Foreground" Value="Firebrick" />
+                </DataTrigger>
+              </DataTemplate.Triggers>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
       </Grid>
 
       <GridSplitter Grid.Column="0" Grid.ColumnSpan="5" Grid.Row="1" HorizontalAlignment="Stretch" />
@@ -225,6 +263,7 @@
                   EnableRowVirtualization="True">
           <DataGrid.RowStyle>
             <Style TargetType="DataGridRow">
+              <Setter Property="ToolTip" Value="{Binding FullText}" />
               <Style.Triggers>
                 <DataTrigger Binding="{Binding SeverityText}" Value="Fehler">
                   <Setter Property="Foreground" Value="Firebrick" />

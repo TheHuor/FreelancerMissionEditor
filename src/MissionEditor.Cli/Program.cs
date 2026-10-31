@@ -13,7 +13,9 @@ internal static class Program
     private const string Usage = """
         Freelancer Mission Editor – Kommandozeile
 
-          check <datei> [--min info|warning|error]   Prüfungen ausgeben (Exitcode 1 bei Fehlern)
+          check <datei> [--min info|warning|error] [--hints]
+                                                     Prüfungen ausgeben (Exitcode 1 bei Fehlern),
+                                                     --hints mit Erklärung und Abhilfe
           roundtrip <datei>                          Laden + Speichern im Speicher, Bytes vergleichen
           stats <datei>                              Anzahl Trigger, Objekte, Verweise
           graph <datei> <trigger> [--back n] [--forward n] [--deact]
@@ -33,7 +35,7 @@ internal static class Program
         {
             return args[0].ToLowerInvariant() switch
             {
-                "check" => Check(args[1], GetOption(args, "--min")),
+                "check" => Check(args[1], GetOption(args, "--min"), args.Contains("--hints", StringComparer.OrdinalIgnoreCase)),
                 "roundtrip" => RoundTrip(args[1]),
                 "stats" => Stats(args[1]),
                 "graph" when args.Length >= 3 => Graph(args[1], args[2], args),
@@ -60,7 +62,7 @@ internal static class Program
         return index >= 0 && index + 1 < args.Length ? args[index + 1] : null;
     }
 
-    private static int Check(string path, string? minimum)
+    private static int Check(string path, string? minimum, bool showHints)
     {
         FindingSeverity threshold = minimum?.ToLowerInvariant() switch
         {
@@ -71,7 +73,11 @@ internal static class Program
         MissionScript script = MissionScript.Load(path);
         IReadOnlyList<Finding> findings = MissionChecker.Run(script);
         foreach (Finding finding in findings.Where(item => item.Severity >= threshold))
+        {
             Console.WriteLine($"{path}:{finding.LineNumber}: {SeverityText(finding.Severity)} [{finding.CheckId}] {finding.Message}");
+            if (showHints && finding.Hint is not null)
+                Console.WriteLine($"    -> {finding.Hint}");
+        }
         int errors = findings.Count(item => item.Severity == FindingSeverity.Error);
         int warnings = findings.Count(item => item.Severity == FindingSeverity.Warning);
         int infos = findings.Count(item => item.Severity == FindingSeverity.Info);

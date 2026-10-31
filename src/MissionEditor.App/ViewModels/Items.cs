@@ -78,6 +78,42 @@ public sealed class FindingItem(Finding finding, TriggerNode? node)
 
     /// <summary>The message.</summary>
     public string Message => Finding.Message;
+
+    /// <summary>Explanation and fix, empty if none.</summary>
+    public string Hint => Finding.Hint ?? string.Empty;
+
+    /// <summary>True when there is a hint.</summary>
+    public bool HasHint => Finding.Hint is not null;
+
+    /// <summary>Message and hint for tooltips.</summary>
+    public string FullText => HasHint ? $"{Message}\n\n{Hint}" : Message;
+}
+
+/// <summary>One line of the section preview, marked when a finding points at it.</summary>
+public sealed class SectionLineItem(int number, string text, IReadOnlyList<FindingItem> findings)
+{
+    /// <summary>Line number in the file (0 for a synthetic note).</summary>
+    public int Number { get; } = number;
+
+    /// <summary>Line number as shown, empty for a note.</summary>
+    public string NumberText => Number > 0 ? Number.ToString() : string.Empty;
+
+    /// <summary>The line text.</summary>
+    public string Text { get; } = text;
+
+    /// <summary>Findings on this line.</summary>
+    public IReadOnlyList<FindingItem> Findings { get; } = findings;
+
+    /// <summary>True when a finding points at this line.</summary>
+    public bool HasFindings => Findings.Count > 0;
+
+    /// <summary>True when one of the findings is an error.</summary>
+    public bool HasError => Findings.Any(finding => finding.Severity == FindingSeverity.Error);
+
+    /// <summary>Tooltip: the findings with their hints, or null.</summary>
+    public string? ToolTip => HasFindings
+        ? string.Join("\n\n", Findings.Select(finding => $"{finding.SeverityText}: {finding.FullText}"))
+        : null;
 }
 
 /// <summary>A link from the selected trigger to a neighbour, shown in the details.</summary>
