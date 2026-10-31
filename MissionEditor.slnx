@@ -6,6 +6,7 @@
     <Project Path="src/MissionEditor.Mcp/MissionEditor.Mcp.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/MissionEditor.App.SmokeChecks/MissionEditor.App.SmokeChecks.csproj" />
     <Project Path="tests/MissionEditor.Mcp.Tests/MissionEditor.Mcp.Tests.csproj" />
     <Project Path="tests/MissionEditor.Tests/MissionEditor.Tests.csproj" />
   </Folder>
