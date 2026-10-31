@@ -29,6 +29,10 @@ public sealed class MainViewModel : ObservableObject
     private bool _navigating;
     private bool _onlyWithFindings;
     private IReadOnlyList<SectionLineItem> _sectionLines = [];
+    private readonly Stack<IniDocument> _undo = new();
+    private IniDocument? _savedDocument;
+    private string? _filePath;
+    private bool _backupWritten;
     private ILookup<int, FindingItem> _findingsByLine = Array.Empty<FindingItem>().ToLookup(finding => finding.LineNumber);
 
     /// <summary>Creates the view model.</summary>
@@ -39,6 +43,7 @@ public sealed class MainViewModel : ObservableObject
         FindingsView = CollectionViewSource.GetDefaultView(Findings);
         FindingsView.Filter = item => ((FindingItem)item).Severity >= MinimumSeverity;
         BackCommand = new RelayCommand(GoBack, () => _history.Count > 0);
+        UndoCommand = new RelayCommand(Undo, () => _undo.Count > 0);
     }
 
     /// <summary>The loaded script, or null.</summary>
@@ -53,7 +58,9 @@ public sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>Title bar text.</summary>
-    public string WindowTitle => Script?.FilePath is { } path ? $"{Path.GetFileName(path)} – Mission Editor" : "Mission Editor";
+    public string WindowTitle => FilePath is { } path
+        ? $"{Path.GetFileName(path)}{(IsModified ? " *" : string.Empty)} – Mission Editor"
+        : "Mission Editor";
 
     /// <summary>All trigger rows.</summary>
     public ObservableCollection<TriggerItem> Triggers { get; } = [];
@@ -282,20 +289,153 @@ public sealed class MainViewModel : ObservableObject
     public void SelectByName(string nickname) =>
         SelectNode(Triggers.FirstOrDefault(item => item.Name.Equals(nickname, StringComparison.OrdinalIgnoreCase))?.Node);
 
+    /// <summary>The file being edited, or null.</summary>
+    public string? FilePath
+    {
+        get => _filePath;
+        private set
+        {
+            if (SetProperty(ref _filePath, value))
+                OnPropertyChanged(nameof(WindowTitle));
+        }
+    }
+
+    /// <summary>True when the document differs from the file on disk.</summary>
+    public bool IsModified => Script is not null && Script.Document != _savedDocument;
+
+    /// <summary>Undoes the last change.</summary>
+    public RelayCommand UndoCommand { get; }
+
     /// <summary>Loads a mission script and runs the checks.</summary>
     /// <exception cref="IOException">The file cannot be read.</exception>
     /// <exception cref="InvalidDataException">The file is not a text INI.</exception>
     public void Load(string path)
     {
+        IniDocument document = IniDocument.Load(path);
+        bool sameFile = string.Equals(path, FilePath, StringComparison.OrdinalIgnoreCase);
+        if (!sameFile)
+            _backupWritten = false;
+        FilePath = path;
+        _savedDocument = document;
+        _undo.Clear();
+        Analyze(document, keepHistory: sameFile);
+    }
+
+    /// <summary>Writes the document to its file; the first save of a session keeps the original as "*.bak".</summary>
+    public void Save()
+    {
+        if (Script is null || FilePath is null)
+            return;
+        string backup = FilePath + ".bak";
+        if (!_backupWritten && File.Exists(FilePath) && !File.Exists(backup))
+            File.Copy(FilePath, backup);
+        _backupWritten = true;
+        Script.Document.Save(FilePath);
+        MarkSaved();
+    }
+
+    /// <summary>Writes the document to another file and continues editing that one.</summary>
+    public void SaveAs(string path)
+    {
+        if (Script is null)
+            return;
+        Script.Document.Save(path);
+        FilePath = path;
+        _backupWritten = true;
+        MarkSaved();
+    }
+
+    /// <summary>Deletes a section (with undo).</summary>
+    public void DeleteSection(IniSection section)
+    {
+        if (Script is not null)
+            ApplyChange(Script.Document.RemoveSection(section), $"Sektion ab Zeile {section.FirstLineNumber} gelöscht");
+    }
+
+    /// <summary>Replaces the text of a section (with undo).</summary>
+    public void ReplaceSection(IniSection section, string newText)
+    {
+        if (Script is not null)
+            ApplyChange(Script.Document.ReplaceSection(section, newText), $"Sektion ab Zeile {section.FirstLineNumber} geändert");
+    }
+
+    /// <summary>Explains what deleting a section changes in the game, for the confirmation.</summary>
+    public string DescribeDeletion(IniSection section)
+    {
+        if (Script is null)
+            return string.Empty;
+        Trigger? trigger = Script.Triggers.FirstOrDefault(candidate => candidate.Section == section);
+        if (trigger is not null)
+        {
+            if (trigger.IsShadowed)
+                return "Die Engine hat diese Definition ohnehin ignoriert – am Spielverhalten ändert sich nichts.";
+            Trigger? duplicate = Script.Triggers.FirstOrDefault(other => other.Id == trigger.Id && other.IsShadowed);
+            if (duplicate is not null)
+            {
+                return section.HasSameEntries(duplicate.Section)
+                    ? $"Danach gilt die zweite Definition (Zeile {duplicate.LineNumber}). Sie ist inhaltlich gleich – am Spielverhalten ändert sich nichts."
+                    : $"Danach gilt die zweite Definition (Zeile {duplicate.LineNumber}). Sie unterscheidet sich von dieser – das Spielverhalten ändert sich!";
+            }
+            int references = _graph?.FindNode(trigger.Id)?.Incoming.Count ?? 0;
+            return references > 0
+                ? $"Achtung: {references} Verweise (ActTrig/DeactTrig/WatchTrigger/Save) zeigen auf '{trigger.Nickname}' und laufen danach ins Leere."
+                : $"Auf '{trigger.Nickname}' verweist kein anderer Trigger.";
+        }
+        string nickname = section.Find("nickname")?.GetValue(0) ?? string.Empty;
+        IniSection? twin = Script.Document.GetSections(section.Name)
+            .FirstOrDefault(other => other != section && string.Equals(other.Find("nickname")?.GetValue(0), nickname, StringComparison.OrdinalIgnoreCase));
+        if (twin is not null)
+        {
+            return section.HasSameEntries(twin)
+                ? $"Eine gleichnamige, inhaltlich gleiche [{section.Name}] bleibt in Zeile {twin.FirstLineNumber} erhalten."
+                : $"Eine gleichnamige [{section.Name}] bleibt in Zeile {twin.FirstLineNumber} erhalten; sie unterscheidet sich von dieser.";
+        }
+        return nickname.Length > 0 ? $"Verweise auf '{nickname}' finden diese Sektion danach nicht mehr." : string.Empty;
+    }
+
+    private void ApplyChange(IniDocument document, string description)
+    {
+        _undo.Push(Script!.Document);
+        Analyze(document, keepHistory: true);
+        StatusText = $"{description} (Strg+Z macht es rückgängig) · {StatusText}";
+    }
+
+    private void Undo()
+    {
+        if (_undo.Count == 0)
+            return;
+        Analyze(_undo.Pop(), keepHistory: true);
+        StatusText = $"Rückgängig gemacht · {StatusText}";
+    }
+
+    private void MarkSaved()
+    {
+        _savedDocument = Script?.Document;
+        OnPropertyChanged(nameof(IsModified));
+        OnPropertyChanged(nameof(WindowTitle));
+        StatusText = $"Gespeichert: {FilePath}";
+    }
+
+    // Builds script, graph and findings for a document and keeps the selection by name.
+    private void Analyze(IniDocument document, bool keepHistory)
+    {
         string? previousName = SelectedTrigger?.Name;
-        MissionScript script = MissionScript.Load(path);
+        MissionScript script = MissionScript.FromDocument(document, FilePath);
         var graph = new TriggerGraph(script);
         IReadOnlyList<Finding> findings = MissionChecker.Run(script);
 
+        List<uint> historyIds = keepHistory ? _history.Reverse().Select(node => node.Id).ToList() : [];
         _history.Clear();
+        foreach (uint id in historyIds)
+        {
+            if (graph.FindNode(id) is { } node)
+                _history.Push(node);
+        }
         _selectedTrigger = null;
         Script = script;
         _graph = graph;
+        OnPropertyChanged(nameof(IsModified));
+        OnPropertyChanged(nameof(WindowTitle));
 
         Findings.Clear();
         foreach (Finding finding in findings)
@@ -317,9 +457,6 @@ public sealed class MainViewModel : ObservableObject
             ?? Triggers.FirstOrDefault();
         SelectNode(initial?.Node, remember: false);
     }
-
-    /// <summary>Writes the document unchanged to another file.</summary>
-    public void SaveAs(string path) => Script?.Document.Save(path);
 
     /// <summary>Selects a trigger by node (from the graph, the details or a finding).</summary>
     public void SelectNode(TriggerNode? node, bool remember = true)
@@ -382,7 +519,7 @@ public sealed class MainViewModel : ObservableObject
             return [];
         if (SelectedTrigger.Node.Trigger is not { } trigger)
             return [new SectionLineItem(0, $"; '{SelectedTrigger.Name}' wird referenziert, aber kein [Trigger] definiert ihn.", [])];
-        var parts = new List<(string? Caption, IniSection Section)> { (null, trigger.Section) };
+        var parts = new List<(string? Caption, IniSection Section)> { ($"[Trigger] ab Zeile {trigger.LineNumber}", trigger.Section) };
         foreach (Trigger duplicate in Script.Triggers.Where(other => other.Id == trigger.Id && other != trigger))
             parts.Add(($"Zweite Definition, Zeile {duplicate.LineNumber} – von der Engine ignoriert", duplicate.Section));
         if (parts.Count > 1)
@@ -396,7 +533,7 @@ public sealed class MainViewModel : ObservableObject
         foreach ((string? caption, IniSection section) in parts)
         {
             if (caption is not null)
-                items.Add(new SectionLineItem(0, caption, [], isCaption: true));
+                items.Add(new SectionLineItem(0, caption, [], isCaption: true, section: section));
             List<IniLine> lines = [section.Header, .. section.Lines];
             // Trailing blank lines belong to the section in the file but not in the preview.
             while (lines.Count > 1 && lines[^1].Kind == IniLineKind.Blank)

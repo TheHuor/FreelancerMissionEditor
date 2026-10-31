@@ -1,5 +1,6 @@
 using MissionEditor.Core.Checks;
 using MissionEditor.Core.Graph;
+using MissionEditor.Core.Ini;
 using MissionEditor.Core.Model;
 
 namespace MissionEditor.App.ViewModels;
@@ -12,6 +13,9 @@ public sealed class TriggerItem(TriggerNode node, IReadOnlyList<FindingItem> fin
 
     /// <summary>The most serious finding's severity, or null without findings.</summary>
     public FindingSeverity? MaxSeverity => Findings.Count > 0 ? Findings.Max(finding => finding.Severity) : null;
+
+    /// <summary>"Error", "Warning", "Info" or "" – selects the badge and the row colour.</summary>
+    public string BadgeKind => MaxSeverity?.ToString() ?? string.Empty;
 
     /// <summary>True when the most serious finding is an error.</summary>
     public bool HasError => MaxSeverity == FindingSeverity.Error;
@@ -67,6 +71,9 @@ public sealed class FindingItem(Finding finding, TriggerNode? node)
     /// <summary>The severity.</summary>
     public FindingSeverity Severity => Finding.Severity;
 
+    /// <summary>"Error", "Warning" or "Info" – selects the badge.</summary>
+    public string BadgeKind => Severity.ToString();
+
     /// <summary>The line.</summary>
     public int LineNumber => Finding.LineNumber;
 
@@ -90,8 +97,14 @@ public sealed class FindingItem(Finding finding, TriggerNode? node)
 }
 
 /// <summary>One line of the section preview, marked when a finding points at it.</summary>
-public sealed class SectionLineItem(int number, string text, IReadOnlyList<FindingItem> findings, bool isCaption = false)
+public sealed class SectionLineItem(int number, string text, IReadOnlyList<FindingItem> findings, bool isCaption = false, IniSection? section = null)
 {
+    /// <summary>For a caption: the section below it, which the buttons edit or delete.</summary>
+    public IniSection? Section { get; } = section;
+
+    /// <summary>True when the caption offers edit and delete.</summary>
+    public bool HasActions => Section is not null;
+
     /// <summary>True for a caption between two sections (not a file line).</summary>
     public bool IsCaption { get; } = isCaption;
 
@@ -109,6 +122,9 @@ public sealed class SectionLineItem(int number, string text, IReadOnlyList<Findi
 
     /// <summary>True when a finding points at this line.</summary>
     public bool HasFindings => Findings.Count > 0;
+
+    /// <summary>"Error", "Warning", "Info" or "" – selects the badge and the row colour.</summary>
+    public string BadgeKind => HasFindings ? Findings.Max(finding => finding.Severity).ToString() : string.Empty;
 
     /// <summary>True when one of the findings is an error.</summary>
     public bool HasError => Findings.Any(finding => finding.Severity == FindingSeverity.Error);

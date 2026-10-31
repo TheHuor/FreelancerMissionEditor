@@ -4,7 +4,7 @@
         xmlns:controls="clr-namespace:MissionEditor.App.Controls"
         xmlns:viewModels="clr-namespace:MissionEditor.App.ViewModels"
         Title="{Binding WindowTitle}" Width="1400" Height="900" WindowState="Maximized"
-        AllowDrop="True" Drop="OnFileDrop">
+        AllowDrop="True" Drop="OnFileDrop" Closing="OnWindowClosing">
   <Window.DataContext>
     <viewModels:MainViewModel />
   </Window.DataContext>
@@ -13,15 +13,47 @@
     <KeyBinding Key="F5" Command="{x:Static NavigationCommands.Refresh}" />
     <KeyBinding Key="Left" Modifiers="Alt" Command="{Binding BackCommand}" />
     <KeyBinding Key="F" Modifiers="Ctrl" Command="{x:Static NavigationCommands.Search}" />
+    <KeyBinding Key="S" Modifiers="Ctrl" Command="{x:Static ApplicationCommands.Save}" />
+    <KeyBinding Key="Z" Modifiers="Ctrl" Command="{Binding UndoCommand}" />
   </Window.InputBindings>
   <Window.CommandBindings>
     <CommandBinding Command="{x:Static ApplicationCommands.Open}" Executed="OnOpen" />
     <CommandBinding Command="{x:Static ApplicationCommands.SaveAs}" Executed="OnSaveAs" CanExecute="OnCanUseScript" />
+    <CommandBinding Command="{x:Static ApplicationCommands.Save}" Executed="OnSave" CanExecute="OnCanSave" />
     <CommandBinding Command="{x:Static NavigationCommands.Refresh}" Executed="OnReload" CanExecute="OnCanUseScript" />
     <CommandBinding Command="{x:Static NavigationCommands.Search}" Executed="OnFocusFilter" />
   </Window.CommandBindings>
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    <!-- Severity badge: red circle with a cross for errors, yellow triangle with "!" for warnings,
+         grey circle with "i" for hints. Bound to BadgeKind of the DataContext. -->
+    <ControlTemplate x:Key="SeverityBadge" TargetType="ContentControl">
+      <Grid Width="16" Height="16">
+        <Ellipse x:Name="ErrorShape" Fill="#C62828" Visibility="Collapsed" />
+        <TextBlock x:Name="ErrorGlyph" Text="✕" Foreground="White" FontWeight="Bold" FontSize="10" FontFamily="Segoe UI"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+        <Path x:Name="WarningShape" Data="M8,0.5 L15.5,15 L0.5,15 Z" Fill="#FBC02D" Stroke="#E6A100" StrokeThickness="1" Visibility="Collapsed" />
+        <TextBlock x:Name="WarningGlyph" Text="!" Foreground="#3E2723" FontWeight="Bold" FontSize="11" FontFamily="Segoe UI"
+                   HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,0" Visibility="Collapsed" />
+        <Ellipse x:Name="InfoShape" Fill="#9E9E9E" Visibility="Collapsed" />
+        <TextBlock x:Name="InfoGlyph" Text="i" Foreground="White" FontWeight="Bold" FontSize="11" FontFamily="Segoe UI"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+      </Grid>
+      <ControlTemplate.Triggers>
+        <DataTrigger Binding="{Binding BadgeKind}" Value="Error">
+          <Setter TargetName="ErrorShape" Property="Visibility" Value="Visible" />
+          <Setter TargetName="ErrorGlyph" Property="Visibility" Value="Visible" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding BadgeKind}" Value="Warning">
+          <Setter TargetName="WarningShape" Property="Visibility" Value="Visible" />
+          <Setter TargetName="WarningGlyph" Property="Visibility" Value="Visible" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding BadgeKind}" Value="Info">
+          <Setter TargetName="InfoShape" Property="Visibility" Value="Visible" />
+          <Setter TargetName="InfoGlyph" Property="Visibility" Value="Visible" />
+        </DataTrigger>
+      </ControlTemplate.Triggers>
+    </ControlTemplate>
     <Style x:Key="LinkButton" TargetType="Button">
       <Setter Property="Cursor" Value="Hand" />
       <Setter Property="Foreground" Value="#1565C0" />
@@ -40,7 +72,9 @@
       <ToolBar>
         <Button Command="{x:Static ApplicationCommands.Open}" Content="Öffnen…" ToolTip="Missions-INI öffnen (Strg+O, oder Datei hineinziehen)" />
         <Button Command="{x:Static NavigationCommands.Refresh}" Content="Neu laden" ToolTip="Datei neu laden und prüfen (F5)" />
-        <Button Command="{x:Static ApplicationCommands.SaveAs}" Content="Speichern unter…" ToolTip="Datei unverändert (Byte für Byte) speichern" />
+        <Button Command="{x:Static ApplicationCommands.Save}" Content="Speichern" ToolTip="Änderungen in die Datei schreiben (Strg+S); beim ersten Mal wird eine .bak-Sicherung angelegt" />
+        <Button Command="{x:Static ApplicationCommands.SaveAs}" Content="Speichern unter…" ToolTip="In eine andere Datei speichern" />
+        <Button Command="{Binding UndoCommand}" Content="↶ Rückgängig" ToolTip="Letzte Änderung zurücknehmen (Strg+Z)" />
         <Separator />
         <Button Command="{Binding BackCommand}" Content="◀ Zurück" ToolTip="Zum vorher gewählten Trigger (Alt+←)" />
       </ToolBar>
@@ -74,6 +108,18 @@
                  VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                  SelectionChanged="OnTriggerListSelectionChanged" HorizontalContentAlignment="Stretch"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.ItemContainerStyle>
+            <Style TargetType="ListBoxItem">
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding BadgeKind}" Value="Error">
+                  <Setter Property="Background" Value="#FDECEA" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding BadgeKind}" Value="Warning">
+                  <Setter Property="Background" Value="#FFF8E1" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </ListBox.ItemContainerStyle>
           <ListBox.ItemTemplate>
             <DataTemplate DataType="viewModels:TriggerItem">
               <DockPanel>
@@ -82,12 +128,9 @@
                         ToolTip="{Binding FindingsToolTip}">
                   <Button.Template>
                     <ControlTemplate TargetType="Button">
-                      <TextBlock x:Name="Sign" Text="⚠" Foreground="#E65100" FontSize="14" Background="Transparent" />
-                      <ControlTemplate.Triggers>
-                        <DataTrigger Binding="{Binding HasError}" Value="True">
-                          <Setter TargetName="Sign" Property="Foreground" Value="Firebrick" />
-                        </DataTrigger>
-                      </ControlTemplate.Triggers>
+                      <Border Background="Transparent" Padding="2">
+                        <ContentControl Template="{StaticResource SeverityBadge}" />
+                      </Border>
                     </ControlTemplate>
                   </Button.Template>
                 </Button>
@@ -167,7 +210,7 @@
         <ItemsControl Grid.Row="2" ItemsSource="{Binding SelectedFindings}" Margin="0,0,0,6">
           <ItemsControl.ItemTemplate>
             <DataTemplate DataType="viewModels:FindingItem">
-              <Border x:Name="Box" Background="#FFF3E0" BorderBrush="#E65100" BorderThickness="3,0,0,0"
+              <Border x:Name="Box" Background="#FFF8E1" BorderBrush="#F9A825" BorderThickness="3,0,0,0"
                       Padding="6,3" Margin="0,0,0,3" Cursor="Hand" MouseLeftButtonUp="OnDetailFindingClicked"
                       ToolTip="Klicken: in der Prüfliste zeigen">
                 <StackPanel>
@@ -211,6 +254,7 @@
         </ListView>
         <GridSplitter Grid.Row="4" HorizontalAlignment="Stretch" />
         <ListBox x:Name="SectionPreview" Grid.Row="5" ItemsSource="{Binding SelectedSectionLines}" SelectionMode="Extended"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  FontFamily="Consolas" HorizontalContentAlignment="Stretch" KeyDown="OnSectionPreviewKeyDown"
                  ToolTip="Strg+C kopiert die markierten Zeilen" ToolTipService.InitialShowDelay="2000">
           <ListBox.ItemContainerStyle>
@@ -226,9 +270,15 @@
                 <DockPanel>
                   <TextBlock DockPanel.Dock="Left" Width="48" Text="{Binding NumberText}" Foreground="#9E9E9E"
                              TextAlignment="Right" Margin="0,0,6,0" />
-                  <TextBlock x:Name="Sign" DockPanel.Dock="Left" Width="16" Text="⚠" Foreground="#E65100"
-                             FontFamily="Segoe UI Symbol" Visibility="Hidden" />
-                  <TextBlock x:Name="LineText" Text="{Binding Text}" />
+                  <ContentControl DockPanel.Dock="Left" Width="16" Margin="0,0,4,0" VerticalAlignment="Center" Template="{StaticResource SeverityBadge}" />
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="4,1"
+                              Visibility="{Binding HasActions, Converter={StaticResource BoolToVisibility}}">
+                    <Button Content="Bearbeiten" Padding="6,0" Margin="0,0,4,0" FontFamily="Segoe UI" Click="OnEditSection"
+                            ToolTip="Diesen Abschnitt im Textfenster bearbeiten" />
+                    <Button Content="Löschen" Padding="6,0" FontFamily="Segoe UI" Click="OnDeleteSection"
+                            ToolTip="Diesen Abschnitt aus der Datei entfernen (Strg+Z macht es rückgängig)" />
+                  </StackPanel>
+                  <TextBlock x:Name="LineText" Text="{Binding Text}" VerticalAlignment="Center" TextWrapping="Wrap" />
                 </DockPanel>
               </Border>
               <DataTemplate.Triggers>
@@ -240,14 +290,12 @@
                   <Setter TargetName="LineText" Property="Foreground" Value="#37474F" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding HasFindings}" Value="True">
-                  <Setter TargetName="Row" Property="Background" Value="#FFF3E0" />
-                  <Setter TargetName="Row" Property="BorderBrush" Value="#E65100" />
-                  <Setter TargetName="Sign" Property="Visibility" Value="Visible" />
+                  <Setter TargetName="Row" Property="Background" Value="#FFF8E1" />
+                  <Setter TargetName="Row" Property="BorderBrush" Value="#F9A825" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding HasError}" Value="True">
                   <Setter TargetName="Row" Property="Background" Value="#FFEBEE" />
                   <Setter TargetName="Row" Property="BorderBrush" Value="Firebrick" />
-                  <Setter TargetName="Sign" Property="Foreground" Value="Firebrick" />
                 </DataTrigger>
               </DataTemplate.Triggers>
             </DataTemplate>
@@ -282,6 +330,13 @@
             </Style>
           </DataGrid.RowStyle>
           <DataGrid.Columns>
+            <DataGridTemplateColumn Width="26" CanUserResize="False">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <ContentControl Template="{StaticResource SeverityBadge}" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
             <DataGridTextColumn Header="Schwere" Binding="{Binding SeverityText}" Width="70" />
             <DataGridTextColumn Header="Zeile" Binding="{Binding LineNumber}" Width="60" />
             <DataGridTextColumn Header="Prüfung" Binding="{Binding CheckId}" Width="130" />

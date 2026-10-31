@@ -110,6 +110,74 @@ public sealed class IniDocument
         return null;
     }
 
+    /// <summary>
+    /// The line range <see cref="RemoveSection"/> deletes: the header up to the last entry of the
+    /// section, plus the blank lines right after it. Comments after the last entry stay, because they
+    /// usually introduce the next section.
+    /// </summary>
+    public static (int FirstLine, int LastLine) GetRemovalRange(IniSection section)
+    {
+        int lastLine = section.Entries.Count > 0 ? section.Entries[^1].Number : section.Header.Number;
+        foreach (IniLine line in section.Lines.Where(line => line.Number > lastLine))
+        {
+            if (line.Kind != IniLineKind.Blank)
+                break;
+            lastLine = line.Number;
+        }
+        return (section.Header.Number, lastLine);
+    }
+
+    /// <summary>
+    /// Returns a new document without the given section (see <see cref="GetRemovalRange"/>); every
+    /// other line, the encoding and the BOM stay exactly as they were.
+    /// </summary>
+    public IniDocument RemoveSection(IniSection section)
+    {
+        if (section.Index >= Sections.Count || Sections[section.Index] != section)
+            throw new ArgumentException("Die Sektion gehört nicht zu diesem Dokument.", nameof(section));
+        (int firstLine, int lastLine) = GetRemovalRange(section);
+        var builder = new StringBuilder();
+        foreach (IniLine line in Lines.Where(line => line.Number < firstLine || line.Number > lastLine))
+            builder.Append(line.Text).Append(line.LineEnding);
+        return new IniDocument(SplitLines(builder.ToString()), Encoding, HasBom);
+    }
+
+    /// <summary>
+    /// Returns a new document in which the section (header up to its last entry; comments and blank
+    /// lines after it stay) is replaced by <paramref name="newText"/>. The new lines get the line
+    /// ending the file uses; everything else stays byte for byte.
+    /// </summary>
+    public IniDocument ReplaceSection(IniSection section, string newText)
+    {
+        if (section.Index >= Sections.Count || Sections[section.Index] != section)
+            throw new ArgumentException("Die Sektion gehört nicht zu diesem Dokument.", nameof(section));
+        int firstLine = section.Header.Number;
+        int lastLine = section.Entries.Count > 0 ? section.Entries[^1].Number : section.Header.Number;
+        string lineEnding = Lines.FirstOrDefault(line => line.LineEnding.Length > 0)?.LineEnding ?? "\r\n";
+        string[] newLines = newText.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd('\n').Split('\n');
+
+        var builder = new StringBuilder();
+        foreach (IniLine line in Lines.Where(line => line.Number < firstLine))
+            builder.Append(line.Text).Append(line.LineEnding);
+        for (int i = 0; i < newLines.Length; i++)
+        {
+            // The last new line keeps the ending of the last replaced line ("" at the end of the file).
+            string ending = i < newLines.Length - 1 ? lineEnding : Lines[lastLine - 1].LineEnding;
+            builder.Append(newLines[i]).Append(ending);
+        }
+        foreach (IniLine line in Lines.Where(line => line.Number > lastLine))
+            builder.Append(line.Text).Append(line.LineEnding);
+        return new IniDocument(SplitLines(builder.ToString()), Encoding, HasBom);
+    }
+
+    /// <summary>The section text from the header up to its last entry, as <see cref="ReplaceSection"/> replaces it.</summary>
+    public static string GetEditableText(IniSection section)
+    {
+        int lastLine = section.Entries.Count > 0 ? section.Entries[^1].Number : section.Header.Number;
+        IEnumerable<IniLine> lines = new[] { section.Header }.Concat(section.Lines.Where(line => line.Number <= lastLine));
+        return string.Join(Environment.NewLine, lines.Select(line => line.Text));
+    }
+
     /// <summary>The file content as bytes, including the BOM if the file had one.</summary>
     public byte[] ToBytes()
     {

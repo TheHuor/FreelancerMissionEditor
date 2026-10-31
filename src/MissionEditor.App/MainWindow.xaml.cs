@@ -38,6 +38,8 @@ public partial class MainWindow : Window
 
     private void LoadFile(string path)
     {
+        if (!ConfirmDiscard())
+            return;
         try
         {
             Mouse.OverrideCursor = Cursors.Wait;
@@ -56,7 +58,7 @@ public partial class MainWindow : Window
     private void OnOpen(object sender, ExecutedRoutedEventArgs args)
     {
         var dialog = new OpenFileDialog { Filter = FileFilter };
-        if (ViewModel.Script?.FilePath is { } current)
+        if (ViewModel.FilePath is { } current)
             dialog.InitialDirectory = Path.GetDirectoryName(current);
         if (dialog.ShowDialog(this) == true)
             LoadFile(dialog.FileName);
@@ -64,13 +66,13 @@ public partial class MainWindow : Window
 
     private void OnReload(object sender, ExecutedRoutedEventArgs args)
     {
-        if (ViewModel.Script?.FilePath is { } path)
+        if (ViewModel.FilePath is { } path)
             LoadFile(path);
     }
 
     private void OnSaveAs(object sender, ExecutedRoutedEventArgs args)
     {
-        var dialog = new SaveFileDialog { Filter = FileFilter, FileName = Path.GetFileName(ViewModel.Script?.FilePath ?? "mission.ini") };
+        var dialog = new SaveFileDialog { Filter = FileFilter, FileName = Path.GetFileName(ViewModel.FilePath ?? "mission.ini") };
         if (dialog.ShowDialog(this) != true)
             return;
         try
@@ -84,6 +86,73 @@ public partial class MainWindow : Window
     }
 
     private void OnCanUseScript(object sender, CanExecuteRoutedEventArgs args) => args.CanExecute = ViewModel.Script is not null;
+
+    private void OnCanSave(object sender, CanExecuteRoutedEventArgs args) => args.CanExecute = ViewModel.IsModified;
+
+    private void OnSave(object sender, ExecutedRoutedEventArgs args) => TrySave();
+
+    private bool TrySave()
+    {
+        try
+        {
+            ViewModel.Save();
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, exception.Message, "Speichern fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
+    }
+
+    // Asks what to do with unsaved changes; false means the caller should stop.
+    private bool ConfirmDiscard()
+    {
+        if (!ViewModel.IsModified)
+            return true;
+        MessageBoxResult answer = MessageBox.Show(this,
+            $"Die Änderungen an {Path.GetFileName(ViewModel.FilePath)} sind noch nicht gespeichert. Jetzt speichern?",
+            "Ungespeicherte Änderungen", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+        return answer switch
+        {
+            MessageBoxResult.Yes => TrySave(),
+            MessageBoxResult.No => true,
+            _ => false,
+        };
+    }
+
+    private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs args)
+    {
+        if (!ConfirmDiscard())
+            args.Cancel = true;
+    }
+
+    private void OnEditSection(object sender, RoutedEventArgs args)
+    {
+        if (sender is not FrameworkElement { DataContext: SectionLineItem { Section: { } section } })
+            return;
+        var editor = new SectionEditorWindow(
+            $"[{section.Name}] ab Zeile {section.FirstLineNumber} bearbeiten",
+            Core.Ini.IniDocument.GetEditableText(section),
+            "Text der Sektion von der Kopfzeile bis zur letzten Angabe. Bei [Trigger] muss 'nickname' direkt nach der Kopfzeile stehen. "
+            + "Übernehmen (Strg+Enter) prüft die Datei neu; gespeichert wird erst mit Strg+S, Strg+Z macht die Änderung rückgängig.")
+        {
+            Owner = this,
+        };
+        if (editor.ShowDialog() == true && editor.Text != Core.Ini.IniDocument.GetEditableText(section))
+            ViewModel.ReplaceSection(section, editor.Text);
+    }
+
+    private void OnDeleteSection(object sender, RoutedEventArgs args)
+    {
+        if (sender is not FrameworkElement { DataContext: SectionLineItem { Section: { } section } })
+            return;
+        (int firstLine, int lastLine) = Core.Ini.IniDocument.GetRemovalRange(section);
+        string question = $"[{section.Name}] in den Zeilen {firstLine}–{lastLine} löschen?\n\n{ViewModel.DescribeDeletion(section)}\n\n"
+            + "Gespeichert wird erst mit Strg+S; Strg+Z macht das Löschen rückgängig.";
+        if (MessageBox.Show(this, question, "Sektion löschen", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
+            ViewModel.DeleteSection(section);
+    }
 
     private void OnFocusFilter(object sender, ExecutedRoutedEventArgs args)
     {

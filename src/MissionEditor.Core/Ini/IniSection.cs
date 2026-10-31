@@ -44,6 +44,17 @@ public sealed class IniSection
     /// <summary>All entries with the given key.</summary>
     public IEnumerable<IniLine> FindAll(string key) => Entries.Where(entry => entry.IsKey(key));
 
+    /// <summary>
+    /// True when both sections have the same entries in the same order (keys case-insensitive,
+    /// values as written, spacing and comments ignored) – i.e. they mean the same to the engine.
+    /// </summary>
+    public bool HasSameEntries(IniSection other) =>
+        Is(other.Name)
+        && Entries.Count == other.Entries.Count
+        && Entries.Zip(other.Entries).All(pair =>
+            string.Equals(pair.First.Key, pair.Second.Key, StringComparison.OrdinalIgnoreCase)
+            && pair.First.Values.SequenceEqual(pair.Second.Values));
+
     /// <summary>The text of the section as it is in the file (header, entries, comments).</summary>
     public string GetText()
     {

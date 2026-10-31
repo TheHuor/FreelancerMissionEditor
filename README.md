@@ -29,6 +29,15 @@ der ersten Definition, auch für [NNObjective], [ObjList] usw.); das ⚠ in der 
 Fehlern) zeigt den Fund in der Prüfliste, „Nur Trigger mit Funden“ filtert die Liste, die Funde des
 gewählten Triggers stehen oben in den Details.
 
+Bearbeiten: Jeder Abschnitt in der Quelltext-Vorschau hat „Bearbeiten“ (Textfenster, Übernehmen mit
+Strg+Enter) und „Löschen“ (die Rückfrage sagt, was sich im Spiel ändert). Danach wird sofort neu geprüft.
+Strg+Z macht Änderungen rückgängig, Strg+S speichert; beim ersten Speichern einer Datei bleibt das Original
+als `<datei>.bak` erhalten. Alle nicht geänderten Zeilen bleiben Byte für Byte gleich. Ungespeicherte
+Änderungen zeigt ein `*` im Titel; vor Schließen, Öffnen und Neu laden fragt der Editor nach.
+
+Symbole: roter Kreis mit ✕ = Fehler, gelbes Dreieck mit ! = Warnung, grauer Kreis mit i = Hinweis;
+Trigger mit Funden sind in der Liste rosa (Fehler) bzw. gelb (Warnung) hinterlegt.
+
 ## Wie die Datei gelesen wird
 
 Nach dem Decompilat von content.dll/common.dll (`fl_decomp`, `MissionScript.cpp`, `common_ini.cpp`):
