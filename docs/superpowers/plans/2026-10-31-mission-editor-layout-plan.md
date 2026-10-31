@@ -1,6 +1,6 @@
 # Mission Editor: WPF-Layout Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Implementierung noch nicht freigegeben; der Plan kann an einen anderen Agenten übergeben werden.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Implementierung am 31.10.2026 im Chat freigegeben. Ergebnisse und Prüflimits: [Ausführungsprotokoll](2026-10-31-mission-editor-layout-progress.md).
 
 **Goal:** Den bestehenden Missionseditor im abgestimmten Stil von Variante 2 gestalten und seine Arbeitsbereiche besser nutzbar machen.
 

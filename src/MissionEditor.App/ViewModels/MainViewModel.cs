@@ -631,6 +631,8 @@ public sealed class MainViewModel : ObservableObject
             kinds.Add(TriggerReferenceKind.Save);
         Layout = GraphLayout.Build(SelectedTrigger.Node, new GraphLayoutOptions
         {
+            NodeHeight = 56,
+            NodeWidth = 260,
             DepthBackward = DepthBackward,
             DepthForward = DepthForward,
             Kinds = kinds,

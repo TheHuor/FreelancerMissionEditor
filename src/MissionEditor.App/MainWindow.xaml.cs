@@ -15,6 +15,8 @@ public partial class MainWindow : Window
 {
     private const string FileFilter = "Missions-INI (*.ini)|*.ini|Alle Dateien (*.*)|*.*";
 
+    private GridLength _findingsHeight = new(220);
+
     private Point? _panStart;
     private Point _panStartOffset;
 
@@ -22,6 +24,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        SizeChanged += (_, _) => ConstrainFindingsHeight();
         string[] arguments = Environment.GetCommandLineArgs();
         if (arguments.Length > 1)
         {
@@ -218,6 +221,7 @@ public partial class MainWindow : Window
     // Brings the finding's line into the source preview and marks it.
     private void ShowInPreview(FindingItem finding)
     {
+        DetailTabs.SelectedIndex = 0;
         SectionLineItem? line = ViewModel.ShowFinding(finding);
         if (finding.Node is not null)
             Dispatcher.BeginInvoke(() => BringDetailFindingIntoView(finding), System.Windows.Threading.DispatcherPriority.Loaded);
@@ -235,6 +239,7 @@ public partial class MainWindow : Window
         FindingItem finding = line.Findings.OrderByDescending(item => item.Severity).First();
         if (finding.Node is null || finding.Node != ViewModel.SelectedTrigger?.Node)
             return;
+        DetailTabs.SelectedIndex = 0;
         ViewModel.FindingsExpanded = true;
         ViewModel.CurrentFinding = finding;
         Dispatcher.BeginInvoke(() => BringDetailFindingIntoView(finding), System.Windows.Threading.DispatcherPriority.Loaded);
@@ -251,6 +256,7 @@ public partial class MainWindow : Window
 
     private void ShowInFindingsGrid(FindingItem finding)
     {
+        FindingsExpander.IsExpanded = true;
         ShowInPreview(finding);
         if (finding.Severity < ViewModel.MinimumSeverity)
             ViewModel.MinimumSeverity = finding.Severity;
@@ -263,6 +269,34 @@ public partial class MainWindow : Window
     {
         if (sender is DataGrid { SelectedItem: FindingItem finding })
             ShowInPreview(finding);
+    }
+
+    // Remember the drawer height only for this window session.
+    private void OnFindingsCollapsed(object sender, RoutedEventArgs args)
+    {
+        if (args.OriginalSource != FindingsExpander || FindingsRow is null)
+            return;
+        _findingsHeight = new GridLength(Math.Max(100, FindingsRow.ActualHeight));
+        FindingsRow.Height = new GridLength(40);
+    }
+
+    private void OnFindingsExpanded(object sender, RoutedEventArgs args)
+    {
+        if (args.OriginalSource == FindingsExpander && FindingsRow is not null)
+        {
+            FindingsRow.Height = _findingsHeight;
+            ConstrainFindingsHeight();
+        }
+    }
+
+    // Keep the graph and source usable after restoring a drawer in a smaller window.
+    private void ConstrainFindingsHeight()
+    {
+        if (FindingsExpander is not { IsExpanded: true, Parent: Grid grid } || grid.ActualHeight <= 0)
+            return;
+        double maximum = Math.Max(100, grid.ActualHeight - grid.RowDefinitions[0].MinHeight - 6);
+        if (FindingsRow.Height.IsAbsolute && FindingsRow.Height.Value > maximum)
+            FindingsRow.Height = new GridLength(maximum);
     }
 
     // Wheel zooms around the mouse position; Shift+wheel scrolls sideways.
