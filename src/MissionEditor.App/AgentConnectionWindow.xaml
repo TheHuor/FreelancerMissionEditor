@@ -1,0 +1,77 @@
+<Window x:Class="MissionEditor.App.AgentConnectionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Style="{StaticResource {x:Type Window}}"
+        Title="KI-Agent verbinden" Width="760" Height="760" MinWidth="620" MinHeight="560"
+        ShowInTaskbar="False" WindowStartupLocation="CenterOwner">
+  <DockPanel Margin="28,20,28,24">
+    <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,16,0,0" Margin="0,16,0,0">
+      <Button Content="Schließen" IsCancel="True" IsDefault="True" Click="OnClose" MinWidth="100" Padding="12,6" HorizontalAlignment="Right" />
+    </Border>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel>
+        <TextBlock Text="KI-Agent verbinden" FontSize="24" FontWeight="SemiBold" />
+        <TextBlock TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0" LineHeight="20"
+                   Text="Ein KI-Agent wie Claude Code, Claude Desktop oder Codex kann über den MCP-Server Missionen untersuchen, prüfen, Triggerabläufe nachverfolgen und Änderungen als Entwurf vorschlagen. Der Server läuft lokal und sieht nur das unten gewählte Verzeichnis. Ohne Export-Freigabe liest er nur." />
+
+        <TextBlock Text="MCP-SERVER" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,22,0,6" />
+        <DockPanel>
+          <Button DockPanel.Dock="Right" Content="Prüfen" Click="OnProbe" Margin="6,0,0,0" Padding="10,4" ToolTip="Server mit --version starten" />
+          <Button DockPanel.Dock="Right" Content="Durchsuchen…" Click="OnBrowseServer" Margin="6,0,0,0" Padding="10,4" />
+          <TextBox x:Name="ServerBox" FontFamily="Consolas" TextChanged="OnInputChanged" AutomationProperties.Name="Pfad zum MCP-Server" />
+        </DockPanel>
+        <TextBlock x:Name="ServerStatus" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap" />
+
+        <TextBlock Text="MISSIONSVERZEICHNIS (WORKSPACE)" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,18,0,6" />
+        <DockPanel>
+          <Button DockPanel.Dock="Right" Content="Durchsuchen…" Click="OnBrowseWorkspace" Margin="6,0,0,0" Padding="10,4" />
+          <TextBox x:Name="WorkspaceBox" FontFamily="Consolas" TextChanged="OnInputChanged" AutomationProperties.Name="Missionsverzeichnis" />
+        </DockPanel>
+        <TextBlock FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0" TextWrapping="Wrap"
+                   Text="Der Agent sieht nur .ini-Dateien in diesem Verzeichnis und seinen Unterordnern, z. B. DATA\MISSIONS des Spiels." />
+        <CheckBox x:Name="AllowWritesBox" Margin="0,12,0,0" Checked="OnInputChanged" Unchecked="OnInputChanged"
+                  Content="Agent darf Entwürfe als neue Dateien exportieren (--allow-writes)" />
+        <TextBlock FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="24,4,0,0" TextWrapping="Wrap"
+                   Text="Bestehende Dateien werden nie überschrieben. Exportierte Entwürfe öffnest du hier im Editor und übernimmst sie selbst." />
+        <Border x:Name="UnsavedHint" Background="{StaticResource WarningSurfaceBrush}" BorderBrush="{StaticResource WarningBrush}" BorderThickness="3,0,0,0"
+                Padding="10,6" Margin="0,14,0,0" Visibility="Collapsed">
+          <TextBlock TextWrapping="Wrap" Text="Die geöffnete Mission hat ungespeicherte Änderungen. Der Agent sieht nur den gespeicherten Stand – vorher mit Strg+S speichern." />
+        </Border>
+
+        <TextBlock Text="EINRICHTUNG IM AGENTEN" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,22,0,6" />
+        <TabControl x:Name="ClientTabs" MinHeight="230">
+          <TabItem Header="Claude Code">
+            <DockPanel Margin="10">
+              <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{StaticResource TextBrush}"
+                         Text="Befehl in einem Terminal ausführen. Danach steht der Server in allen Claude-Code-Sitzungen zur Verfügung (/mcp zeigt den Status)." />
+              <Button DockPanel.Dock="Bottom" Content="Befehl kopieren" Tag="ClaudeCode" Click="OnCopy" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,4" />
+              <TextBox x:Name="ClaudeCodeBox" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                       AutomationProperties.Name="Befehl für Claude Code" />
+            </DockPanel>
+          </TabItem>
+          <TabItem Header="Claude Desktop">
+            <DockPanel Margin="10">
+              <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{StaticResource TextBrush}"
+                         Text="In Claude Desktop unter Einstellungen → Entwickler → Konfiguration bearbeiten in claude_desktop_config.json einfügen. Gibt es dort schon mcpServers, nur den Eintrag freelancer-missions übernehmen. Danach Claude Desktop neu starten." />
+              <Button DockPanel.Dock="Bottom" Content="JSON kopieren" Tag="ClaudeDesktop" Click="OnCopy" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,4" />
+              <TextBox x:Name="ClaudeDesktopBox" IsReadOnly="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                       AutomationProperties.Name="Konfiguration für Claude Desktop" />
+            </DockPanel>
+          </TabItem>
+          <TabItem Header="Codex">
+            <DockPanel Margin="10">
+              <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{StaticResource TextBrush}"
+                         Text="In %USERPROFILE%\.codex\config.toml anhängen und Codex neu starten." />
+              <Button DockPanel.Dock="Bottom" Content="TOML kopieren" Tag="Codex" Click="OnCopy" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,4" />
+              <TextBox x:Name="CodexBox" IsReadOnly="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                       AutomationProperties.Name="Konfiguration für Codex" />
+            </DockPanel>
+          </TabItem>
+        </TabControl>
+        <TextBlock x:Name="CopyStatus" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0" />
+        <TextBlock FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,10,0,0" TextWrapping="Wrap" LineHeight="18"
+                   Text="Beispielauftrag an den Agenten: „Prüfe m13\m13.ini mit dem Mission Editor und erkläre die Fehler.“ Missionsinhalte behandelt der Server als Daten, nicht als Anweisungen." />
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

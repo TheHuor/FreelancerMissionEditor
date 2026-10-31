@@ -158,7 +158,15 @@ Netzwerkzugang, braucht keine API-Schlüssel und enthält kein eigenes Sprachmod
 
 ### Einrichten
 
-Bauen bzw. starten:
+Am einfachsten über den Editor: **„KI-Agent verbinden…“** in der Werkzeugleiste. Der Dialog
+findet die `MissionEditor.Mcp.exe` (neben dem Editor, in einem daneben entpackten Release-Ordner
+`mcp` oder in der Build-Ausgabe), schlägt den Ordner der geöffneten Mission als Workspace vor und
+zeigt die fertige Einrichtung für Claude Code, Claude Desktop und Codex zum Kopieren. „Prüfen“
+startet den Server testweise; der Schalter „Export erlauben“ ergänzt `--allow-writes`. Hat die
+geöffnete Mission ungespeicherte Änderungen, weist der Dialog darauf hin, denn der Agent sieht nur
+den gespeicherten Stand. Pfad und Export-Wahl merkt sich der Editor.
+
+Von Hand bauen bzw. starten:
 
 ```
 dotnet build src/MissionEditor.Mcp -c Release

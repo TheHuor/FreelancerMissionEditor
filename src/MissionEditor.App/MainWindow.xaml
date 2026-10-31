@@ -93,7 +93,8 @@
         <Button Style="{StaticResource {x:Type Button}}" Command="{Binding UndoCommand}" Content="↶ Rückgängig" ToolTip="Letzte Änderung zurücknehmen (Strg+Z)" />
         <Separator />
         <Button Style="{StaticResource {x:Type Button}}" Command="{Binding BackCommand}" Content="◀ Zurück" ToolTip="Zum vorher gewählten Trigger (Alt+←)" />
-        <Button Content="Über…" Click="OnAbout" Margin="12,0,0,0" ToolTip="Versionen und Referenzen"/>
+        <Button Content="KI-Agent verbinden…" Click="OnConnectAgent" Margin="12,0,0,0" ToolTip="Einrichtung für Claude Code, Claude Desktop oder Codex über den MCP-Server"/>
+        <Button Content="Über…" Click="OnAbout" Margin="6,0,0,0" ToolTip="Versionen und Referenzen"/>
       </WrapPanel>
     </Border>
     <StatusBar DockPanel.Dock="Bottom">

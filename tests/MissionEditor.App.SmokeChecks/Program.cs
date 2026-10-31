@@ -115,6 +115,26 @@ internal static class Program
             encoder.Save(previewStream);
         }
         about.Close();
+
+        // Agent connection: paths with spaces and backslashes survive all three configuration formats.
+        const string ServerPath = @"C:\Program Files\Mission Editor\MissionEditor.Mcp.exe";
+        const string MissionsPath = @"D:\freelancer crossfire\DATA\MISSIONS";
+        string json = AgentConnection.JsonConfiguration(ServerPath, MissionsPath, allowWrites: true);
+        using (var parsed = System.Text.Json.JsonDocument.Parse(json))
+        {
+            var server = parsed.RootElement.GetProperty("mcpServers").GetProperty(AgentConnection.ServerName);
+            Assert(server.GetProperty("command").GetString() == ServerPath, "agent JSON keeps the server path");
+            Assert(string.Join("|", server.GetProperty("args").EnumerateArray().Select(argument => argument.GetString())) == $"--workspace|{MissionsPath}|--allow-writes", "agent JSON passes workspace and write flag");
+        }
+        Assert(AgentConnection.CodexConfiguration(ServerPath, MissionsPath, false).Contains(@"command = ""C:\\Program Files\\Mission Editor\\MissionEditor.Mcp.exe"""), "agent TOML escapes backslashes");
+        Assert(!AgentConnection.CodexConfiguration(ServerPath, MissionsPath, false).Contains("--allow-writes"), "agent TOML is read-only by default");
+        Assert(AgentConnection.ClaudeCodeCommand(ServerPath, MissionsPath, false).Contains($"-- \"{ServerPath}\" --workspace \"{MissionsPath}\""), "Claude Code command quotes paths");
+        var agentWindow = new AgentConnectionWindow(tmp, hasUnsavedChanges: false) { Owner = window };
+        agentWindow.Show(); agentWindow.UpdateLayout();
+        Assert(agentWindow.ClaudeCodeText.Contains($"--workspace \"{Path.GetDirectoryName(tmp)}\""), "agent dialog suggests the folder of the open mission");
+        agentWindow.Close();
+
+        about.Close();
         Console.WriteLine("ALL CHECKS PASSED");
         File.Delete(tmp);
         File.Delete(tmp + ".bak");
