@@ -381,7 +381,7 @@
         <ControlTemplate TargetType="Slider">
           <Grid>
             <Border Height="3" Background="{StaticResource BorderBrush}" VerticalAlignment="Center" Margin="4,0" />
-            <Track x:Name="PART_Track" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value}">
+            <Track x:Name="PART_Track" Orientation="Horizontal" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value}">
               <Track.DecreaseRepeatButton>
                 <RepeatButton Style="{StaticResource ScrollPage}" Command="Slider.DecreaseLarge" />
               </Track.DecreaseRepeatButton>
