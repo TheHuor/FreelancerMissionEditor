@@ -275,7 +275,26 @@ public sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>The findings of the selected trigger.</summary>
-    public IReadOnlyList<FindingItem> SelectedFindings => SelectedTrigger?.Findings ?? [];
+    public IReadOnlyList<FindingRow> SelectedFindings
+    {
+        get
+        {
+            var rows = new List<FindingRow>();
+            string? previousHint = null;
+            foreach (FindingItem finding in SelectedTrigger?.Findings ?? [])
+            {
+                rows.Add(new FindingRow(finding, finding.Hint != previousHint));
+                previousHint = finding.Hint;
+            }
+            return rows;
+        }
+    }
+
+    /// <summary>Header of the findings area, e.g. "Funde (6)".</summary>
+    public string SelectedFindingsHeader => $"Funde ({SelectedTrigger?.Findings.Count ?? 0})";
+
+    /// <summary>True when the selected trigger has findings.</summary>
+    public bool HasSelectedFindings => SelectedTrigger?.Findings.Count > 0;
 
     /// <summary>The severities to choose from, with German names.</summary>
     public IReadOnlyList<KeyValuePair<FindingSeverity, string>> Severities { get; } =
@@ -509,6 +528,8 @@ public sealed class MainViewModel : ObservableObject
         }
         SelectedSectionLines = BuildTriggerPreview();
         OnPropertyChanged(nameof(SelectedFindings));
+        OnPropertyChanged(nameof(SelectedFindingsHeader));
+        OnPropertyChanged(nameof(HasSelectedFindings));
         OnPropertyChanged(nameof(SelectedSummary));
         UpdateLayout();
     }

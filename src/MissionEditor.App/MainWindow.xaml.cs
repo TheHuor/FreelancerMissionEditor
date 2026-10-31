@@ -202,8 +202,8 @@ public partial class MainWindow : Window
 
     private void OnDetailFindingClicked(object sender, MouseButtonEventArgs args)
     {
-        if (sender is FrameworkElement { DataContext: FindingItem finding })
-            ShowInFindingsGrid(finding);
+        if (sender is FrameworkElement { DataContext: FindingRow row })
+            ShowInFindingsGrid(row.Item);
     }
 
     private void OnSectionPreviewKeyDown(object sender, KeyEventArgs args)

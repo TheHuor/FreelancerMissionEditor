@@ -207,35 +207,42 @@
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Text="{Binding SelectedTrigger.Name}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
         <TextBlock Grid.Row="1" Text="{Binding SelectedSummary}" Foreground="Gray" Margin="0,2,0,6" TextWrapping="Wrap" />
-        <ItemsControl Grid.Row="2" ItemsSource="{Binding SelectedFindings}" Margin="0,0,0,6">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate DataType="viewModels:FindingItem">
-              <Border x:Name="Box" Background="#FFF8E1" BorderBrush="#F9A825" BorderThickness="3,0,0,0"
-                      Padding="6,3" Margin="0,0,0,3" Cursor="Hand" MouseLeftButtonUp="OnDetailFindingClicked"
-                      ToolTip="Klicken: in der Prüfliste zeigen">
-                <StackPanel>
-                  <TextBlock TextWrapping="Wrap">
-                    <Run Text="{Binding SeverityText, Mode=OneWay}" FontWeight="SemiBold" />
-                    <Run Text="{Binding LineNumber, Mode=OneWay, StringFormat={}Zeile {0}:}" Foreground="Gray" />
-                    <Run Text="{Binding Message, Mode=OneWay}" />
-                  </TextBlock>
-                  <TextBlock Text="{Binding Hint}" TextWrapping="Wrap" Foreground="#555" FontSize="11.5" Margin="0,3,0,0"
-                             Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}" />
-                </StackPanel>
-              </Border>
-              <DataTemplate.Triggers>
-                <DataTrigger Binding="{Binding SeverityText}" Value="Fehler">
-                  <Setter TargetName="Box" Property="Background" Value="#FFEBEE" />
-                  <Setter TargetName="Box" Property="BorderBrush" Value="Firebrick" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding SeverityText}" Value="Hinweis">
-                  <Setter TargetName="Box" Property="Background" Value="#F5F5F5" />
-                  <Setter TargetName="Box" Property="BorderBrush" Value="Gray" />
-                </DataTrigger>
-              </DataTemplate.Triggers>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+        <Expander Grid.Row="2" Header="{Binding SelectedFindingsHeader}" IsExpanded="True" Margin="0,0,0,6" FontWeight="SemiBold"
+                  Visibility="{Binding HasSelectedFindings, Converter={StaticResource BoolToVisibility}}">
+          <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontWeight="Normal" Margin="0,4,0,0">
+            <ItemsControl ItemsSource="{Binding SelectedFindings}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="viewModels:FindingRow">
+                  <Border x:Name="Box" Background="#FFF8E1" BorderBrush="#F9A825" BorderThickness="3,0,0,0"
+                          Padding="6,3" Margin="0,0,0,3" Cursor="Hand" MouseLeftButtonUp="OnDetailFindingClicked"
+                          ToolTip="{Binding FullText}">
+                    <StackPanel>
+                      <DockPanel>
+                        <ContentControl DockPanel.Dock="Left" Template="{StaticResource SeverityBadge}" Margin="0,1,6,0" VerticalAlignment="Top" />
+                        <TextBlock TextWrapping="Wrap">
+                          <Run Text="{Binding LineNumber, Mode=OneWay, StringFormat={}Zeile {0}:}" Foreground="Gray" />
+                          <Run Text="{Binding Message, Mode=OneWay}" />
+                        </TextBlock>
+                      </DockPanel>
+                      <TextBlock Text="{Binding Hint}" TextWrapping="Wrap" Foreground="#555" FontSize="11.5" Margin="0,3,0,0"
+                                 Visibility="{Binding ShowHint, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                  </Border>
+                  <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding SeverityText}" Value="Fehler">
+                      <Setter TargetName="Box" Property="Background" Value="#FFEBEE" />
+                      <Setter TargetName="Box" Property="BorderBrush" Value="Firebrick" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding SeverityText}" Value="Hinweis">
+                      <Setter TargetName="Box" Property="Background" Value="#F5F5F5" />
+                      <Setter TargetName="Box" Property="BorderBrush" Value="Gray" />
+                    </DataTrigger>
+                  </DataTemplate.Triggers>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Expander>
         <ListView Grid.Row="3" ItemsSource="{Binding References}">
           <ListView.View>
             <GridView>
