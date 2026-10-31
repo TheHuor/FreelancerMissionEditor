@@ -236,7 +236,7 @@
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Text="{Binding SelectedTrigger.Name}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
         <TextBlock Grid.Row="1" Text="{Binding SelectedSummary}" Foreground="Gray" Margin="0,2,0,6" TextWrapping="Wrap" />
-        <Expander Grid.Row="2" Header="{Binding SelectedFindingsHeader}" IsExpanded="{Binding FindingsExpanded}" Margin="0,0,0,6" FontWeight="SemiBold"
+        <Expander Grid.Row="2" Header="{Binding SelectedFindingsHeader}" IsExpanded="{Binding FindingsExpanded, Mode=TwoWay}" Margin="0,0,0,6" FontWeight="SemiBold"
                   Visibility="{Binding HasSelectedFindings, Converter={StaticResource BoolToVisibility}}">
           <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontWeight="Normal" Margin="0,4,0,0">
             <ItemsControl x:Name="DetailFindings" ItemsSource="{Binding SelectedFindings}">
@@ -294,6 +294,7 @@
         </ListView>
         <GridSplitter Grid.Row="4" HorizontalAlignment="Stretch" />
         <ListBox x:Name="SectionPreview" Grid.Row="5" ItemsSource="{Binding SelectedSectionLines}" SelectionMode="Extended"
+                 MouseDoubleClick="OnSectionPreviewDoubleClick"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  FontFamily="Consolas" HorizontalContentAlignment="Stretch" KeyDown="OnSectionPreviewKeyDown"
                  ToolTip="Strg+C kopiert die markierten Zeilen" ToolTipService.InitialShowDelay="2000">

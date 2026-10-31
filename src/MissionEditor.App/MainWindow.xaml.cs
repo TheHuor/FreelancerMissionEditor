@@ -227,6 +227,19 @@ public partial class MainWindow : Window
         SectionPreview.ScrollIntoView(line);
     }
 
+    // Double-click on a marked line in the source preview: open the findings above and highlight its finding.
+    private void OnSectionPreviewDoubleClick(object sender, MouseButtonEventArgs args)
+    {
+        if (SectionPreview.SelectedItem is not SectionLineItem { HasFindings: true } line)
+            return;
+        FindingItem finding = line.Findings.OrderByDescending(item => item.Severity).First();
+        if (finding.Node is null || finding.Node != ViewModel.SelectedTrigger?.Node)
+            return;
+        ViewModel.FindingsExpanded = true;
+        ViewModel.CurrentFinding = finding;
+        Dispatcher.BeginInvoke(() => BringDetailFindingIntoView(finding), System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
     // Scrolls the findings area in the details to the highlighted finding.
     private void BringDetailFindingIntoView(FindingItem finding)
     {
