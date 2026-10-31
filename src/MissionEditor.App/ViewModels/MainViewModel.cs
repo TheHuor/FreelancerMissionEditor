@@ -367,7 +367,7 @@ public sealed class MainViewModel : ObservableObject
 
     /// <summary>Loads a mission script and runs the checks.</summary>
     /// <exception cref="IOException">The file cannot be read.</exception>
-    /// <exception cref="InvalidDataException">The file is not a text INI.</exception>
+    /// <exception cref="InvalidDataException">The INI or BINI file is malformed or unsupported.</exception>
     public void Load(string path)
     {
         IniDocument document = IniDocument.Load(path);
@@ -509,7 +509,7 @@ public sealed class MainViewModel : ObservableObject
 
         int errors = findings.Count(finding => finding.Severity == FindingSeverity.Error);
         int warnings = findings.Count(finding => finding.Severity == FindingSeverity.Warning);
-        StatusText = $"{script.Document.Lines.Count} Zeilen · {script.Triggers.Count} Trigger · {script.Objects.Count} Objekte · {graph.Edges.Count} Verweise · {errors} Fehler, {warnings} Warnungen";
+        StatusText = $"{(script.Document.IsBini ? "BINI · " : string.Empty)}{script.Document.Lines.Count} Zeilen · {script.Triggers.Count} Trigger · {script.Objects.Count} Objekte · {graph.Edges.Count} Verweise · {errors} Fehler, {warnings} Warnungen";
 
         TriggerItem? initial = (previousName is null ? null : Triggers.FirstOrDefault(item => item.Name.Equals(previousName, StringComparison.OrdinalIgnoreCase)))
             ?? Triggers.FirstOrDefault(item => item.IsInitiallyActive)

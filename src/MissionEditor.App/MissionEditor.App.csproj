@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\MissionEditor.Core\MissionEditor.Core.csproj" />
@@ -10,6 +10,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets/MissionEditor.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Resource Include="Assets/MissionEditor.png" />
+    <Resource Include="Assets/MissionEditor.ico" />
+    <Resource Include="Assets/GraphBackground.png" />
+  </ItemGroup>
 </Project>

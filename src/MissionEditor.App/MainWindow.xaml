@@ -200,8 +200,8 @@
           </CheckBox>
           <TextBlock VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" Text="{Binding HiddenNodeText}" />
         </WrapPanel>
-        <Grid>
-          <ScrollViewer x:Name="GraphScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="{StaticResource WindowBrush}" PreviewMouseWheel="OnGraphMouseWheel" PreviewMouseLeftButtonDown="OnGraphPanStart" PreviewMouseMove="OnGraphPanMove" PreviewMouseLeftButtonUp="OnGraphPanEnd" LostMouseCapture="OnGraphPanLost" ToolTip="Ziehen: verschieben · Mausrad: zoomen · Umschalt+Mausrad: waagerecht scrollen" ToolTipService.InitialShowDelay="1500">
+        <Grid Background="{StaticResource GraphBackgroundBrush}">
+          <ScrollViewer x:Name="GraphScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="Transparent" PreviewMouseWheel="OnGraphMouseWheel" PreviewMouseLeftButtonDown="OnGraphPanStart" PreviewMouseMove="OnGraphPanMove" PreviewMouseLeftButtonUp="OnGraphPanEnd" LostMouseCapture="OnGraphPanLost" ToolTip="Ziehen: verschieben · Mausrad: zoomen · Umschalt+Mausrad: waagerecht scrollen" ToolTipService.InitialShowDelay="1500">
             <controls:TriggerGraphCanvas x:Name="GraphCanvas" Layout="{Binding Layout}" NodeClicked="OnGraphNodeClicked" Redrawn="OnGraphRedrawn">
               <controls:TriggerGraphCanvas.LayoutTransform>
                 <ScaleTransform ScaleX="{Binding Value, ElementName=ZoomSlider}" ScaleY="{Binding Value, ElementName=ZoomSlider}" />
