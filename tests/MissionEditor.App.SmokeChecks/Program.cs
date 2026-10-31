@@ -124,11 +124,12 @@ internal static class Program
         {
             var server = parsed.RootElement.GetProperty("mcpServers").GetProperty(AgentConnection.ServerName);
             Assert(server.GetProperty("command").GetString() == ServerPath, "agent JSON keeps the server path");
-            Assert(string.Join("|", server.GetProperty("args").EnumerateArray().Select(argument => argument.GetString())) == $"--workspace|{MissionsPath}|--allow-writes", "agent JSON passes workspace and write flag");
+            Assert(string.Join("|", server.GetProperty("args").EnumerateArray().Select(argument => argument.GetString())) == $"--allow-root|{MissionsPath}|--allow-writes", "agent JSON passes the folder limit and write flag");
         }
+        Assert(AgentConnection.Arguments(string.Empty, false).Count == 0, "without a folder the server gets no folder option");
         Assert(AgentConnection.CodexConfiguration(ServerPath, MissionsPath, false).Contains(@"command = ""C:\\Program Files\\Mission Editor\\MissionEditor.Mcp.exe"""), "agent TOML escapes backslashes");
         Assert(!AgentConnection.CodexConfiguration(ServerPath, MissionsPath, false).Contains("--allow-writes"), "agent TOML is read-only by default");
-        Assert(AgentConnection.ClaudeCodeCommand(ServerPath, MissionsPath, false).Contains($"-- \"{ServerPath}\" --workspace \"{MissionsPath}\""), "Claude Code command quotes paths");
+        Assert(AgentConnection.ClaudeCodeCommand(ServerPath, MissionsPath, false).Contains($"-- \"{ServerPath}\" --allow-root \"{MissionsPath}\""), "Claude Code command quotes paths");
         using (var claudeJson = System.Text.Json.JsonDocument.Parse(AgentConnection.ClaudeCodeJson(ServerPath, MissionsPath, false)))
         {
             var server = claudeJson.RootElement.GetProperty("mcpServers").GetProperty(AgentConnection.ServerName);
@@ -139,7 +140,7 @@ internal static class Program
         CheckAiAdvice(window);
         var agentWindow = new AgentConnectionWindow(tmp, hasUnsavedChanges: false) { Owner = window };
         agentWindow.Show(); agentWindow.UpdateLayout();
-        Assert(agentWindow.ClaudeCodeText.Contains($"--workspace \"{Path.GetDirectoryName(tmp)}\""), "agent dialog suggests the folder of the open mission");
+        Assert(!agentWindow.ClaudeCodeText.Contains("--allow-root") && !agentWindow.ClaudeCodeText.Contains("--workspace"), "agent dialog suggests no folder limit for a mission outside known folders");
         agentWindow.Close();
 
         about.Close();
@@ -160,6 +161,8 @@ internal static class Program
         Check(AgentPrompts.ChooseWorkspace(@"D:\Games\Freelancer\DATA\MISSIONS\M13\m13.ini", [@"D:\Other", Workspace, Workspace + @"\M13"])
             == (Workspace + @"\M13", true), "the innermost workspace containing the mission is chosen");
         Check(AgentPrompts.ChooseWorkspace(@"D:\Other\x.ini", [Workspace]) == (Workspace, false), "a workspace not containing the mission is reported as such");
+        Check(AgentPrompts.ChooseWorkspace(@"D:\Other\x.ini", [Workspace, string.Empty]) == (string.Empty, true), "a server without folder limit reaches every mission");
+        Check(AgentPrompts.IsReachable(@"D:\Other\x.ini", string.Empty) && !AgentPrompts.IsReachable(@"D:\Other\x.ini", Workspace), "reachability follows the folder limit");
 
         var missing = new MissionEditor.Core.Checks.Finding(MissionEditor.Core.Checks.FindingSeverity.Error, "unknown-trigger", 5582, "check_capcf2",
             "Act_ActTrig auf unbekannten Trigger 'turn_off_music' – die Aktivierung passiert nie.", "Hinweis");
@@ -176,8 +179,8 @@ internal static class Program
         var dialog = new NewMissionPromptWindow(@"D:\Games\Freelancer\DATA\MISSIONS\M13\m13.ini", Workspace, exportAllowed: false) { Owner = owner };
         dialog.Show(); dialog.UpdateLayout();
         string newMission = dialog.BuildPrompt("Drei Piraten greifen am Wegpunkt an.");
-        Check(newMission.Contains("Drei Piraten") && newMission.Contains(@"M13\m13.ini als Vorlage") && newMission.Contains("prepare_new_mission")
-            && newMission.Contains("nicht freigeschaltet"), "new-mission prompt has description, template and export state");
+        Check(newMission.Contains("Drei Piraten") && newMission.Contains(@"D:\Games\Freelancer\DATA\MISSIONS\M13\m13.ini als Vorlage") && newMission.Contains("prepare_new_mission")
+            && newMission.Contains("nicht freigeschaltet"), "new-mission prompt has description, template (full path) and export state");
         dialog.Close();
     }
 
@@ -315,6 +318,12 @@ internal static class Program
             Check(AgentClientConfig.ConfiguredServer(AgentClient.ClaudeDesktop, desktop) == (missionsPath, true), "registered workspace and export flag are read from Claude Desktop");
             Check(AgentClientConfig.ConfiguredServer(AgentClient.Codex, codex) == (missionsPath, false), "registered workspace is read from the Codex table");
             Check(AgentClientConfig.ConfiguredServer(AgentClient.ClaudeDesktop, broken) is null, "no workspace from an invalid file");
+            // Without a folder the entry has no --allow-root; it still counts as set up, with no limit.
+            string unlimited = Path.Combine(folder, "unlimited.json");
+            AgentClientConfig.AddServer(AgentClient.ClaudeCode, unlimited, serverPath, string.Empty, allowWrites: true);
+            Check(AgentClientConfig.ConfiguredServer(AgentClient.ClaudeCode, unlimited) == (string.Empty, true), "an entry without folder is read as set up without limit");
+            File.WriteAllText(unlimited, "{\"mcpServers\":{\"freelancer-missions\":{\"command\":\"x\",\"args\":[\"--workspace\",\"D:\\\\Old\"]}}}");
+            Check(AgentClientConfig.ConfiguredServer(AgentClient.ClaudeCode, unlimited) == (@"D:\Old", false), "the older --workspace option is still read");
 
             // Manual way: insert the snippet exactly where the instruction says and parse the result.
             string withoutServers = Path.Combine(folder, "plain.json");

@@ -129,12 +129,19 @@ Netzwerkzugang, braucht keine API-Schlüssel und enthält kein eigenes Sprachmod
 
 ### Sicherheit
 
-- Der Server sieht nur das mit `--workspace` freigegebene Verzeichnis. Pfade außerhalb davon,
-  symbolische Links und andere Dateitypen als `.ini` werden abgewiesen; Dateien über 8 MiB auch.
+- Missionen werden mit ihrem **absoluten Pfad** angegeben. Ohne weitere Option darf der Server jede
+  lokale `.ini`-Datei lesen – passend für mehrere Missionen und Spielinstallationen.
+- Wer ihn einschränken will, gibt einen oder mehrere Ordner mit `--allow-root <Ordner>` an. Dann
+  gelten nur `.ini`-Dateien darin; relative Pfade beziehen sich auf den ersten Ordner, symbolische
+  Links innerhalb der Ordner werden abgewiesen. Die Fehlermeldung nennt den aufgelösten Pfad und die
+  erlaubten Ordner. (`--workspace <Ordner>` ist die ältere Schreibweise dafür.)
+- Andere Dateitypen als `.ini` und Dateien über 8 MiB werden immer abgewiesen.
 - Standardmäßig wird nur gelesen. Änderungen entstehen als Entwürfe im Arbeitsspeicher
   (höchstens acht pro Sitzung) mit Vorher/Nachher und den Befunden des Entwurfs.
 - Erst mit `--allow-writes` darf ein Entwurf exportiert werden – und zwar nur in eine **neue**
-  Datei. Bestehende Dateien und Originalmissionen werden nie überschrieben.
+  Datei in einem vorhandenen Ordner. Bestehende Dateien und Originalmissionen werden nie
+  überschrieben. Der Server weist den Agenten an, vor dem Export zu fragen; Claude Code und Codex
+  fragen ohnehin vor jedem Werkzeugaufruf, den du nicht dauerhaft erlaubt hast.
 - Sektionsänderungen verlangen den SHA256 der gelesenen Fassung. Hat sich die Datei seitdem
   geändert, werden Entwurf und Export abgelehnt.
 - BINI bleibt BINI; Zeichen, die die Kodierung der Datei nicht kennt, werden abgewiesen.
@@ -160,8 +167,10 @@ Netzwerkzugang, braucht keine API-Schlüssel und enthält kein eigenes Sprachmod
 
 Am einfachsten über den Editor: **„KI-Agent verbinden…“** in der Werkzeugleiste. Der Dialog
 findet die `MissionEditor.Mcp.exe` (neben dem Editor, in einem daneben entpackten Release-Ordner
-`mcp` oder in der Build-Ausgabe) und schlägt den Ordner der geöffneten Mission als Workspace vor.
-„Prüfen“ startet den Server testweise; der Schalter „Export erlauben“ ergänzt `--allow-writes`.
+`mcp` oder in der Build-Ausgabe). Das Feld „Freigegebener Ordner“ bleibt normalerweise leer: Dann
+kann der Agent jede Mission über ihren vollständigen Pfad lesen. Ein Ordner dort ergänzt
+`--allow-root`. „Prüfen“ startet den Server testweise; der Schalter „Export erlauben“ ergänzt
+`--allow-writes`.
 
 Je Client (Claude Code, Claude Desktop, Codex) zeigt der Dialog, ob der Server dort schon
 eingetragen ist. **„Hinzufügen“** trägt ihn direkt ein bzw. aktualisiert den Eintrag:
@@ -169,7 +178,7 @@ eingetragen ist. **„Hinzufügen“** trägt ihn direkt ein bzw. aktualisiert d
 | Client | Datei |
 |---|---|
 | Claude Code (Kommandozeile und Desktop-App) | `%USERPROFILE%\.claude.json` |
-| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json`; bei der Store-Version (MSIX) zusätzlich deren Kopie unter `%LOCALAPPDATA%\Packages\AnthropicPBC.Claude_*\LocalCache\Roaming\Claude\`, sobald es sie gibt |
 | Codex | `%USERPROFILE%\.codex\config.toml` |
 
 Nur der Eintrag `freelancer-missions` wird angelegt oder ersetzt, alles andere in der Datei bleibt.
@@ -181,7 +190,14 @@ Kommandozeile; der Dialog sagt, ob sie installiert ist) und den Text zum Einfüg
 Anleitung dafür richtet sich nach dem Zustand der Datei: neu anlegen, `"mcpServers"` ergänzen oder
 nur den Eintrag in ein vorhandenes `"mcpServers"` einfügen. Hat die geöffnete Mission
 ungespeicherte Änderungen, weist der Dialog darauf hin, denn der Agent sieht nur den gespeicherten
-Stand. Pfad, Workspace und Export-Wahl merkt sich der Editor.
+Stand.
+
+Maßgeblich sind allein die Einträge in diesen Client-Dateien; dort stehen Serverpfad, Ordner und
+Export-Freigabe. Zusätzlich merkt sich der Editor die letzten Eingaben des Dialogs in
+`%LOCALAPPDATA%\FreelancerMissionEditor\agent-connection.json` – nur als Vorschlag für das nächste
+Öffnen, der Server liest diese Datei nicht. Wer etwas ändern will, öffnet den Dialog erneut und
+klickt „Aktualisieren“; das passt alle Dateien des Clients an. Danach den Client neu starten bzw. in
+Claude Code `/mcp reconnect freelancer-missions` ausführen.
 
 ### „Frag KI“ direkt im Editor
 
@@ -217,24 +233,25 @@ Alternativ arbeitest du im Chat von Claude oder Codex; der Editor liefert fertig
 | „KI-Agent ▾ → Alle Funde erklären lassen“ | Funde zusammenfassen, je Art erklären, Reihenfolge zum Beheben vorschlagen |
 | „KI-Agent ▾ → Neue Mission mit KI…“ | aus einer Beschreibung eine Mission schreiben, mit dem Server prüfen und erst nach Zustimmung exportieren |
 
-Die Aufträge nennen die Datei relativ zum Workspace, die Meldung samt Erklärung des Editors und die
-passenden Tools, und sie verlangen Entwürfe statt direkter Änderungen. Liegt die Mission außerhalb
-des Workspace oder hat sie ungespeicherte Änderungen, sagt die Statusleiste das beim Kopieren.
+Die Aufträge nennen die Datei mit vollständigem Pfad, die Meldung samt Erklärung des Editors und die
+passenden Tools, und sie verlangen Entwürfe statt direkter Änderungen. Ist der Server auf einen Ordner
+beschränkt, der die Mission nicht enthält, oder hat sie ungespeicherte Änderungen, sagt die
+Statusleiste das beim Kopieren.
 
 Von Hand bauen bzw. starten:
 
 ```
 dotnet build src/MissionEditor.Mcp -c Release
-dotnet run --project src/MissionEditor.Mcp -- --workspace <Missionsverzeichnis> [--allow-writes]
+dotnet run --project src/MissionEditor.Mcp -- [--allow-root <Ordner>]... [--allow-writes]
 ```
 
 Ein Release enthält zusätzlich `MissionEditorMcp-<version>-win-x64.zip` mit
 `MissionEditor.Mcp.exe`, das ohne installiertes .NET läuft.
 
-Claude Code:
+Claude Code (für alle Projekte des Benutzers, ohne Ordnerbeschränkung):
 
 ```
-claude mcp add freelancer-missions -- <Pfad>\MissionEditor.Mcp.exe --workspace "D:\freelancer crossfire\DATA\MISSIONS"
+claude mcp add --scope user freelancer-missions -- "C:\Tools\MissionEditorMcp\MissionEditor.Mcp.exe"
 ```
 
 Claude Desktop (`claude_desktop_config.json`) bzw. andere Clients mit derselben Struktur:
@@ -244,7 +261,7 @@ Claude Desktop (`claude_desktop_config.json`) bzw. andere Clients mit derselben 
   "mcpServers": {
     "freelancer-missions": {
       "command": "C:\\Tools\\MissionEditorMcp\\MissionEditor.Mcp.exe",
-      "args": ["--workspace", "D:\\freelancer crossfire\\DATA\\MISSIONS"]
+      "args": []
     }
   }
 }
@@ -255,11 +272,13 @@ Codex (`~/.codex/config.toml`):
 ```toml
 [mcp_servers.freelancer-missions]
 command = "C:\\Tools\\MissionEditorMcp\\MissionEditor.Mcp.exe"
-args = ["--workspace", "D:\\freelancer crossfire\\DATA\\MISSIONS"]
+args = []
 ```
 
-Für Exporte `"--allow-writes"` an die Argumente anhängen. Ohne installierte exe geht statt
-`command` auch `dotnet` mit dem Pfad zur `MissionEditor.Mcp.dll` als erstem Argument.
+Für Exporte `"--allow-writes"` in die Argumente aufnehmen, für eine Beschränkung
+`"--allow-root", "D:\\freelancer crossfire\\DATA\\MISSIONS"` (mehrfach möglich). Ohne installierte
+exe geht statt `command` auch `dotnet` mit dem Pfad zur `MissionEditor.Mcp.dll` als erstem Argument.
+Im Chat dann einfach den Pfad nennen, z. B. „Prüfe D:\freelancer crossfire\DATA\MISSIONS\M13\m13.ini“.
 
 Der Server arbeitet mit gespeicherten Dateien; ungespeicherte Änderungen im Editor sieht er nicht.
 Namensvorschläge für fehlende Trigger beruhen nur auf Ähnlichkeit und sind kein Beleg für die

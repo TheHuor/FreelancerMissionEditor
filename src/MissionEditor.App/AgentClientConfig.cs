@@ -35,13 +35,30 @@ public static partial class AgentClientConfig
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    /// <summary>The configuration file a client reads.</summary>
-    public static string ConfigPath(AgentClient client) => client switch
+    /// <summary>The configuration file a client reads (the first of <see cref="ConfigPaths"/>).</summary>
+    public static string ConfigPath(AgentClient client) => ConfigPaths(client)[0];
+
+    /// <summary>
+    /// The configuration files to update for a client. Claude Desktop from the Microsoft Store (MSIX) reads its
+    /// own copy under %LOCALAPPDATA%\Packages once it has one; then both that copy and %APPDATA% are updated.
+    /// </summary>
+    public static IReadOnlyList<string> ConfigPaths(AgentClient client)
     {
-        AgentClient.ClaudeCode => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude.json"),
-        AgentClient.ClaudeDesktop => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Claude", "claude_desktop_config.json"),
-        _ => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "config.toml"),
-    };
+        string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (client == AgentClient.ClaudeCode)
+            return [Path.Combine(userProfile, ".claude.json")];
+        if (client == AgentClient.Codex)
+            return [Path.Combine(userProfile, ".codex", "config.toml")];
+
+        string roaming = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Claude", "claude_desktop_config.json");
+        string packages = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Packages");
+        IEnumerable<string> packaged = Directory.Exists(packages)
+            ? Directory.EnumerateDirectories(packages, "AnthropicPBC.Claude_*")
+                .Select(package => Path.Combine(package, "LocalCache", "Roaming", "Claude", "claude_desktop_config.json"))
+                .Where(File.Exists)
+            : [];
+        return [.. packaged, roaming];
+    }
 
     /// <summary>True when the file already has an entry for the server (whatever its settings).</summary>
     public static bool IsConfigured(AgentClient client, string configPath)
@@ -61,7 +78,10 @@ public static partial class AgentClientConfig
         }
     }
 
-    /// <summary>The workspace and export flag given to the server in a client's configuration, or null when it has no entry.</summary>
+    /// <summary>
+    /// The folder limit (empty for none) and export flag given to the server in a client's configuration, or null
+    /// when it has no entry.
+    /// </summary>
     public static (string Workspace, bool AllowWrites)? ConfiguredServer(AgentClient client, string configPath)
     {
         try
@@ -78,20 +98,21 @@ public static partial class AgentClientConfig
                 string body = text[(section.Index + section.Length)..];
                 int nextTable = Regex.Match(body, @"^\s*\[", RegexOptions.Multiline) is { Success: true } next ? next.Index : body.Length;
                 Match args = Regex.Match(body[..nextTable], @"^\s*args\s*=\s*\[(.*)\]", RegexOptions.Multiline);
-                if (!args.Success)
-                    return null;
-                arguments = Regex.Matches(args.Groups[1].Value, "\"((?:[^\"\\\\]|\\\\.)*)\"")
-                    .Select(match => match.Groups[1].Value.Replace("\\\"", "\"").Replace("\\\\", "\\"));
+                arguments = args.Success
+                    ? Regex.Matches(args.Groups[1].Value, "\"((?:[^\"\\\\]|\\\\.)*)\"")
+                        .Select(match => match.Groups[1].Value.Replace("\\\"", "\"").Replace("\\\\", "\\"))
+                    : [];
             }
             else
             {
-                if (JsonNode.Parse(text)?["mcpServers"]?[AgentConnection.ServerName]?["args"] is not JsonArray array)
+                if (JsonNode.Parse(text)?["mcpServers"]?[AgentConnection.ServerName] is not JsonObject server)
                     return null;
-                arguments = array.Select(item => item?.GetValue<string>() ?? string.Empty);
+                arguments = server["args"] is JsonArray array ? array.Select(item => item?.GetValue<string>() ?? string.Empty) : [];
             }
+            // An empty workspace means the server runs without a folder limit.
             List<string> list = arguments.ToList();
-            int index = list.IndexOf("--workspace");
-            return index >= 0 && index + 1 < list.Count ? (list[index + 1], list.Contains("--allow-writes")) : null;
+            int index = list.FindIndex(argument => argument is "--allow-root" or "--workspace");
+            return (index >= 0 && index + 1 < list.Count ? list[index + 1] : string.Empty, list.Contains("--allow-writes"));
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException or FormatException)
         {

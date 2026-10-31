@@ -12,7 +12,7 @@
       <StackPanel>
         <TextBlock Text="KI-Agent verbinden" FontSize="24" FontWeight="SemiBold" />
         <TextBlock TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0" LineHeight="20"
-                   Text="Ein KI-Agent wie Claude Code, Claude Desktop oder Codex kann über den MCP-Server Missionen untersuchen, prüfen, Triggerabläufe nachverfolgen und Änderungen als Entwurf vorschlagen. Der Server läuft lokal und sieht nur das unten gewählte Verzeichnis. Ohne Export-Freigabe liest er nur." />
+                   Text="Ein KI-Agent wie Claude Code, Claude Desktop oder Codex kann über den MCP-Server Missionen untersuchen, prüfen, Triggerabläufe nachverfolgen und Änderungen als Entwurf vorschlagen. Der Server läuft lokal; Missionen werden mit ihrem vollständigen Pfad angegeben. Ohne Export-Freigabe liest er nur." />
 
         <TextBlock Text="MCP-SERVER" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,22,0,6" />
         <DockPanel>
@@ -22,13 +22,13 @@
         </DockPanel>
         <TextBlock x:Name="ServerStatus" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap" />
 
-        <TextBlock Text="MISSIONSVERZEICHNIS (WORKSPACE)" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,18,0,6" />
+        <TextBlock Text="FREIGEGEBENER ORDNER (OPTIONAL)" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,18,0,6" />
         <DockPanel>
           <Button DockPanel.Dock="Right" Content="Durchsuchen…" Click="OnBrowseWorkspace" Margin="6,0,0,0" Padding="10,4" />
-          <TextBox x:Name="WorkspaceBox" FontFamily="Consolas" TextChanged="OnInputChanged" AutomationProperties.Name="Missionsverzeichnis" />
+          <TextBox x:Name="WorkspaceBox" FontFamily="Consolas" TextChanged="OnInputChanged" AutomationProperties.Name="Freigegebener Ordner" />
         </DockPanel>
         <TextBlock FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0" TextWrapping="Wrap"
-                   Text="Der Agent sieht nur .ini-Dateien in diesem Verzeichnis und seinen Unterordnern, z. B. DATA\MISSIONS des Spiels." />
+                   Text="Leer lassen: Der Agent darf jede .ini-Datei über ihren vollständigen Pfad lesen. Mit Ordner (z. B. DATA\MISSIONS des Spiels): nur .ini-Dateien darin und in Unterordnern." />
         <CheckBox x:Name="AllowWritesBox" Margin="0,12,0,0" Checked="OnInputChanged" Unchecked="OnInputChanged"
                   Content="Agent darf Entwürfe als neue Dateien exportieren (--allow-writes)" />
         <TextBlock FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="24,4,0,0" TextWrapping="Wrap"

@@ -35,6 +35,52 @@ public sealed class WorkspaceTests : IDisposable
         Assert.Throws<UnauthorizedAccessException>(() => new MissionWorkspace(_root).Inspect(path));
 
     [Fact]
+    public void WithoutRootsAbsolutePathsWorkAndRelativePathsAreExplained()
+    {
+        var workspace = new MissionWorkspace([], allowWrites: true);
+        string sample = Path.Combine(_root, "sample.ini");
+        MissionSummary summary = workspace.Inspect(sample);
+        Assert.Equal(sample, summary.Path);
+        Assert.Contains(workspace.Check(sample).Items, finding => finding.CheckId == "unknown-trigger");
+
+        DraftPreview draft = workspace.PrepareSectionEdit(sample, summary.Sha256, 0, "[Trigger]\nnickname = start\nCnd_True = no_params\nAct_ActTrig = second");
+        Assert.Equal(sample, draft.Source);
+        string copy = Path.Combine(_root, "fixed.ini");
+        Assert.Equal(copy, workspace.WriteDraft(draft.Id, copy).Path);
+        Assert.Throws<DirectoryNotFoundException>(() => workspace.WriteDraft(workspace.PrepareNewMission("[Trigger]\nnickname = x\nCnd_True = no_params").Id,
+            Path.Combine(_root, "missing-folder", "new.ini")));
+
+        ArgumentException relative = Assert.Throws<ArgumentException>(() => workspace.Inspect("sample.ini"));
+        Assert.Contains("kein absoluter Pfad", relative.Message);
+        Assert.Throws<ArgumentException>(() => workspace.Inspect(Path.Combine(_root, "notes.txt")));
+    }
+
+    [Fact]
+    public void SeveralRootsAreAllowedAndTheErrorNamesThem()
+    {
+        string first = Path.Combine(_root, "first");
+        string second = Path.Combine(_root, "second");
+        string outside = Path.Combine(_root, "outside");
+        foreach (string folder in new[] { first, second, outside })
+            Directory.CreateDirectory(folder);
+        File.Copy(Path.Combine(_root, "sample.ini"), Path.Combine(first, "main.ini"));
+        File.Copy(Path.Combine(_root, "sample.ini"), Path.Combine(second, "other.ini"));
+        File.Copy(Path.Combine(_root, "sample.ini"), Path.Combine(outside, "blocked.ini"));
+        // The same folder twice (once with "..") counts once.
+        var workspace = new MissionWorkspace([first, second, Path.Combine(outside, "..", "second")]);
+        Assert.Equal(2, workspace.Roots.Count);
+
+        Assert.Equal("main.ini", workspace.Inspect("main.ini").Path);
+        string other = Path.Combine(second, "other.ini");
+        Assert.Equal(other, workspace.Inspect(other).Path);
+        UnauthorizedAccessException blocked = Assert.Throws<UnauthorizedAccessException>(() => workspace.Inspect(Path.Combine(outside, "blocked.ini")));
+        Assert.Contains(first, blocked.Message);
+        Assert.Contains(second, blocked.Message);
+        Assert.Contains("blocked.ini", blocked.Message);
+        Assert.Throws<DirectoryNotFoundException>(() => new MissionWorkspace([Path.Combine(_root, "does-not-exist")]));
+    }
+
+    [Fact]
     public void DraftsDoNotChangeSourceAndWritesRequireExplicitMode()
     {
         var workspace = new MissionWorkspace(_root);

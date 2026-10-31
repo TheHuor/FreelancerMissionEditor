@@ -7,7 +7,7 @@ namespace MissionEditor.App;
 
 /// <summary>
 /// Ready-to-paste requests for an AI agent connected to the MCP server: they name the server, the file
-/// (relative to the shared workspace) and the tools to use, and ask for drafts instead of direct changes.
+/// (by its full path) and the tools to use, and ask for drafts instead of direct changes.
 /// </summary>
 public static partial class AgentPrompts
 {
@@ -23,17 +23,22 @@ public static partial class AgentPrompts
             : relative;
     }
 
+    /// <summary>True when a server limited to the workspace (empty for no limit) can read the mission.</summary>
+    public static bool IsReachable(string missionPath, string workspace) =>
+        workspace.Length == 0 || RelativeToWorkspace(missionPath, workspace) is not null;
+
     /// <summary>
-    /// The workspace to name files against: of all workspaces registered at the clients (and the one the
-    /// editor remembered), the one that contains the mission; otherwise the first known one, or null.
+    /// The server setting that applies to the mission: of all folder limits registered at the clients (and the
+    /// one the editor remembered; empty for no limit), one that lets the server read the mission; otherwise the
+    /// first known one, or null when the server is not set up anywhere.
     /// </summary>
     public static (string? Workspace, bool ContainsMission) ChooseWorkspace(string? missionPath, IEnumerable<string> workspaces)
     {
-        List<string> known = workspaces.Where(workspace => workspace.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        List<string> known = workspaces.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (missionPath is not null)
         {
-            // The innermost folder gives the shortest relative path.
-            string? containing = known.Where(workspace => RelativeToWorkspace(missionPath, workspace) is not null)
+            // A folder that contains the mission is named before "no limit" (the empty string sorts last).
+            string? containing = known.Where(workspace => IsReachable(missionPath, workspace))
                 .OrderByDescending(workspace => workspace.Length).FirstOrDefault();
             if (containing is not null)
                 return (containing, true);
@@ -92,7 +97,7 @@ public static partial class AgentPrompts
         if (templateReference is not null)
             text.AppendLine($"2. {templateReference} als Vorlage für Aufbau und Stil ansehen (list_sections, read_mission_source, get_trigger_context).");
         else
-            text.AppendLine("2. Eine vorhandene Mission im Workspace als Vorlage für Aufbau und Stil ansehen (list_sections, read_mission_source).");
+            text.AppendLine("2. Eine vorhandene Mission als Vorlage für Aufbau und Stil ansehen (list_sections, read_mission_source); frag mich nach dem Pfad, falls nötig.");
         text.AppendLine("3. Regeln: [Trigger] beginnt mit nickname; pro Trigger genau eine Cnd_-Zeile; der Starttrigger hat InitState = ACTIVE; jeder Act_ActTrig zeigt auf einen vorhandenen Trigger.");
         text.AppendLine("4. Mit prepare_new_mission prüfen und Funde beheben, bis keine Fehler mehr bleiben.");
         text.AppendLine(exportAllowed

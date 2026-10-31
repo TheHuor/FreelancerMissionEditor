@@ -12,25 +12,29 @@ public partial class NewMissionPromptWindow : Window
 
     /// <summary>Creates the dialog.</summary>
     /// <param name="missionPath">The open mission, offered as template; null when none is open.</param>
-    /// <param name="workspace">The workspace shared with the agent, or null when not set up yet.</param>
+    /// <param name="workspace">The server's folder limit (empty for none), or null when the server is not set up yet.</param>
     /// <param name="exportAllowed">True when the server was set up with --allow-writes.</param>
     public NewMissionPromptWindow(string? missionPath, string? workspace, bool exportAllowed)
     {
         InitializeComponent();
         _exportAllowed = exportAllowed;
-        _templateReference = missionPath is not null && workspace is not null ? AgentPrompts.RelativeToWorkspace(missionPath, workspace) : null;
-        TargetBox.Text = "neue_mission.ini";
+        bool reachable = missionPath is not null && workspace is not null && AgentPrompts.IsReachable(missionPath, workspace);
+        _templateReference = reachable ? missionPath : null;
+        // The new file goes next to the open mission, or into the server's folder.
+        string? targetFolder = missionPath is not null ? Path.GetDirectoryName(missionPath) : workspace is { Length: > 0 } ? workspace : null;
+        TargetBox.Text = targetFolder is null ? "neue_mission.ini" : Path.Combine(targetFolder, "neue_mission.ini");
         TemplateBox.Content = _templateReference is null
-            ? "Keine Vorlage (die geöffnete Mission liegt nicht im Workspace)"
-            : $"Die geöffnete Mission als Vorlage nennen ({_templateReference})";
+            ? missionPath is null ? "Keine Vorlage (keine Mission geöffnet)" : "Keine Vorlage (der Server darf die geöffnete Mission nicht lesen)"
+            : $"Die geöffnete Mission als Vorlage nennen ({Path.GetFileName(_templateReference)})";
         TemplateBox.IsEnabled = _templateReference is not null;
         TemplateBox.IsChecked = _templateReference is not null;
+        string limit = workspace is { Length: > 0 } ? $"Server beschränkt auf {workspace}." : "Server ohne Ordnerbeschränkung.";
         if (workspace is null)
-            ShowHint(false, "Noch kein Workspace eingerichtet – erst „KI-Agent verbinden…“ verwenden, sonst kann der Agent den Server nicht nutzen.");
+            ShowHint(false, "Der MCP-Server ist noch bei keinem Client eingetragen – erst „KI-Agent verbinden…“ verwenden.");
         else
             ShowHint(true, exportAllowed
-                ? $"Workspace: {workspace}. Export ist freigeschaltet; der Agent fragt vor dem Schreiben nach."
-                : $"Workspace: {workspace}. Export ist nicht freigeschaltet – der Agent zeigt dir den Text, du speicherst ihn selbst.");
+                ? $"{limit} Export ist freigeschaltet; der Agent fragt vor dem Schreiben nach."
+                : $"{limit} Export ist nicht freigeschaltet – der Agent zeigt dir den Text, du speicherst ihn selbst.");
         Loaded += (_, _) => DescriptionBox.Focus();
     }
 

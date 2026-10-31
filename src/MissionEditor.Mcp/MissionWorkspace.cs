@@ -7,22 +7,37 @@ using MissionEditor.Core.Model;
 
 namespace MissionEditor.Mcp;
 
-/// <summary>A bounded workspace over saved mission files; proposed edits never replace source files.</summary>
+/// <summary>
+/// Access to saved mission files by absolute path, optionally limited to allowed root folders (relative paths
+/// resolve against the first one); proposed edits never replace source files.
+/// </summary>
 public sealed class MissionWorkspace
 {
     private const int MaxFileBytes = 8 * 1024 * 1024;
-    private readonly string _root;
+    private readonly string[] _roots;
     private readonly bool _allowWrites;
     private readonly object _draftGate = new();
     private readonly Dictionary<string, StoredDraft> _drafts = [];
 
-    /// <summary>Creates a workspace; exporting drafts requires explicit startup opt-in.</summary>
-    public MissionWorkspace(string root, bool allowWrites = false)
+    /// <summary>Creates a workspace limited to one folder, which is also the base for relative paths.</summary>
+    public MissionWorkspace(string root, bool allowWrites = false) : this([root], allowWrites) { }
+
+    /// <summary>Creates a workspace; without roots every absolute path is allowed. Exporting drafts requires explicit startup opt-in.</summary>
+    public MissionWorkspace(IEnumerable<string> roots, bool allowWrites = false)
     {
-        _root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
-        if (!Directory.Exists(_root)) throw new DirectoryNotFoundException("Das Missionsverzeichnis existiert nicht.");
+        _roots = roots.Select(root => Path.TrimEndingDirectorySeparator(Path.GetFullPath(root))).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        foreach (string root in _roots)
+        {
+            if (!Directory.Exists(root)) throw new DirectoryNotFoundException($"Der freigegebene Ordner existiert nicht: {root}");
+        }
         _allowWrites = allowWrites;
     }
+
+    /// <summary>The allowed root folders; empty when every absolute path is allowed.</summary>
+    public IReadOnlyList<string> Roots => _roots;
+
+    /// <summary>True when drafts may be exported as new files.</summary>
+    public bool AllowWrites => _allowWrites;
 
     /// <summary>Returns the saved document's format, revision and counts.</summary>
     public MissionSummary Inspect(string path)
@@ -144,7 +159,8 @@ public sealed class MissionWorkspace
         {
             var draft = GetDraft(id);
             string destination = Resolve(outputPath);
-            if (File.Exists(destination) || Directory.Exists(destination)) throw new IOException("Die Zieldatei existiert bereits; Überschreiben ist nicht erlaubt.");
+            if (File.Exists(destination) || Directory.Exists(destination)) throw new IOException($"Die Zieldatei existiert bereits; Überschreiben ist nicht erlaubt: {destination}");
+            if (!Directory.Exists(Path.GetDirectoryName(destination))) throw new DirectoryNotFoundException($"Der Zielordner existiert nicht: {Path.GetDirectoryName(destination)}");
             if (draft.Source is not null && Load(draft.Source).Hash != draft.SourceHash)
                 throw new InvalidOperationException("Die Quelldatei wurde seit dem Entwurf verändert. Entwurf neu erstellen.");
             byte[] bytes = draft.Document.ToBytes();
@@ -197,25 +213,36 @@ public sealed class MissionWorkspace
     private string Resolve(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        string candidate = Path.GetFullPath(path, _root);
-        string relative = Path.GetRelativePath(_root, candidate);
-        if (relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) || Path.IsPathRooted(relative))
-            throw new UnauthorizedAccessException("Pfad liegt außerhalb des freigegebenen Missionsverzeichnisses.");
+        if (!Path.IsPathFullyQualified(path) && _roots.Length == 0)
+            throw new ArgumentException($"„{path}“ ist kein absoluter Pfad. Den vollständigen Pfad angeben, z. B. D:\\Freelancer\\DATA\\MISSIONS\\M13\\m13.ini.");
+        string candidate = Path.GetFullPath(path, _roots.Length > 0 ? _roots[0] : Environment.CurrentDirectory);
         if (!Path.GetExtension(candidate).Equals(".ini", StringComparison.OrdinalIgnoreCase) || candidate.IndexOf(':', Path.GetPathRoot(candidate)!.Length) >= 0)
-            throw new ArgumentException("Nur .ini-Dateien sind erlaubt.");
-        // Reject junctions/symlinks instead of allowing a path inside the root to escape through them.
+            throw new ArgumentException($"Nur .ini-Dateien sind erlaubt: {candidate}");
+        if (_roots.Length == 0)
+            return candidate;
+
+        string root = _roots.FirstOrDefault(root => IsInside(root, candidate))
+            ?? throw new UnauthorizedAccessException($"{candidate} liegt außerhalb der freigegebenen Ordner ({string.Join("; ", _roots)}).");
+        // Reject junctions/symlinks instead of allowing a path inside a root to escape through them.
         string? current = candidate;
         while (current is not null)
         {
             if ((File.Exists(current) || Directory.Exists(current)) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
-                throw new UnauthorizedAccessException("Symbolische Links und Verzeichnisverknüpfungen werden nicht unterstützt.");
-            if (current == _root) break;
+                throw new UnauthorizedAccessException("Symbolische Links und Verzeichnisverknüpfungen werden innerhalb freigegebener Ordner nicht unterstützt.");
+            if (string.Equals(current, root, StringComparison.OrdinalIgnoreCase)) break;
             current = Path.GetDirectoryName(current);
         }
         return candidate;
     }
 
-    private string Relative(string path) => Path.GetRelativePath(_root, path);
+    private static bool IsInside(string root, string candidate)
+    {
+        string relative = Path.GetRelativePath(root, candidate);
+        return relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) && !Path.IsPathRooted(relative);
+    }
+
+    // Paths below the first root (the base for relative paths) are reported relative to it, all others in full.
+    private string Relative(string path) => _roots.Length > 0 && IsInside(_roots[0], path) ? Path.GetRelativePath(_roots[0], path) : path;
     private static void LimitText(string text) { ArgumentNullException.ThrowIfNull(text); if (text.Length > MaxFileBytes) throw new InvalidDataException("Entwurfstext ist zu groß."); }
     private static SourcePage Source(IniDocument document, int firstLine, int lineCount)
     {

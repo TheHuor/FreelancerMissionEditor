@@ -21,9 +21,16 @@ public static class AgentConnection
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FreelancerMissionEditor", "agent-connection.json");
 
-    /// <summary>The server arguments for a workspace.</summary>
-    public static IReadOnlyList<string> Arguments(string workspace, bool allowWrites) =>
-        allowWrites ? ["--workspace", workspace, "--allow-writes"] : ["--workspace", workspace];
+    /// <summary>The server arguments; an empty workspace means no folder limit (missions are named by absolute path).</summary>
+    public static IReadOnlyList<string> Arguments(string workspace, bool allowWrites)
+    {
+        var arguments = new List<string>();
+        if (workspace.Length > 0)
+            arguments.AddRange(["--allow-root", workspace]);
+        if (allowWrites)
+            arguments.Add("--allow-writes");
+        return arguments;
+    }
 
     /// <summary>The command line for <c>claude mcp add</c> (Claude Code), registered for all projects of the user.</summary>
     public static string ClaudeCodeCommand(string executable, string workspace, bool allowWrites) =>

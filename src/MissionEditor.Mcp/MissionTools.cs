@@ -9,7 +9,7 @@ namespace MissionEditor.Mcp;
 [McpServerToolType]
 public sealed class MissionTools(MissionWorkspace workspace)
 {
-    private const string PathDescription = "INI-Pfad relativ zum freigegebenen Missionsverzeichnis, z. B. \"m13/m13.ini\".";
+    private const string PathDescription = "Absoluter Pfad der .ini-Datei, z. B. \"D:\\Freelancer\\DATA\\MISSIONS\\M13\\m13.ini\". Relative Pfade nur, wenn der Server mit --allow-root gestartet wurde (dann relativ zum ersten freigegebenen Ordner).";
     private const string OffsetDescription = "Nullbasierter Startindex für die Seite.";
     private const string LimitDescription = "Höchstzahl der Einträge pro Seite (1–200).";
 
@@ -106,10 +106,10 @@ public sealed class MissionTools(MissionWorkspace workspace)
 
     /// <summary>Writes a draft to a new file.</summary>
     [McpServerTool(Name = "export_mission_draft", Destructive = false, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Nach Prüfung durch den Benutzer einen Entwurf als NEUE Datei exportieren. Erfordert den Serverstart mit --allow-writes. Existierende Dateien und Originalmissionen werden nie überschrieben; BINI-Entwürfe bleiben BINI.")]
+    [Description("Nach Prüfung durch den Benutzer einen Entwurf als NEUE Datei exportieren. Erfordert den Serverstart mit --allow-writes und vorher die ausdrückliche Zustimmung des Benutzers. Existierende Dateien und Originalmissionen werden nie überschrieben; BINI-Entwürfe bleiben BINI.")]
     public MissionSummary ExportDraft(
         [Description("Entwurfs-ID.")] string id,
-        [Description("Neuer .ini-Pfad relativ zum Missionsverzeichnis; die Datei darf noch nicht existieren.")] string outputPath) =>
+        [Description("Neuer .ini-Pfad (absolut, wie bei path); der Ordner muss existieren, die Datei darf noch nicht existieren.")] string outputPath) =>
         Run(() => workspace.WriteDraft(id, outputPath));
 
     /// <summary>The condition and action names the engine knows.</summary>

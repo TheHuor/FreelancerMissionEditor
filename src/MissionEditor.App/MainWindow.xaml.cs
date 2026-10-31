@@ -120,8 +120,8 @@ public partial class MainWindow : Window
             ViewModel.ReportStatus("Auftrag für eine neue Mission kopiert – in Claude oder Codex mit Strg+V einfügen.");
     }
 
-    // Builds a request for the open mission and puts it on the clipboard. The file is named relative to
-    // the workspace the agent was given; outside of it the agent cannot read the file, which the status says.
+    // Builds a request for the open mission (named by its full path) and puts it on the clipboard. When the
+    // server is limited to a folder that does not contain the mission, the agent cannot read it; the status says so.
     private void CopyAgentPrompt(Func<string, string> buildPrompt)
     {
         if (ViewModel.FilePath is not { } missionPath)
@@ -130,21 +130,20 @@ public partial class MainWindow : Window
             return;
         }
         (string? workspace, string clients, _) = ResolveAgentWorkspace(missionPath);
-        string? relative = workspace is null ? null : AgentPrompts.RelativeToWorkspace(missionPath, workspace);
-        Clipboard.SetText(buildPrompt(relative ?? missionPath));
+        Clipboard.SetText(buildPrompt(missionPath));
 
         string status = workspace is null
             ? "Auftrag kopiert. Achtung: Bei keinem Client (Claude Code, Claude Desktop, Codex) ist der MCP-Server eingetragen – „KI-Agent ▾ → KI-Agent verbinden…“."
-            : relative is null
-                ? $"Auftrag kopiert. Achtung: Die Mission liegt nicht im Workspace des Servers ({workspace}); der Agent kann sie so nicht lesen. Workspace im Verbinden-Dialog anpassen."
-                : $"Auftrag kopiert – in {clients} mit Strg+V einfügen (Workspace {workspace}).";
+            : !AgentPrompts.IsReachable(missionPath, workspace)
+                ? $"Auftrag kopiert. Achtung: Der Server ist auf {workspace} beschränkt, die Mission liegt woanders; der Agent kann sie so nicht lesen. Ordner im Verbinden-Dialog leeren oder anpassen."
+                : $"Auftrag kopiert – in {clients} mit Strg+V einfügen.";
         if (ViewModel.IsModified)
             status += " Ungespeicherte Änderungen: erst speichern (Strg+S), der Agent sieht nur die Datei.";
         ViewModel.ReportStatus(status);
     }
 
-    // The workspace from the clients' server entries (plus the one remembered by the editor), preferring the one
-    // that contains the mission, with the names of the clients that use it and whether exports are allowed there.
+    // The folder limit from the clients' server entries (plus the one remembered by the editor; empty for none),
+    // preferring one that lets the server read the mission, with the clients that use it and whether exports are allowed.
     private static (string? Workspace, string Clients, bool AllowWrites) ResolveAgentWorkspace(string? missionPath)
     {
         IReadOnlyList<(AgentClient Client, string Workspace, bool AllowWrites)> servers = AgentClientConfig.ConfiguredServers();
@@ -155,7 +154,8 @@ public partial class MainWindow : Window
         (string? workspace, _) = AgentPrompts.ChooseWorkspace(missionPath, candidates);
         if (workspace is null)
             return (null, string.Empty, false);
-        var matching = servers.Where(server => string.Equals(Path.GetFullPath(server.Workspace), Path.GetFullPath(workspace), StringComparison.OrdinalIgnoreCase)).ToList();
+        static string Normalize(string folder) => folder.Length == 0 ? folder : Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
+        var matching = servers.Where(server => string.Equals(Normalize(server.Workspace), Normalize(workspace), StringComparison.OrdinalIgnoreCase)).ToList();
         string clients = matching.Count == 0 ? "Claude oder Codex" : string.Join(" bzw. ", matching.Select(server => AgentClientName(server.Client)));
         bool allowWrites = matching.Count > 0 ? matching.Any(server => server.AllowWrites) : rememberedWrites;
         return (workspace, clients, allowWrites);

@@ -75,6 +75,58 @@ public sealed class ProtocolTests
         }
     }
 
+    [Fact]
+    public async Task ServerWithoutFolderChecksAndDraftsByAbsolutePath()
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "mission-mcp-nofolder-" + Guid.NewGuid());
+        Directory.CreateDirectory(folder);
+        string mission = Path.Combine(folder, "sample.ini");
+        File.WriteAllText(mission, "[Trigger]\nnickname = start\nCnd_True = no_params\nAct_ActTrig = missing");
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var transport = new StdioClientTransport(new StdioClientTransportOptions
+            {
+                Name = "Mission Editor integration test",
+                Command = "dotnet",
+                Arguments = [ServerDll(), "--allow-writes"],
+            });
+            await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token);
+            Assert.Contains("absolutem Pfad", client.ServerInstructions);
+
+            CallToolResult checkedMission = await Call(client, "check_mission", new() { ["path"] = mission }, timeout.Token);
+            Assert.False(checkedMission.IsError ?? false);
+            Assert.Contains("unknown-trigger", TextOf(checkedMission));
+
+            CallToolResult inspected = await Call(client, "inspect_mission", new() { ["path"] = mission }, timeout.Token);
+            string sha256;
+            using (JsonDocument summary = JsonDocument.Parse(TextOf(inspected)))
+                sha256 = summary.RootElement.GetProperty("sha256").GetString()!;
+            CallToolResult draft = await Call(client, "prepare_section_edit", new()
+            {
+                ["path"] = mission, ["expectedSha256"] = sha256, ["sectionIndex"] = 0,
+                ["replacementText"] = "[Trigger]\nnickname = start\nCnd_True = no_params",
+            }, timeout.Token);
+            Assert.False(draft.IsError ?? false);
+            string draftId;
+            using (JsonDocument prepared = JsonDocument.Parse(TextOf(draft)))
+                draftId = prepared.RootElement.GetProperty("id").GetString()!;
+
+            string copy = Path.Combine(folder, "fixed.ini");
+            CallToolResult export = await Call(client, "export_mission_draft", new() { ["id"] = draftId, ["outputPath"] = copy }, timeout.Token);
+            Assert.False(export.IsError ?? false);
+            Assert.True(File.Exists(copy));
+
+            CallToolResult relative = await Call(client, "inspect_mission", new() { ["path"] = "sample.ini" }, timeout.Token);
+            Assert.True(relative.IsError);
+            Assert.Contains("kein absoluter Pfad", TextOf(relative));
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
     private static Task<CallToolResult> Call(McpClient client, string tool, Dictionary<string, object?> arguments, CancellationToken cancellation) =>
         client.CallToolAsync(tool, arguments, cancellationToken: cancellation).AsTask();
 
