@@ -82,6 +82,45 @@ public static partial class AgentPrompts
         return text.ToString();
     }
 
+    /// <summary>Asks the agent to explain the mission's story and flow in plain language.</summary>
+    public static string ForExplainMission(string missionReference)
+    {
+        var text = new StringBuilder();
+        text.AppendLine(Opening);
+        text.AppendLine($"Datei: {missionReference}");
+        text.AppendLine();
+        text.AppendLine("Erklär mir diese Mission, so wie ein Spieler sie erlebt.");
+        text.AppendLine("1. Verschaff dir einen Überblick: inspect_mission, list_triggers (alle Seiten) und list_sections für Objekte, NPCs, Dialoge und Ziele.");
+        text.AppendLine("2. Starte bei den Triggern mit InitState = ACTIVE und folge dem Ablauf mit get_trigger_context; lies unklare Stellen mit read_mission_source.");
+        text.AppendLine("3. Beschreibe die Mission in Abschnitten in Spielreihenfolge: Ausgangslage, Aufträge und Ziele, wer wann auftaucht, was den nächsten Abschnitt auslöst, Erfolg und Scheitern.");
+        text.AppendLine("4. Nenne zu jedem Abschnitt die tragenden Trigger mit Zeilennummer, damit ich sie im Editor finde.");
+        text.AppendLine("5. Fasse am Ende den Ablauf als kurze Kette zusammen (Trigger A → B → C) und nenne Nebenstränge und Speicherpunkte.");
+        text.Append("Nur lesen, nichts ändern. Was sich aus dem Skript nicht sicher ergibt (z. B. Dialoginhalte hinter IDs), als Annahme kennzeichnen.");
+        return text.ToString();
+    }
+
+    /// <summary>Asks the agent to look for gaps and breaks in the mission flow beyond the editor's checks.</summary>
+    public static string ForGapsAndBreaks(string missionReference)
+    {
+        var text = new StringBuilder();
+        text.AppendLine(Opening);
+        text.AppendLine($"Datei: {missionReference}");
+        text.AppendLine();
+        text.AppendLine("Prüfe die Mission auf Lücken und Brüche im Ablauf – über die Prüfungen des Editors hinaus.");
+        text.AppendLine("1. check_mission (ab Warning) als Ausgangspunkt; dann den Ablauf ab den Triggern mit InitState = ACTIVE mit list_triggers und get_trigger_context nachverfolgen.");
+        text.AppendLine("2. Such gezielt nach:");
+        text.AppendLine("   - Triggern, die nie aktiviert werden (nicht ACTIVE und von keinem Act_ActTrig erreicht);");
+        text.AppendLine("   - Sackgassen: Abschnitte, nach denen nichts mehr ausgelöst wird und die Mission weder gelingt noch scheitert;");
+        text.AppendLine("   - Bedingungen, die nie eintreten können (z. B. Cnd_Destroyed oder Cnd_SpaceEnter für Objekte, die nie gespawnt werden);");
+        text.AppendLine("   - Triggern, die deaktiviert werden, bevor sie auslösen konnten, und Wettläufen zwischen parallel aktiven Triggern;");
+        text.AppendLine("   - Zielen und Wegpunkten, die gesetzt, aber nie erfüllt oder entfernt werden, und Objekten oder NPCs, die gespawnt, aber nie gebraucht werden;");
+        text.AppendLine("   - fehlenden Pfaden für Scheitern (Spieler stirbt, wichtiger NPC stirbt) und Speicherpunkten an Stellen, von denen aus die Mission nicht weitergeht.");
+        text.AppendLine("3. Liste die Befunde nach Schwere (blockiert die Mission / stört / Schönheitsfehler), je mit Zeile, Trigger, was im Spiel passiert und ob es belegt oder nur vermutet ist.");
+        text.AppendLine("4. Schlag zu den blockierenden Befunden eine Korrektur vor.");
+        text.Append(Safety);
+        return text.ToString();
+    }
+
     /// <summary>Asks the agent to write a new mission from a description.</summary>
     public static string ForNewMission(string description, string? templateReference, string targetReference, bool exportAllowed)
     {

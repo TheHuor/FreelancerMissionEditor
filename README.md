@@ -230,6 +230,8 @@ Alternativ arbeitest du im Chat von Claude oder Codex; der Editor liefert fertig
 | Wo | Auftrag |
 |---|---|
 | Rechtsklick in der Prüfliste → „An KI-Agent übergeben“ | Fund erklären und eine Korrektur als Entwurf vorschlagen; bei unbekannten Trigger-Zielen: prüfen, ob es ein Tippfehler ist oder ein Trigger fehlt, und ihn im Stil der Nachbarn entwerfen |
+| „KI-Agent ▾ → Mission erklären lassen“ | Ablauf und Geschichte in Spielreihenfolge erklären, ab den aktiven Starttriggern, mit den tragenden Triggern und Zeilen; nur lesen |
+| „KI-Agent ▾ → Auf Lücken und Brüche prüfen lassen“ | über die Prüfungen des Editors hinaus suchen: nie aktivierte Trigger, Sackgassen, unmögliche Bedingungen, zu früh deaktivierte Trigger, offene Ziele, fehlende Pfade für Scheitern; nach Schwere, belegt oder vermutet |
 | „KI-Agent ▾ → Alle Funde erklären lassen“ | Funde zusammenfassen, je Art erklären, Reihenfolge zum Beheben vorschlagen |
 | „KI-Agent ▾ → Neue Mission mit KI…“ | aus einer Beschreibung eine Mission schreiben, mit dem Server prüfen und erst nach Zustimmung exportieren |
 

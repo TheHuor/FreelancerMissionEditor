@@ -176,6 +176,13 @@ internal static class Program
         Check(findingPrompt.Contains("Zeile 4843") && findingPrompt.Contains("Erklärung des Editors: Die Engine verwirft") && findingPrompt.Contains("Bezugsstelle: Zeile 4384")
             && findingPrompt.Contains("prepare_section_edit"), "finding prompt carries line, explanation, related line and the draft rule");
 
+        string explain = AgentPrompts.ForExplainMission(@"D:\M13\m13.ini");
+        Check(explain.Contains(@"Datei: D:\M13\m13.ini") && explain.Contains("InitState = ACTIVE") && explain.Contains("Zeilennummer")
+            && explain.Contains("nichts ändern"), "explain prompt follows the flow from the start triggers, read-only");
+        string gaps = AgentPrompts.ForGapsAndBreaks(@"D:\M13\m13.ini");
+        Check(gaps.Contains("nie aktiviert") && gaps.Contains("Sackgassen") && gaps.Contains("belegt oder nur vermutet")
+            && gaps.Contains("prepare_section_edit"), "gaps prompt names the kinds of breaks and asks for evidence and drafts");
+
         var dialog = new NewMissionPromptWindow(@"D:\Games\Freelancer\DATA\MISSIONS\M13\m13.ini", Workspace, exportAllowed: false) { Owner = owner };
         dialog.Show(); dialog.UpdateLayout();
         string newMission = dialog.BuildPrompt("Drei Piraten greifen am Wegpunkt an.");

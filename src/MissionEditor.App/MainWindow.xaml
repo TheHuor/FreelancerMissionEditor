@@ -96,6 +96,8 @@
         <Button x:Name="AgentMenuButton" Content="KI-Agent ▾" Click="OnAgentMenu" Margin="12,0,0,0" ToolTip="Aufträge für Claude oder Codex kopieren und den MCP-Server einrichten">
           <Button.ContextMenu>
             <ContextMenu>
+              <MenuItem Header="Mission erklären lassen" Click="OnAskAgentToExplainMission" ToolTip="Auftrag kopieren: Ablauf und Geschichte der Mission in Spielreihenfolge erklären, mit den tragenden Triggern" />
+              <MenuItem Header="Auf Lücken und Brüche prüfen lassen" Click="OnAskAgentForGapsAndBreaks" ToolTip="Auftrag kopieren: unerreichbare Trigger, Sackgassen, unmögliche Bedingungen und fehlende Pfade suchen" />
               <MenuItem Header="Alle Funde erklären lassen" Click="OnAskAgentForAllFindings" ToolTip="Auftrag kopieren: Funde der Mission zusammenfassen, erklären und Korrekturen vorschlagen" />
               <MenuItem Header="Neue Mission mit KI…" Click="OnAskAgentForNewMission" />
               <Separator />

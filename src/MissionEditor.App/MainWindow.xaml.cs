@@ -112,6 +112,10 @@ public partial class MainWindow : Window
 
     private void OnAskAgentForAllFindings(object sender, RoutedEventArgs args) => CopyAgentPrompt(AgentPrompts.ForAllFindings);
 
+    private void OnAskAgentToExplainMission(object sender, RoutedEventArgs args) => CopyAgentPrompt(AgentPrompts.ForExplainMission);
+
+    private void OnAskAgentForGapsAndBreaks(object sender, RoutedEventArgs args) => CopyAgentPrompt(AgentPrompts.ForGapsAndBreaks);
+
     private void OnAskAgentForNewMission(object sender, RoutedEventArgs args)
     {
         (string? workspace, _, bool allowWrites) = ResolveAgentWorkspace(ViewModel.FilePath);
