@@ -22,7 +22,9 @@ dotnet run --project Tools/MissionEditor/src/MissionEditor.Cli -- check <datei.i
 ```
 
 Im Editor: Datei öffnen (Strg+O oder hineinziehen), Trigger filtern (Strg+F), Knoten oder Verweise
-anklicken, Zurück mit Alt+←, Zoom mit Strg+Mausrad, Doppelklick auf einen Fund springt zum Trigger.
+anklicken, Zurück mit Alt+←. Graph: auf freier Fläche ziehen verschiebt, Mausrad zoomt an der
+Mausposition, Umschalt+Mausrad scrollt waagerecht, „Einpassen“ zeigt alles; ein Knoten unter der Maus
+hebt seine Kanten hervor. Doppelklick auf einen Fund springt zum Trigger.
 
 ## Wie die Datei gelesen wird
 

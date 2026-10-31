@@ -1,7 +1,9 @@
 ﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 using MissionEditor.App.ViewModels;
 using MissionEditor.Core.Graph;
 using Microsoft.Win32;
@@ -12,6 +14,9 @@ namespace MissionEditor.App;
 public partial class MainWindow : Window
 {
     private const string FileFilter = "Missions-INI (*.ini)|*.ini|Alle Dateien (*.*)|*.*";
+
+    private Point? _panStart;
+    private Point _panStartOffset;
 
     /// <summary>Creates the window; command line: [file] [trigger to select].</summary>
     public MainWindow()
@@ -123,11 +128,89 @@ public partial class MainWindow : Window
             ViewModel.SelectNode(node);
     }
 
+    // Wheel zooms around the mouse position; Shift+wheel scrolls sideways.
     private void OnGraphMouseWheel(object sender, MouseWheelEventArgs args)
     {
-        if (Keyboard.Modifiers != ModifierKeys.Control)
-            return;
-        ZoomSlider.Value = Math.Clamp(ZoomSlider.Value * (args.Delta > 0 ? 1.1 : 1 / 1.1), ZoomSlider.Minimum, ZoomSlider.Maximum);
         args.Handled = true;
+        if (Keyboard.Modifiers == ModifierKeys.Shift)
+        {
+            GraphScroller.ScrollToHorizontalOffset(GraphScroller.HorizontalOffset - args.Delta);
+            return;
+        }
+        double factor = args.Delta > 0 ? 1.15 : 1 / 1.15;
+        SetZoom(ZoomSlider.Value * factor, args.GetPosition(GraphScroller));
+    }
+
+    // Sets the zoom and keeps the graph point under the anchor (viewport coordinates) in place.
+    private void SetZoom(double zoom, Point anchor)
+    {
+        double oldZoom = ZoomSlider.Value;
+        double newZoom = Math.Clamp(zoom, ZoomSlider.Minimum, ZoomSlider.Maximum);
+        double graphX = (GraphScroller.HorizontalOffset + anchor.X) / oldZoom;
+        double graphY = (GraphScroller.VerticalOffset + anchor.Y) / oldZoom;
+        ZoomSlider.Value = newZoom;
+        GraphScroller.UpdateLayout();
+        GraphScroller.ScrollToHorizontalOffset(graphX * newZoom - anchor.X);
+        GraphScroller.ScrollToVerticalOffset(graphY * newZoom - anchor.Y);
+    }
+
+    private void OnZoomToFit(object sender, RoutedEventArgs args)
+    {
+        if (GraphCanvas.Width is not > 0 || GraphCanvas.Height is not > 0)
+            return;
+        double zoom = Math.Min(GraphScroller.ViewportWidth / GraphCanvas.Width, GraphScroller.ViewportHeight / GraphCanvas.Height);
+        ZoomSlider.Value = Math.Clamp(zoom, ZoomSlider.Minimum, 1);
+        GraphScroller.ScrollToHorizontalOffset(0);
+        GraphScroller.ScrollToVerticalOffset(0);
+    }
+
+    private void OnZoomReset(object sender, RoutedEventArgs args) =>
+        SetZoom(1, new Point(GraphScroller.ViewportWidth / 2, GraphScroller.ViewportHeight / 2));
+
+    // Dragging on empty space (not on a node) moves the view.
+    private void OnGraphPanStart(object sender, MouseButtonEventArgs args)
+    {
+        if (!IsEmptyGraphArea(args.OriginalSource as DependencyObject))
+            return;
+        _panStart = args.GetPosition(GraphScroller);
+        _panStartOffset = new Point(GraphScroller.HorizontalOffset, GraphScroller.VerticalOffset);
+        GraphScroller.CaptureMouse();
+        GraphScroller.Cursor = Cursors.SizeAll;
+        args.Handled = true;
+    }
+
+    // True unless the element is (inside) a node, an edge or a scroll bar.
+    private bool IsEmptyGraphArea(DependencyObject? element)
+    {
+        for (DependencyObject? current = element; current is not null && current != GraphScroller; current = VisualTreeHelper.GetParent(current))
+        {
+            if (current is ScrollBar || current is System.Windows.Shapes.Path)
+                return false;
+            if (current is FrameworkElement { Parent: Controls.TriggerGraphCanvas })
+                return false;
+        }
+        return true;
+    }
+
+    private void OnGraphPanMove(object sender, MouseEventArgs args)
+    {
+        if (_panStart is not { } start)
+            return;
+        Vector moved = args.GetPosition(GraphScroller) - start;
+        GraphScroller.ScrollToHorizontalOffset(_panStartOffset.X - moved.X);
+        GraphScroller.ScrollToVerticalOffset(_panStartOffset.Y - moved.Y);
+    }
+
+    private void OnGraphPanEnd(object sender, MouseButtonEventArgs args)
+    {
+        if (_panStart is null)
+            return;
+        GraphScroller.ReleaseMouseCapture();
+    }
+
+    private void OnGraphPanLost(object sender, MouseEventArgs args)
+    {
+        _panStart = null;
+        GraphScroller.Cursor = null;
     }
 }

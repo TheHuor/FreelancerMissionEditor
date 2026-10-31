@@ -143,9 +143,9 @@ internal static class Program
         output.AppendLine("  rankdir=LR; node [shape=box, fontname=\"Consolas\", fontsize=10];");
         foreach (LayoutNode node in layout.Nodes)
         {
-            string label = node.Node.Trigger is { } trigger ? $"{trigger.Nickname}\\n{Escape(trigger.ConditionText)}" : $"? {node.Node.Name}";
-            string style = node.Node.IsMissing ? ", color=red, style=dashed" : node == layout.Center ? ", style=bold" : string.Empty;
-            output.AppendLine($"  \"{Escape(node.Node.Name)}\" [label=\"{label}\"{style}];");
+            string label = node.Node!.Trigger is { } trigger ? $"{trigger.Nickname}\\n{Escape(trigger.ConditionText)}" : $"? {node.Node!.Name}";
+            string style = node.Node!.IsMissing ? ", color=red, style=dashed" : node == layout.Center ? ", style=bold" : string.Empty;
+            output.AppendLine($"  \"{Escape(node.Node!.Name)}\" [label=\"{label}\"{style}];");
         }
         foreach (LayoutEdge edge in layout.Edges)
         {
@@ -156,7 +156,7 @@ internal static class Program
                 TriggerReferenceKind.Save => "color=orange, label=\"save\"",
                 _ => "color=darkgreen",
             };
-            output.AppendLine($"  \"{Escape(edge.From.Node.Name)}\" -> \"{Escape(edge.To.Node.Name)}\" [{attributes}];");
+            output.AppendLine($"  \"{Escape(edge.From.Node!.Name)}\" -> \"{Escape(edge.To.Node!.Name)}\" [{attributes}];");
         }
         output.AppendLine("}");
         Console.Write(output);

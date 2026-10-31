@@ -117,12 +117,19 @@
             <TextBlock Text="DeactTrig" Foreground="{x:Static controls:GraphOptions.DeactivateBrush}" FontWeight="SemiBold" />
           </CheckBox>
           <TextBlock Text="Zoom" VerticalAlignment="Center" />
-          <Slider x:Name="ZoomSlider" Width="120" Minimum="0.3" Maximum="2" Value="1" Margin="4,0" VerticalAlignment="Center" />
+          <Slider x:Name="ZoomSlider" Width="120" Minimum="0.1" Maximum="3" Value="1" Margin="4,0" VerticalAlignment="Center" />
+          <TextBlock Width="40" VerticalAlignment="Center" Text="{Binding Value, ElementName=ZoomSlider, StringFormat={}{0:P0}}" />
+          <Button Content="Einpassen" Padding="6,1" Margin="4,0" Click="OnZoomToFit" ToolTip="Ganzen Graph sichtbar machen" />
+          <Button Content="100 %" Padding="6,1" Margin="0,0,12,0" Click="OnZoomReset" />
           <TextBlock VerticalAlignment="Center" Foreground="Gray"
                      Text="{Binding HiddenNodeText}" />
         </WrapPanel>
         <ScrollViewer x:Name="GraphScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
-                      Background="#FAFAFA" PreviewMouseWheel="OnGraphMouseWheel">
+                      Background="#FAFAFA" PreviewMouseWheel="OnGraphMouseWheel"
+                      PreviewMouseLeftButtonDown="OnGraphPanStart" PreviewMouseMove="OnGraphPanMove"
+                      PreviewMouseLeftButtonUp="OnGraphPanEnd" LostMouseCapture="OnGraphPanLost"
+                      ToolTip="Ziehen: verschieben · Mausrad: zoomen · Umschalt+Mausrad: waagerecht scrollen"
+                      ToolTipService.InitialShowDelay="1500">
           <controls:TriggerGraphCanvas x:Name="GraphCanvas" Layout="{Binding Layout}" NodeClicked="OnGraphNodeClicked" Redrawn="OnGraphRedrawn">
             <controls:TriggerGraphCanvas.LayoutTransform>
               <ScaleTransform ScaleX="{Binding Value, ElementName=ZoomSlider}" ScaleY="{Binding Value, ElementName=ZoomSlider}" />

@@ -114,8 +114,61 @@ public class MissionScriptTests
         Assert.True(graph.FindNode("secnod")!.IsMissing);
 
         GraphLayout layout = GraphLayout.Build(graph.FindNode("second")!, new GraphLayoutOptions());
-        Assert.Equal(0, layout.Center.Layer);
-        Assert.Contains(layout.Nodes, node => node.Node.Name == "start" && node.Layer == -1);
-        Assert.DoesNotContain(layout.Nodes, node => node.Node.Name == "third");
+        LayoutNode startBox = layout.Nodes.Single(node => node.Node!.Name == "start");
+        Assert.True(startBox.Layer < layout.Center.Layer);
+        Assert.DoesNotContain(layout.Nodes, node => node.Node!.Name == "third");
+    }
+
+    private const string LayeredSample = """
+        [Trigger]
+        nickname = a
+        Cnd_True = no_params
+        Act_ActTrig = b
+        Act_ActTrig = c
+
+        [Trigger]
+        nickname = b
+        Cnd_True = no_params
+        Act_ActTrig = c
+
+        [Trigger]
+        nickname = c
+        Cnd_True = no_params
+        Act_ActTrig = a
+        Act_ActTrig = c
+        """;
+
+    [Fact]
+    public void LayoutRoutesLongEdgesAndBreaksCycles()
+    {
+        var graph = new TriggerGraph(MissionScript.FromDocument(IniDocument.ParseText(LayeredSample)));
+        GraphLayout layout = GraphLayout.Build(graph.FindNode("a")!, new GraphLayoutOptions { DepthBackward = 3, DepthForward = 3 });
+
+        int LayerOf(string name) => layout.Nodes.Single(node => node.Node!.Name == name).Layer;
+        Assert.True(LayerOf("a") < LayerOf("b"));
+        Assert.True(LayerOf("b") < LayerOf("c"));
+
+        // a -> c and the backward c -> a span two columns and pass b's column through a dummy each.
+        Assert.Equal(2, layout.Dummies.Count);
+        LayoutEdge longEdge = layout.Edges.Single(edge => edge.From.Node!.Name == "a" && edge.To.Node!.Name == "c");
+        Assert.Equal(4, longEdge.Points.Count);
+
+        // c -> a closes the cycle and is drawn backwards; c -> c is a self loop.
+        LayoutEdge cycle = layout.Edges.Single(edge => edge.From.Node!.Name == "c" && edge.To.Node!.Name == "a");
+        Assert.True(cycle.IsBackward);
+        Assert.True(cycle.Points[^1].X < cycle.Points[0].X);
+        Assert.Contains(layout.Edges, edge => edge.IsSelfLoop);
+
+        // Forward edges end at the left side of their target.
+        foreach (LayoutEdge edge in layout.Edges.Where(edge => !edge.IsBackward && !edge.IsSelfLoop))
+            Assert.Equal(edge.To.X, edge.Points[^1].X);
+
+        // No two boxes of a column overlap.
+        foreach (IGrouping<int, LayoutNode> column in layout.Nodes.Concat(layout.Dummies).GroupBy(node => node.Layer))
+        {
+            var sorted = column.OrderBy(node => node.Y).ToList();
+            for (int i = 1; i < sorted.Count; i++)
+                Assert.True(sorted[i].Y >= sorted[i - 1].Y + sorted[i - 1].Height);
+        }
     }
 }
