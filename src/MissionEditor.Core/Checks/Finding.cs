@@ -3,14 +3,14 @@ namespace MissionEditor.Core.Checks;
 /// <summary>How serious a finding is.</summary>
 public enum FindingSeverity
 {
-    /// <summary>Worth a look, usually harmless.</summary>
-    Info,
+  /// <summary>Worth a look, usually harmless.</summary>
+  Info,
 
-    /// <summary>Probably a mistake or without effect in the game.</summary>
-    Warning,
+  /// <summary>Probably a mistake or without effect in the game.</summary>
+  Warning,
 
-    /// <summary>Breaks the mission or crashes the game.</summary>
-    Error,
+  /// <summary>Breaks the mission or crashes the game.</summary>
+  Error,
 }
 
 /// <summary>One result of a check.</summary>
@@ -21,17 +21,23 @@ public enum FindingSeverity
 /// <param name="Message">The message for the user (German).</param>
 /// <param name="Hint">Why it matters and how to fix it (German), if there is advice to give.</param>
 /// <param name="RelatedLineNumber">Another line the finding refers to (e.g. the first definition of a duplicate), if any.</param>
-public sealed record Finding(FindingSeverity Severity, string CheckId, int LineNumber, string? Subject, string Message, string? Hint = null, int? RelatedLineNumber = null);
+public sealed record Finding (FindingSeverity Severity, string CheckId, int LineNumber, string? Subject, string Message, string? Hint = null, int? RelatedLineNumber = null);
 
 /// <summary>A check over a mission script.</summary>
 public interface IMissionCheck
 {
-    /// <summary>Short id, e.g. "unknown-trigger".</summary>
-    string Id { get; }
+  /// <summary>Short id, e.g. "unknown-trigger".</summary>
+  string Id
+  {
+    get;
+  }
 
-    /// <summary>Title for the user (German).</summary>
-    string Title { get; }
+  /// <summary>Title for the user (German).</summary>
+  string Title
+  {
+    get;
+  }
 
-    /// <summary>Runs the check.</summary>
-    IEnumerable<Finding> Run(Model.MissionScript script);
+  /// <summary>Runs the check.</summary>
+  IEnumerable<Finding> Run (Model.MissionScript script);
 }
