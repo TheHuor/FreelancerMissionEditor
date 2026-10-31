@@ -4,6 +4,10 @@
     <ProjectReference Include="..\MissionEditor.Core\MissionEditor.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Anthropic" Version="13.3.0" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>

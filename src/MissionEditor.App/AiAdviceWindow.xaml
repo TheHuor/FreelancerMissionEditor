@@ -1,0 +1,67 @@
+<Window x:Class="MissionEditor.App.AiAdviceWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Style="{StaticResource {x:Type Window}}"
+        Title="Frag KI" Width="1000" Height="780" MinWidth="720" MinHeight="520"
+        ShowInTaskbar="False" WindowStartupLocation="CenterOwner">
+  <DockPanel Margin="24,18,24,20">
+    <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,14,0,0" Margin="0,14,0,0">
+      <DockPanel>
+        <Button DockPanel.Dock="Left" Content="KI-Einstellungen…" Click="OnSettings" Padding="12,6" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button x:Name="AskAgainButton" Content="Erneut fragen" Click="OnAskAgain" Padding="12,6" Margin="0,0,8,0" />
+          <Button x:Name="ApplyButton" Content="Übernehmen" Click="OnApply" FontWeight="SemiBold" Padding="14,6" Margin="0,0,8,0" IsEnabled="False"
+                  ToolTip="Die Korrektur in die Mission einsetzen (Strg+Z im Editor macht es rückgängig, gespeichert wird erst mit Strg+S)" />
+          <Button Content="Schließen" IsCancel="True" Click="OnClose" Padding="14,6" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <StackPanel DockPanel.Dock="Top">
+      <TextBlock Text="Frag KI" FontSize="22" FontWeight="SemiBold" />
+      <TextBlock x:Name="FindingText" TextWrapping="Wrap" Margin="0,6,0,0" />
+      <DockPanel Margin="0,12,0,0">
+        <Button x:Name="CancelButton" DockPanel.Dock="Right" Content="Abbrechen" Click="OnCancel" Padding="10,3" Margin="8,0,0,0" Visibility="Collapsed" />
+        <ProgressBar x:Name="Progress" DockPanel.Dock="Right" Width="140" Height="6" IsIndeterminate="True" VerticalAlignment="Center" Visibility="Collapsed" />
+        <TextBlock x:Name="StatusText" TextWrapping="Wrap" FontSize="12" VerticalAlignment="Center" />
+      </DockPanel>
+    </StackPanel>
+
+    <Grid x:Name="ResultPanel" Margin="0,14,0,0" Visibility="Collapsed">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" MaxHeight="230" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel>
+          <TextBlock Text="ERKLÄRUNG" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4" />
+          <TextBox x:Name="ExplanationText" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent" />
+          <TextBlock x:Name="AssumptionsText" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource WarningBrush}" Margin="0,6,0,0" />
+        </StackPanel>
+      </ScrollViewer>
+      <StackPanel Grid.Row="1" Margin="0,12,0,6">
+        <TextBlock Text="KORREKTURVORSCHLAG" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" />
+        <TextBlock x:Name="FixSummaryText" TextWrapping="Wrap" Margin="0,4,0,0" />
+      </StackPanel>
+      <Grid Grid.Row="2" x:Name="FixPanel">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="12" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <DockPanel Grid.Column="0">
+          <TextBlock DockPanel.Dock="Top" Text="Vorher" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,4" />
+          <TextBox x:Name="BeforeBox" IsReadOnly="True" FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" />
+        </DockPanel>
+        <DockPanel Grid.Column="2">
+          <TextBlock DockPanel.Dock="Top" Text="Nachher (vor dem Übernehmen änderbar)" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,4" />
+          <TextBox x:Name="AfterBox" FontFamily="Consolas" AcceptsReturn="True" AcceptsTab="True" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                   TextChanged="OnAfterChanged" />
+        </DockPanel>
+      </Grid>
+      <TextBlock Grid.Row="3" x:Name="CheckText" TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0" />
+    </Grid>
+  </DockPanel>
+</Window>

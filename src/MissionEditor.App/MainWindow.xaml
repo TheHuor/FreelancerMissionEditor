@@ -93,10 +93,52 @@
         <Button Style="{StaticResource {x:Type Button}}" Command="{Binding UndoCommand}" Content="↶ Rückgängig" ToolTip="Letzte Änderung zurücknehmen (Strg+Z)" />
         <Separator />
         <Button Style="{StaticResource {x:Type Button}}" Command="{Binding BackCommand}" Content="◀ Zurück" ToolTip="Zum vorher gewählten Trigger (Alt+←)" />
-        <Button Content="Über…" Click="OnAbout" Margin="12,0,0,0" ToolTip="Versionen und Referenzen"/>
+        <Button Content="▶ Durchspielen" Click="OnSimulate" Margin="6,0,0,0" ToolTip="Den Ablauf der Trigger Schritt für Schritt durchspielen, ohne das Spiel zu starten" />
+        <Button x:Name="AgentMenuButton" Content="KI-Agent ▾" Click="OnAgentMenu" Margin="12,0,0,0" ToolTip="Aufträge für Claude oder Codex kopieren und den MCP-Server einrichten">
+          <Button.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="Frag KI: Mission erklären" Click="OnAskAiToExplainMission" FontWeight="SemiBold" ToolTip="Die Antwort erscheint hier im Editor (Anbieter unter „KI-Einstellungen…“)" />
+              <MenuItem Header="Frag KI: Lücken und Brüche" Click="OnAskAiForGapsAndBreaks" FontWeight="SemiBold" ToolTip="Die Antwort erscheint hier im Editor (Anbieter unter „KI-Einstellungen…“)" />
+              <Separator />
+              <MenuItem Header="Mission erklären lassen" Click="OnAskAgentToExplainMission" ToolTip="Auftrag kopieren: Ablauf und Geschichte der Mission in Spielreihenfolge erklären, mit den tragenden Triggern" />
+              <MenuItem Header="Auf Lücken und Brüche prüfen lassen" Click="OnAskAgentForGapsAndBreaks" ToolTip="Auftrag kopieren: unerreichbare Trigger, Sackgassen, unmögliche Bedingungen und fehlende Pfade suchen" />
+              <MenuItem Header="Alle Funde erklären lassen" Click="OnAskAgentForAllFindings" ToolTip="Auftrag kopieren: Funde der Mission zusammenfassen, erklären und Korrekturen vorschlagen" />
+              <MenuItem Header="Neue Mission mit KI…" Click="OnAskAgentForNewMission" />
+              <Separator />
+              <MenuItem Header="Mit Datei vergleichen…" Click="OnCompareWithFile" ToolTip="Einen exportierten Entwurf (oder eine andere Fassung) abschnittsweise vergleichen und übernehmen" />
+              <Separator />
+              <MenuItem Header="KI-Agent verbinden…" Click="OnConnectAgent" />
+              <MenuItem Header="KI-Einstellungen…" Click="OnAiSettings" />
+            </ContextMenu>
+          </Button.ContextMenu>
+        </Button>
+        <Button Content="Über…" Click="OnAbout" Margin="6,0,0,0" ToolTip="Versionen und Referenzen"/>
       </WrapPanel>
     </Border>
+    <!-- Shown when another program (e.g. the AI agent) changed the open file on disk. -->
+    <Border x:Name="ChangedOnDiskBanner" DockPanel.Dock="Top" Visibility="Collapsed" Background="{StaticResource WarningSurfaceBrush}"
+            BorderBrush="{StaticResource WarningBrush}" BorderThickness="0,0,0,1" Padding="12,6">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="Ignorieren" Click="OnIgnoreDiskChange" Margin="6,0,0,0" Padding="10,3" />
+        <Button DockPanel.Dock="Right" Content="Neu laden" Click="OnReloadAfterDiskChange" Padding="10,3" FontWeight="SemiBold" />
+        <TextBlock x:Name="ChangedOnDiskText" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" />
+      </DockPanel>
+    </Border>
     <StatusBar DockPanel.Dock="Bottom">
+      <StatusBar.ItemsPanel>
+        <ItemsPanelTemplate>
+          <DockPanel LastChildFill="True" />
+        </ItemsPanelTemplate>
+      </StatusBar.ItemsPanel>
+      <!-- Which installation provides nicknames and texts; several game versions can be switched here. -->
+      <StatusBarItem DockPanel.Dock="Right">
+        <StackPanel Orientation="Horizontal">
+          <TextBlock Text="{Binding GameDataText}" VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" TextTrimming="CharacterEllipsis" MaxWidth="620"
+                     ToolTip="{Binding GameDataText}" />
+          <Button Content="Spielordner…" Click="OnGameFolder" Margin="8,0,0,0" Padding="8,1" FontSize="12"
+                  ToolTip="Festlegen, aus welcher Freelancer-Installation Nicknames und Texte kommen" />
+        </StackPanel>
+      </StatusBarItem>
       <StatusBarItem Content="{Binding StatusText}" />
     </StatusBar>
     <Grid>
@@ -241,13 +283,14 @@
         <TextBlock Grid.Row="1" Text="{Binding SelectedSummary}" MaxHeight="48" ToolTip="{Binding SelectedSummary}" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,6" TextWrapping="Wrap" />
         <TabControl x:Name="DetailTabs" Grid.Row="2" Grid.RowSpan="2">
           <TabItem Header="{Binding SelectedFindingsHeader}">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontWeight="Normal" Margin="0,4,0,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontWeight="Normal" Margin="0,4,0,0" TextElement.Foreground="{StaticResource TextBrush}">
               <ItemsControl x:Name="DetailFindings" ItemsSource="{Binding SelectedFindings}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate DataType="viewModels:FindingRow">
                     <Border x:Name="Box" Background="{StaticResource WarningSurfaceBrush}" BorderBrush="{StaticResource WarningBrush}" BorderThickness="3,0,0,0" Padding="6,3" Margin="0,0,0,3" Cursor="Hand" MouseLeftButtonUp="OnDetailFindingClicked" ToolTip="{Binding FullText}">
                       <StackPanel>
                         <DockPanel>
+                          <Button DockPanel.Dock="Right" Content="Frag KI" Click="OnAskAiForDetailFinding" Padding="6,0" Margin="6,0,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Erklärung und Korrekturvorschlag direkt hier im Editor anzeigen" />
                           <ContentControl DockPanel.Dock="Left" Template="{StaticResource SeverityBadge}" Margin="0,1,6,0" VerticalAlignment="Top" />
                           <TextBlock TextWrapping="Wrap">
                             <Run Text="{Binding LineNumber, Mode=OneWay, StringFormat={}Zeile {0}:}" Foreground="{StaticResource MutedTextBrush}" />
@@ -323,7 +366,12 @@
                       <Button Content="Bearbeiten" Padding="6,0" Margin="0,0,4,0" FontFamily="Segoe UI" Click="OnEditSection" ToolTip="Diesen Abschnitt im Textfenster bearbeiten" />
                       <Button Content="Löschen" Style="{StaticResource DangerButton}" Padding="6,0" FontFamily="Segoe UI" Click="OnDeleteSection" ToolTip="Diesen Abschnitt aus der Datei entfernen (Strg+Z macht es rückgängig)" />
                     </StackPanel>
-                    <TextBlock Grid.Column="2" x:Name="LineText" Text="{Binding Text}" VerticalAlignment="Center" TextWrapping="NoWrap" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                      <TextBlock x:Name="LineText" Text="{Binding Text}" TextWrapping="NoWrap" />
+                      <!-- The text behind IDS numbers, from the resource DLLs of the game. -->
+                      <TextBlock Text="{Binding NoteText}" Margin="16,0,0,0" FontFamily="Segoe UI" FontStyle="Italic" Foreground="{StaticResource MutedTextBrush}" TextWrapping="NoWrap"
+                                 Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}" ToolTip="Text aus den Ressourcen-DLLs des Spiels" />
+                    </StackPanel>
                   </Grid>
                 </Border>
                 <DataTemplate.Triggers>
@@ -364,6 +412,12 @@
             <TextBlock Text="Doppelklick öffnet die Fundstelle" Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center" />
           </StackPanel>
           <DataGrid x:Name="FindingsGrid" ItemsSource="{Binding FindingsView}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="None" MouseDoubleClick="OnFindingDoubleClick" EnableRowVirtualization="True">
+            <DataGrid.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="Frag KI …" Click="OnAskAiForGridFinding" FontWeight="SemiBold" />
+                <MenuItem Header="An KI-Agent übergeben (Auftrag kopieren)" Click="OnAskAgentForGridFinding" />
+              </ContextMenu>
+            </DataGrid.ContextMenu>
             <DataGrid.Resources>
               <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#173C56" />
               <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#E4EDF5" />

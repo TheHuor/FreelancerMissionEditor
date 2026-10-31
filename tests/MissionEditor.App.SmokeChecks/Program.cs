@@ -44,7 +44,7 @@ internal static class Program
         drawer.IsExpanded=true; window.UpdateLayout();
         var workspace=(Grid)drawer.Parent;
         Assert(row.Height.Value <= workspace.ActualHeight-workspace.RowDefinitions[0].MinHeight-6,
-            "drawer restoration respects remaining workspace height after resize");
+            $"drawer restoration respects remaining workspace height after resize (row {row.Height.Value}, workspace {workspace.ActualHeight}, window {window.ActualHeight})");
         window.Height=1080; window.UpdateLayout();
         tabs.SelectedIndex=1;
         drawer.IsExpanded=false;
@@ -103,7 +103,7 @@ internal static class Program
         Assert(vm.WindowTitle.Contains(AboutWindow.DisplayVersion), "main caption contains build version");
         var about = new AboutWindow { Owner = window };
         about.Show(); about.UpdateLayout();
-        Assert(about.Modules.Count == 3 && about.Modules.All(module => module.Version == AboutWindow.DisplayVersion), "About lists consistent GUI, Core and CLI repository versions");
+        Assert(about.Modules.Count == 4 && about.Modules.All(module => module.Version == AboutWindow.DisplayVersion), "About lists consistent GUI, Core, CLI and MCP repository versions");
         if (Environment.GetEnvironmentVariable("MISSION_EDITOR_ABOUT_PREVIEW") is { Length: > 0 } previewPath)
         {
             var dpi = VisualTreeHelper.GetDpi(about);
@@ -115,10 +115,349 @@ internal static class Program
             encoder.Save(previewStream);
         }
         about.Close();
+
+        // Agent connection: paths with spaces and backslashes survive all three configuration formats.
+        const string ServerPath = @"C:\Program Files\Mission Editor\MissionEditor.Mcp.exe";
+        const string MissionsPath = @"D:\freelancer crossfire\DATA\MISSIONS";
+        string json = AgentConnection.JsonConfiguration(ServerPath, MissionsPath, allowWrites: true);
+        using (var parsed = System.Text.Json.JsonDocument.Parse(json))
+        {
+            var server = parsed.RootElement.GetProperty("mcpServers").GetProperty(AgentConnection.ServerName);
+            Assert(server.GetProperty("command").GetString() == ServerPath, "agent JSON keeps the server path");
+            Assert(string.Join("|", server.GetProperty("args").EnumerateArray().Select(argument => argument.GetString())) == $"--allow-root|{MissionsPath}|--allow-writes", "agent JSON passes the folder limit and write flag");
+        }
+        Assert(AgentConnection.Arguments(string.Empty, false).Count == 0, "without a folder the server gets no folder option");
+        Assert(AgentConnection.CodexConfiguration(ServerPath, MissionsPath, false).Contains(@"command = ""C:\\Program Files\\Mission Editor\\MissionEditor.Mcp.exe"""), "agent TOML escapes backslashes");
+        Assert(!AgentConnection.CodexConfiguration(ServerPath, MissionsPath, false).Contains("--allow-writes"), "agent TOML is read-only by default");
+        Assert(AgentConnection.ClaudeCodeCommand(ServerPath, MissionsPath, false).Contains($"-- \"{ServerPath}\" --allow-root \"{MissionsPath}\""), "Claude Code command quotes paths");
+        using (var claudeJson = System.Text.Json.JsonDocument.Parse(AgentConnection.ClaudeCodeJson(ServerPath, MissionsPath, false)))
+        {
+            var server = claudeJson.RootElement.GetProperty("mcpServers").GetProperty(AgentConnection.ServerName);
+            Assert(server.GetProperty("type").GetString() == "stdio" && server.GetProperty("command").GetString() == ServerPath, "Claude Code .claude.json entry is a stdio server with the path");
+        }
+        CheckAgentClientConfig(ServerPath, MissionsPath);
+        CheckAgentPrompts(window);
+        CheckAiAdvice(window);
+        var agentWindow = new AgentConnectionWindow(hasUnsavedChanges: false) { Owner = window };
+        agentWindow.Show(); agentWindow.UpdateLayout();
+        Assert(!agentWindow.ClaudeCodeText.Contains("--allow-root") && !agentWindow.ClaudeCodeText.Contains("--workspace"), "agent dialog suggests no folder limit by default");
+        agentWindow.Close();
+
+        // IDS texts need the game's resource DLLs; checked only where the original game is installed.
+        const string VanillaMission = @"D:\Games\Freelancer\DATA\MISSIONS\M01A\m01a.ini";
+        if (File.Exists(VanillaMission) && MissionEditor.Core.Model.GameData.ForMission(VanillaMission) is { } gameData)
+        {
+            var vanilla = MissionEditor.Core.Model.MissionScript.Load(VanillaMission);
+            var named = vanilla.Document.Sections.SelectMany(section => section.Entries.Select(line => (section.Name, line)))
+                .First(entry => entry.line.IsKey("individual_name"));
+            Assert(gameData.DescribeIds(named.line, named.Name) is { Length: > 2 }, "IDS texts are read from the game's resource DLLs");
+            var objective = vanilla.Document.Sections.First(section => section.Is("NNObjective")).Find("type")!;
+            Assert(gameData.DescribeIds(objective, "NNObjective") is { Length: > 2 }, "objective texts are read for [NNObjective] type = ids");
+        }
+        else
+            Console.WriteLine("SKIP IDS texts (original game not installed)");
+
+        // A fixed game folder applies to a mission outside any installation (the fixture copy lies in the temp folder).
+        if (File.Exists(VanillaMission))
+        {
+            vm.ApplyGameFolder(new GameFolderSettings { GameFolder = @"D:\Games\Freelancer" });
+            Assert(vm.GameData is not null && vm.GameDataText.Contains(@"D:\Games\Freelancer") && vm.GameDataText.Contains("fest eingestellt"),
+                "a fixed game folder applies to a mission outside the installation");
+            var gameDialog = new GameFolderWindow(new GameFolderSettings(), vm.FilePath) { Owner = window };
+            gameDialog.Show();
+            gameDialog.ChooseFolderForTest(Path.GetTempPath());
+            Assert(gameDialog.StatusForTest.Contains("kein EXE"), "the game folder dialog rejects a folder without freelancer.ini");
+            gameDialog.ChooseFolderForTest(@"D:\Games\Freelancer");
+            Assert(gameDialog.StatusForTest.StartsWith("Gelesen"), "the game folder dialog reads a valid installation");
+            SavePreview(gameDialog, "gamefolder");
+            gameDialog.Close();
+            vm.ApplyGameFolder(new GameFolderSettings());
+            Assert(vm.GameData is null && vm.GameDataText.Contains("keine Installation"), "automatic finds no installation for a mission in the temp folder");
+        }
+        else
+            Console.WriteLine("SKIP game folder (original game not installed)");
+
+        // A change by another program (the agent) shows the reload banner; the editor's own save does not.
+        vm.Load(tmp);
+        typeof(MainWindow).GetMethod("WatchFile", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, [tmp]);
+        window.CheckDiskState();
+        Assert(!window.IsChangedOnDiskBannerVisible, "no reload banner right after loading");
+        File.AppendAllText(tmp, "\r\n; changed by the agent\r\n");
+        File.SetLastWriteTimeUtc(tmp, DateTime.UtcNow.AddMinutes(1));
+        window.CheckDiskState();
+        Assert(window.IsChangedOnDiskBannerVisible, "a change on disk shows the reload banner");
+        vm.Load(tmp);
+        typeof(MainWindow).GetMethod("WatchFile", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, [tmp]);
+
+        // Compare with an exported draft and take over the changed section.
+        var startTrigger = vm.Script!.EffectiveTriggers.First();
+        string draftPath = tmp + ".draft.ini";
+        string draftText = File.ReadAllText(tmp, MissionEditor.Core.Ini.IniDocument.Windows1252)
+            .Replace(startTrigger.NicknameLine.Text, startTrigger.NicknameLine.Text + "\r\nAct_DebugMsg = from_the_draft");
+        File.WriteAllText(draftPath, draftText, MissionEditor.Core.Ini.IniDocument.Windows1252);
+        var compare = new CompareWindow(vm, draftPath, MissionEditor.Core.Ini.IniDocument.Load(draftPath)) { Owner = window };
+        Assert(compare.Changes.Count == 1 && compare.Changes[0].Kind == MissionEditor.Core.Ini.SectionChangeKind.Changed
+            && compare.Changes[0].Title.Contains(startTrigger.Nickname), "compare finds exactly the changed section of the draft");
+        compare.Show();
+        SavePreview(compare, "compare");
+        compare.ApplyForTest(_ => true);
+        Assert(vm.IsModified && vm.Script!.Document.Lines.Any(line => line.Text == "Act_DebugMsg = from_the_draft"), "compare takes the chosen section over (with undo)");
+        vm.UndoCommand.Execute(null);
+        Assert(!vm.Script!.Document.Lines.Any(line => line.Text == "Act_DebugMsg = from_the_draft"), "undo reverts the taken-over sections");
+        File.Delete(draftPath);
+
+        // "Frag KI" about the whole mission: free text, a digest instead of the file.
+        var missionAdvice = new MissionAdviceWindow(vm, MissionEditor.App.Ai.MissionQuestion.GapsAndBreaks, askOnOpen: false) { Owner = window };
+        var missionRequest = missionAdvice.BuildRequest();
+        Assert(missionRequest.AnswerSchema is null && missionRequest.User.Contains("Trigger (Dateireihenfolge):")
+            && missionRequest.User.Contains(startTrigger.Nickname) && missionRequest.User.Contains("Funde des Editors"), "mission request carries the trigger digest and the findings as free text");
+        Assert(missionRequest.User.Length <= MissionEditor.App.Ai.MissionAdvice.MaxDigestLength + 4000, "mission digest stays within its limit for the large fixture");
+        missionAdvice.Show();
+        missionAdvice.ShowAnswerForTest("1. Blockiert: …");
+        missionAdvice.UpdateLayout();
+        Assert(((TextBox)missionAdvice.FindName("AnswerBox")).Text == "1. Blockiert: …", "mission answer is shown in the editor");
+        missionAdvice.Close();
+
+        // Stepping through the flow: the start triggers are active, firing one runs its actions.
+        var simulation = new SimulationWindow(vm) { Owner = window };
+        simulation.Show(); simulation.UpdateLayout();
+        Assert(simulation.Simulator.Active.Count > 0 || simulation.Simulator.Steps.Count > 0, "simulation starts with the active triggers");
+        if (simulation.Simulator.Active.FirstOrDefault() is { } firstActive)
+        {
+            int steps = simulation.Simulator.Steps.Count;
+            simulation.FireForTest(firstActive.Nickname);
+            Assert(simulation.Simulator.Steps.Count > steps && ((ListBox)simulation.FindName("LogList")).Items.Count > 0, "firing a trigger adds its step to the log");
+            Assert(vm.SelectedTrigger is not null, "simulation leaves a trigger selected in the main window");
+        }
+        SavePreview(simulation, "simulation");
+        simulation.Close();
+
+        about.Close();
         Console.WriteLine("ALL CHECKS PASSED");
         File.Delete(tmp);
         File.Delete(tmp + ".bak");
         window.Close();
         app.Shutdown();
+    }
+
+    // With MISSION_EDITOR_PREVIEW_DIR set, saves a DPI-aware picture of the window there for a visual check.
+    private static void SavePreview(Window window, string name)
+    {
+        if (Environment.GetEnvironmentVariable("MISSION_EDITOR_PREVIEW_DIR") is not { Length: > 0 } folder)
+            return;
+        window.UpdateLayout();
+        var dpi = VisualTreeHelper.GetDpi(window);
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(window.ActualWidth * dpi.DpiScaleX), (int)(window.ActualHeight * dpi.DpiScaleY),
+            dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+        bitmap.Render(window);
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+        using var stream = File.Create(Path.Combine(folder, name + ".png"));
+        encoder.Save(stream);
+    }
+
+    // Requests for the agent name the file relative to the workspace, the finding and the right tools.
+    private static void CheckAgentPrompts(Window owner)
+    {
+        static void Check(bool value, string message) { if (!value) throw new Exception(message); Console.WriteLine("PASS " + message); }
+        const string Workspace = @"D:\Games\Freelancer\DATA\MISSIONS";
+        Check(AgentPrompts.RelativeToWorkspace(@"D:\Games\Freelancer\DATA\MISSIONS\M13\m13.ini", Workspace) == @"M13\m13.ini", "prompt path is relative to the workspace");
+        Check(AgentPrompts.RelativeToWorkspace(@"D:\Other\m13.ini", Workspace) is null, "prompt path outside the workspace is detected");
+        Check(AgentPrompts.ChooseWorkspace(@"D:\Games\Freelancer\DATA\MISSIONS\M13\m13.ini", [@"D:\Other", Workspace, Workspace + @"\M13"])
+            == (Workspace + @"\M13", true), "the innermost workspace containing the mission is chosen");
+        Check(AgentPrompts.ChooseWorkspace(@"D:\Other\x.ini", [Workspace]) == (Workspace, false), "a workspace not containing the mission is reported as such");
+        Check(AgentPrompts.ChooseWorkspace(@"D:\Other\x.ini", [Workspace, string.Empty]) == (string.Empty, true), "a server without folder limit reaches every mission");
+        Check(AgentPrompts.IsReachable(@"D:\Other\x.ini", string.Empty) && !AgentPrompts.IsReachable(@"D:\Other\x.ini", Workspace), "reachability follows the folder limit");
+
+        var missing = new MissionEditor.Core.Checks.Finding(MissionEditor.Core.Checks.FindingSeverity.Error, "unknown-trigger", 5582, "check_capcf2",
+            "Act_ActTrig auf unbekannten Trigger 'turn_off_music' – die Aktivierung passiert nie.", "Hinweis");
+        string missingPrompt = AgentPrompts.ForFinding(@"M13\m13.ini", missing);
+        Check(missingPrompt.Contains("suggest_missing_trigger für „turn_off_music“") && missingPrompt.Contains(@"Datei: M13\m13.ini")
+            && missingPrompt.Contains(AgentConnection.ServerName), "missing-trigger prompt asks for evidence about the missing trigger");
+
+        var duplicate = new MissionEditor.Core.Checks.Finding(MissionEditor.Core.Checks.FindingSeverity.Warning, "duplicate-nickname", 4843, "follow_player",
+            "[ObjList] 'follow_player' ist doppelt (erste Definition Zeile 4384).", "Die Engine verwirft die zweite Liste.", 4384);
+        string findingPrompt = AgentPrompts.ForFinding(@"M13\m13.ini", duplicate);
+        Check(findingPrompt.Contains("Zeile 4843") && findingPrompt.Contains("Erklärung des Editors: Die Engine verwirft") && findingPrompt.Contains("Bezugsstelle: Zeile 4384")
+            && findingPrompt.Contains("prepare_section_edit"), "finding prompt carries line, explanation, related line and the draft rule");
+
+        string explain = AgentPrompts.ForExplainMission(@"D:\M13\m13.ini");
+        Check(explain.Contains(@"Datei: D:\M13\m13.ini") && explain.Contains("InitState = ACTIVE") && explain.Contains("Zeilennummer")
+            && explain.Contains("nichts ändern"), "explain prompt follows the flow from the start triggers, read-only");
+        string gaps = AgentPrompts.ForGapsAndBreaks(@"D:\M13\m13.ini");
+        Check(gaps.Contains("nie aktiviert") && gaps.Contains("Sackgassen") && gaps.Contains("belegt oder nur vermutet")
+            && gaps.Contains("prepare_section_edit"), "gaps prompt names the kinds of breaks and asks for evidence and drafts");
+
+        var dialog = new NewMissionPromptWindow(@"D:\Games\Freelancer\DATA\MISSIONS\M13\m13.ini", Workspace, exportAllowed: false) { Owner = owner };
+        dialog.Show(); dialog.UpdateLayout();
+        string newMission = dialog.BuildPrompt("Drei Piraten greifen am Wegpunkt an.");
+        Check(newMission.Contains("Drei Piraten") && newMission.Contains(@"D:\Games\Freelancer\DATA\MISSIONS\M13\m13.ini als Vorlage") && newMission.Contains("prepare_new_mission")
+            && newMission.Contains("nicht freigeschaltet"), "new-mission prompt has description, template (full path) and export state");
+        dialog.Close();
+    }
+
+    // "Frag KI" without network: request context, answer parsing, fix check, the window and the key storage.
+    private static void CheckAiAdvice(Window owner)
+    {
+        static void Check(bool value, string message) { if (!value) throw new Exception(message); Console.WriteLine("PASS " + message); }
+        var claudeCli = new MissionEditor.App.Ai.CliAdvisor(new MissionEditor.App.Ai.AiSettings { Provider = MissionEditor.App.Ai.AiProvider.ClaudeCli }, MissionEditor.App.Ai.AiProvider.ClaudeCli);
+        string notLoggedIn = claudeCli.DescribeFailure(1, "{\"type\":\"result\",\"is_error\":true,\"result\":\"Not logged in · Please run /login\",\"usage\":{}}", string.Empty);
+        Check(notLoggedIn.Contains("nicht angemeldet") && notLoggedIn.Contains("/login") && !notLoggedIn.Contains("usage"), "a not-logged-in claude CLI gets a short login hint instead of its JSON");
+        Check(claudeCli.DescribeFailure(2, "{\"result\":\"Credit balance too low\"}", string.Empty) == "Claude Code (lokal) endete mit Fehler 2: Credit balance too low", "other CLI errors show only the message from the JSON");
+        string folder = Path.Combine(Path.GetTempPath(), "mission-ai-" + Guid.NewGuid());
+        Directory.CreateDirectory(folder);
+        try
+        {
+            string missionPath = Path.Combine(folder, "ai.ini");
+            File.WriteAllText(missionPath, "[Trigger]\nnickname = start\nInitState = ACTIVE\nCnd_True = no_params\nAct_ActTrig = secnod\n\n[Trigger]\nnickname = second\nCnd_Timer = 5\n");
+            var viewModel = new MainViewModel();
+            viewModel.Load(missionPath);
+            var finding = viewModel.Findings.Single(item => item.CheckId == "unknown-trigger").Finding;
+            var script = viewModel.Script!;
+
+            var request = MissionEditor.App.Ai.AiAdvice.BuildRequest(script, new MissionEditor.Core.Graph.TriggerGraph(script), finding, "ai.ini");
+            Check(request.User.Contains("Act_ActTrig = secnod") && request.User.Contains("Ähnliche vorhandene Trigger: second")
+                && request.User.Contains("nickname = second") && request.EditableSections.SetEquals([1]), "AI request carries the section, similar triggers and the editable section");
+
+            const string Answer = """
+                Hier ist die Antwort: {"explanation":"Tippfehler im Triggernamen.","hasFix":true,"sectionStartLine":1,
+                "replacementText":"[Trigger]\nnickname = start\nInitState = ACTIVE\nCnd_True = no_params\nAct_ActTrig = second",
+                "fixSummary":"secnod in second korrigiert.","assumptions":[]}
+                """;
+            var advice = MissionEditor.App.Ai.AiAdvice.Parse(Answer);
+            var fix = MissionEditor.App.Ai.AiAdvice.CheckFix(script, request, finding, advice);
+            Check(advice.HasFix && fix.FindingResolved && fix.NewFindings.Count == 0 && fix.FindingsAfter < fix.FindingsBefore, "AI fix is checked: the finding disappears, nothing new appears");
+
+            bool rejected = false;
+            try { MissionEditor.App.Ai.AiAdvice.CheckFix(script, request, finding, advice with { SectionStartLine = 7 }); }
+            catch (InvalidDataException) { rejected = true; }
+            Check(rejected, "AI fix for a section that was not offered is rejected");
+
+            var adviceWindow = new AiAdviceWindow(viewModel, finding, askOnOpen: false) { Owner = owner };
+            adviceWindow.ShowAnswerForTest(Answer.Substring(Answer.IndexOf('{')));
+            Check(adviceWindow.OfferedFix is { FindingResolved: true }, "AI window offers the checked fix");
+            if (Environment.GetEnvironmentVariable("MISSION_EDITOR_AI_PREVIEW") is { Length: > 0 } previewPath)
+            {
+                adviceWindow.Show();
+                adviceWindow.UpdateLayout();
+                var dpi = VisualTreeHelper.GetDpi(adviceWindow);
+                var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(adviceWindow.ActualWidth * dpi.DpiScaleX), (int)(adviceWindow.ActualHeight * dpi.DpiScaleY),
+                    dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+                bitmap.Render(adviceWindow);
+                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+                using var previewStream = File.Create(previewPath);
+                encoder.Save(previewStream);
+            }
+            adviceWindow.Close();
+
+            var settingsWindow = new AiSettingsWindow { Owner = owner };
+            settingsWindow.Show();
+            settingsWindow.UpdateLayout();
+            var textBrush = ((SolidColorBrush)Application.Current.FindResource("TextBrush")).Color;
+            var radio = (System.Windows.Controls.RadioButton)settingsWindow.FindName("ClaudeCliOption");
+            Check(radio.Foreground is SolidColorBrush { Color: var radioColor } && radioColor == textBrush, "radio buttons use the readable theme text colour");
+            Check(ProgramLocator.CurrentPath().Contains(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "bin"), StringComparison.OrdinalIgnoreCase),
+                "program search includes the user's .local\\bin even without a refreshed PATH");
+            if (Environment.GetEnvironmentVariable("MISSION_EDITOR_AISETTINGS_PREVIEW") is { Length: > 0 } settingsPreview)
+            {
+                radio.IsChecked = true;
+                settingsWindow.UpdateLayout();
+                var dpi = VisualTreeHelper.GetDpi(settingsWindow);
+                var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(settingsWindow.ActualWidth * dpi.DpiScaleX), (int)(settingsWindow.ActualHeight * dpi.DpiScaleY),
+                    dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+                bitmap.Render(settingsWindow);
+                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+                using var previewStream = File.Create(settingsPreview);
+                encoder.Save(previewStream);
+            }
+            settingsWindow.Close();
+
+            string settingsPath = Path.Combine(folder, "ai-settings.json");
+            new MissionEditor.App.Ai.AiSettings { Provider = MissionEditor.App.Ai.AiProvider.CodexCli, ApiKey = "sk-test-not-a-real-key", Model = "claude-opus-5-5" }.Save(settingsPath);
+            var loaded = MissionEditor.App.Ai.AiSettings.Load(settingsPath);
+            Check(!File.ReadAllText(settingsPath).Contains("sk-test") && loaded.ApiKey == "sk-test-not-a-real-key" && loaded.Provider == MissionEditor.App.Ai.AiProvider.CodexCli,
+                "AI settings keep the API key encrypted and restore it");
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
+    // Adding the server keeps everything else in the client files; the manual instructions yield valid files.
+    private static void CheckAgentClientConfig(string serverPath, string missionsPath)
+    {
+        static void Check(bool value, string message) { if (!value) throw new Exception(message); Console.WriteLine("PASS " + message); }
+        string folder = Path.Combine(Path.GetTempPath(), "mission-agent-config-" + Guid.NewGuid());
+        Directory.CreateDirectory(folder);
+        try
+        {
+            string claudeJson = Path.Combine(folder, ".claude.json");
+            File.WriteAllText(claudeJson, "{\n  \"numStartups\": 7,\n  \"mcpServers\": {\n    \"other\": { \"command\": \"x.exe\" }\n  }\n}");
+            string? backup = AgentClientConfig.AddServer(AgentClient.ClaudeCode, claudeJson, serverPath, missionsPath, false);
+            using (var updated = System.Text.Json.JsonDocument.Parse(File.ReadAllText(claudeJson)))
+            {
+                var root = updated.RootElement;
+                Check(root.GetProperty("numStartups").GetInt32() == 7 && root.GetProperty("mcpServers").TryGetProperty("other", out _),
+                    "agent add keeps other settings and servers");
+                Check(root.GetProperty("mcpServers").GetProperty(AgentConnection.ServerName).GetProperty("type").GetString() == "stdio", "agent add writes the stdio entry");
+            }
+            Check(backup is not null && File.ReadAllText(backup).Contains("\"other\""), "agent add keeps a backup of the previous file");
+            Check(AgentClientConfig.IsConfigured(AgentClient.ClaudeCode, claudeJson), "agent add is detected as configured");
+
+            string broken = Path.Combine(folder, "broken.json");
+            File.WriteAllText(broken, "{ not json");
+            bool rejected = false;
+            try { AgentClientConfig.AddServer(AgentClient.ClaudeDesktop, broken, serverPath, missionsPath, false); }
+            catch (InvalidDataException) { rejected = true; }
+            Check(rejected && File.ReadAllText(broken) == "{ not json", "agent add leaves invalid JSON untouched");
+
+            string desktop = Path.Combine(folder, "Claude", "claude_desktop_config.json");
+            AgentClientConfig.AddServer(AgentClient.ClaudeDesktop, desktop, serverPath, missionsPath, true);
+            Check(File.ReadAllText(desktop).Contains("--allow-writes") && !File.ReadAllText(desktop).Contains("\"type\""), "agent add creates a missing Claude Desktop file");
+
+            string codex = Path.Combine(folder, "config.toml");
+            File.WriteAllText(codex, "model = \"o3\"\n\n[mcp_servers.freelancer-missions]\ncommand = \"old.exe\"\nargs = []\n\n[mcp_servers.other]\ncommand = \"y.exe\"\n");
+            AgentClientConfig.AddServer(AgentClient.Codex, codex, serverPath, missionsPath, false);
+            string toml = File.ReadAllText(codex);
+            Check(!toml.Contains("old.exe") && toml.Contains("[mcp_servers.other]") && toml.Contains("model = \"o3\"")
+                && toml.Split("[mcp_servers.freelancer-missions]").Length == 2, "agent add replaces only the Codex table");
+
+            // The registered workspace and export flag are read back from every format.
+            Check(AgentClientConfig.ConfiguredServer(AgentClient.ClaudeCode, claudeJson) == (missionsPath, false), "registered workspace is read from .claude.json");
+            Check(AgentClientConfig.ConfiguredServer(AgentClient.ClaudeDesktop, desktop) == (missionsPath, true), "registered workspace and export flag are read from Claude Desktop");
+            Check(AgentClientConfig.ConfiguredServer(AgentClient.Codex, codex) == (missionsPath, false), "registered workspace is read from the Codex table");
+            Check(AgentClientConfig.ConfiguredServer(AgentClient.ClaudeDesktop, broken) is null, "no workspace from an invalid file");
+            // Without a folder the entry has no --allow-root; it still counts as set up, with no limit.
+            string unlimited = Path.Combine(folder, "unlimited.json");
+            AgentClientConfig.AddServer(AgentClient.ClaudeCode, unlimited, serverPath, string.Empty, allowWrites: true);
+            Check(AgentClientConfig.ConfiguredServer(AgentClient.ClaudeCode, unlimited) == (string.Empty, true), "an entry without folder is read as set up without limit");
+            File.WriteAllText(unlimited, "{\"mcpServers\":{\"freelancer-missions\":{\"command\":\"x\",\"args\":[\"--workspace\",\"D:\\\\Old\"]}}}");
+            Check(AgentClientConfig.ConfiguredServer(AgentClient.ClaudeCode, unlimited) == (@"D:\Old", false), "the older --workspace option is still read");
+
+            // Manual way: insert the snippet exactly where the instruction says and parse the result.
+            string withoutServers = Path.Combine(folder, "plain.json");
+            File.WriteAllText(withoutServers, "{\n  \"theme\": \"dark\"\n}");
+            (string instruction, string snippet) = AgentClientConfig.ManualSnippet(AgentClient.ClaudeCode, withoutServers, serverPath, missionsPath, false);
+            string pasted = File.ReadAllText(withoutServers).Insert(2, snippet + "\n");
+            using (var parsed = System.Text.Json.JsonDocument.Parse(pasted))
+                Check(instruction.Contains("ersten Zeile") && parsed.RootElement.GetProperty("mcpServers").TryGetProperty(AgentConnection.ServerName, out _)
+                    && parsed.RootElement.GetProperty("theme").GetString() == "dark", "manual snippet fits a file without mcpServers");
+
+            string withServers = Path.Combine(folder, "servers.json");
+            File.WriteAllText(withServers, "{\n  \"mcpServers\": {\n    \"other\": { \"command\": \"x.exe\" }\n  }\n}");
+            (instruction, snippet) = AgentClientConfig.ManualSnippet(AgentClient.ClaudeCode, withServers, serverPath, missionsPath, false);
+            string original = File.ReadAllText(withServers);
+            int afterServers = original.IndexOf("\"mcpServers\": {", StringComparison.Ordinal) + "\"mcpServers\": {".Length + 1;
+            using (var parsed = System.Text.Json.JsonDocument.Parse(original.Insert(afterServers, snippet + "\n")))
+                Check(instruction.Contains("\"mcpServers\": {") && parsed.RootElement.GetProperty("mcpServers").EnumerateObject().Count() == 2,
+                    "manual snippet fits an existing mcpServers block");
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
     }
 }

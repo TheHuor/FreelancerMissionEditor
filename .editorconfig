@@ -1,21 +1,39 @@
+# Eine von Visual Studio generierte .editorconfig-Datei mit C++-Einstellungen.
 root = true
-
-[*.{cs,xaml,csproj,props,slnx}]
 charset = utf-8
-indent_style = space
-indent_size = 4
-insert_final_newline = true
 
-[*.{xaml,csproj,props,slnx}]
-indent_size = 2
-
+# C#-Formatierung und XML-Dokumentation
 [*.cs]
-csharp_style_namespace_declarations = file_scoped:suggestion
-dotnet_style_qualification_for_field = false:suggestion
-dotnet_naming_rule.private_fields_underscore.symbols = private_fields
-dotnet_naming_rule.private_fields_underscore.style = underscore_camel
-dotnet_naming_rule.private_fields_underscore.severity = suggestion
+indent_style = space
+indent_size = 2
+tab_width = 2
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+csharp_style_namespace_declarations = file_scoped
+dotnet_style_qualification_for_field = false
+csharp_space_between_method_declaration_name_and_open_parenthesis = true
+csharp_space_between_method_call_name_and_opening_parenthesis = true
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_space_around_binary_operators = before_and_after
+csharp_space_after_comma = true
+csharp_space_before_comma = false
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_preserve_single_line_blocks = false
+csharp_preserve_single_line_statements = false
+dotnet_sort_system_directives_first = true
+# private-Fields mit Unterstrich
+# (z. B. _viewModel)
+dotnet_naming_rule.private_fields_with_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_with_underscore.style = underscore_prefix_style
+dotnet_naming_rule.private_fields_with_underscore.severity = warning
 dotnet_naming_symbols.private_fields.applicable_kinds = field
 dotnet_naming_symbols.private_fields.applicable_accessibilities = private
-dotnet_naming_style.underscore_camel.capitalization = camel_case
-dotnet_naming_style.underscore_camel.required_prefix = _
+dotnet_naming_style.underscore_prefix_style.required_prefix = _
+dotnet_naming_style.underscore_prefix_style.capitalization = camel_case
+dotnet_diagnostic.CS1591.severity = warning

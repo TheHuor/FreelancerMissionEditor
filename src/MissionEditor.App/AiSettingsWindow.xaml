@@ -1,0 +1,53 @@
+<Window x:Class="MissionEditor.App.AiSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Style="{StaticResource {x:Type Window}}"
+        Title="KI-Einstellungen" Width="680" Height="640" MinWidth="540" MinHeight="520"
+        ShowInTaskbar="False" WindowStartupLocation="CenterOwner">
+  <DockPanel Margin="28,20,28,24">
+    <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,16,0,0" Margin="0,16,0,0">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <Button Content="Speichern" Click="OnSave" IsDefault="True" FontWeight="SemiBold" Padding="14,6" Margin="0,0,8,0" />
+        <Button Content="Abbrechen" IsCancel="True" Padding="14,6" />
+      </StackPanel>
+    </Border>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel>
+        <TextBlock Text="KI-Einstellungen" FontSize="24" FontWeight="SemiBold" />
+        <TextBlock TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0" LineHeight="20"
+                   Text="„Frag KI“ schickt einen Fund mit den betroffenen Abschnitten der Mission an ein Sprachmodell und zeigt Erklärung und Korrekturvorschlag im Editor. Übernommen wird nur, was du bestätigst." />
+
+        <TextBlock Text="ANBIETER" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,20,0,6" />
+        <RadioButton x:Name="ApiOption" GroupName="Provider" Checked="OnProviderChanged" Content="Anthropic-API mit eigenem API-Schlüssel" />
+        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="24,2,0,8"
+                   Text="Kostet pro Anfrage API-Guthaben (meist wenige Cent), unabhängig von einem Claude-Abo. Fund und Abschnitte werden an Anthropic gesendet." />
+        <RadioButton x:Name="ClaudeCliOption" GroupName="Provider" Checked="OnProviderChanged" Content="Claude Code (lokal installierte Kommandozeile „claude“)" />
+        <RadioButton x:Name="CodexCliOption" GroupName="Provider" Checked="OnProviderChanged" Content="Codex (lokal installierte Kommandozeile „codex“)" Margin="0,6,0,0" />
+        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="24,2,0,0"
+                   Text="Nutzt das Abo des jeweiligen Programms; langsamer als die API." />
+
+        <StackPanel x:Name="ApiPanel">
+          <TextBlock Text="API-SCHLÜSSEL" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,20,0,6" />
+          <DockPanel>
+            <Button DockPanel.Dock="Right" x:Name="ForgetKeyButton" Content="Schlüssel löschen" Click="OnForgetKey" Margin="6,0,0,0" Padding="10,4" />
+            <PasswordBox x:Name="KeyBox" AutomationProperties.Name="API-Schlüssel" />
+          </DockPanel>
+          <TextBlock x:Name="KeyStatus" TextWrapping="Wrap" FontSize="12" Margin="0,6,0,0" />
+          <TextBlock Text="MODELL" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,16,0,6" />
+          <TextBox x:Name="ModelBox" FontFamily="Consolas" AutomationProperties.Name="Modell" />
+          <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0"
+                     Text="Standard: claude-opus-5-5. Günstiger, aber weniger gründlich: claude-sonnet-5-5 oder claude-haiku-5-5." />
+        </StackPanel>
+
+        <StackPanel x:Name="CliPanel">
+          <TextBlock Text="PROGRAMM" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,20,0,6" />
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Content="Durchsuchen…" Click="OnBrowseCli" Margin="6,0,0,0" Padding="10,4" />
+            <TextBox x:Name="CliBox" FontFamily="Consolas" TextChanged="OnCliChanged" AutomationProperties.Name="Pfad zum Programm" />
+          </DockPanel>
+          <TextBlock x:Name="CliStatus" TextWrapping="Wrap" FontSize="12" Margin="0,6,0,0" />
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>
