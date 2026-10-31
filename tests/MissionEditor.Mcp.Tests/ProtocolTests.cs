@@ -43,6 +43,16 @@ public sealed class ProtocolTests
             using (JsonDocument summary = JsonDocument.Parse(TextOf(inspected)))
                 Assert.Equal(1, summary.RootElement.GetProperty("triggerCount").GetInt32());
 
+            // A finding without a related line still matches the advertised output schema (null, not a missing property);
+            // clients such as Claude Code reject the whole result otherwise.
+            CallToolResult checkedMission = await Call(client, "check_mission", new() { ["path"] = "sample.ini" }, timeout.Token);
+            Assert.False(checkedMission.IsError ?? false);
+            McpClientTool checkTool = tools.Single(tool => tool.Name == "check_mission");
+            Assert.NotNull(checkTool.ProtocolTool.OutputSchema);
+            Assert.NotNull(checkedMission.StructuredContent);
+            AssertRequiredPropertiesPresent(checkTool.ProtocolTool.OutputSchema.Value,
+                JsonSerializer.SerializeToElement(checkedMission.StructuredContent), "check_mission");
+
             CallToolResult outside = await Call(client, "inspect_mission", new() { ["path"] = "../outside.ini" }, timeout.Token);
             Assert.True(outside.IsError);
 
@@ -67,6 +77,33 @@ public sealed class ProtocolTests
 
     private static Task<CallToolResult> Call(McpClient client, string tool, Dictionary<string, object?> arguments, CancellationToken cancellation) =>
         client.CallToolAsync(tool, arguments, cancellationToken: cancellation).AsTask();
+
+    // Checks the "required" lists of the schema recursively through objects and arrays; enough for the generated record schemas.
+    private static void AssertRequiredPropertiesPresent(JsonElement schema, JsonElement value, string location)
+    {
+        if (value.ValueKind == JsonValueKind.Object)
+        {
+            if (schema.TryGetProperty("required", out JsonElement required))
+            {
+                foreach (JsonElement name in required.EnumerateArray())
+                    Assert.True(value.TryGetProperty(name.GetString()!, out _), $"{location}.{name.GetString()} fehlt, ist im Schema aber Pflicht.");
+            }
+            if (schema.TryGetProperty("properties", out JsonElement properties))
+            {
+                foreach (JsonProperty property in properties.EnumerateObject())
+                {
+                    if (value.TryGetProperty(property.Name, out JsonElement child))
+                        AssertRequiredPropertiesPresent(property.Value, child, $"{location}.{property.Name}");
+                }
+            }
+        }
+        else if (value.ValueKind == JsonValueKind.Array && schema.TryGetProperty("items", out JsonElement items))
+        {
+            int index = 0;
+            foreach (JsonElement element in value.EnumerateArray())
+                AssertRequiredPropertiesPresent(items, element, $"{location}[{index++}]");
+        }
+    }
 
     private static string TextOf(CallToolResult result) => string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
 
