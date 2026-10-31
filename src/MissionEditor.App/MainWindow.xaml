@@ -25,6 +25,35 @@
   </Window.CommandBindings>
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    <SolidColorBrush x:Key="SelectionBrush" Color="#CCE4F7" />
+    <SolidColorBrush x:Key="SelectionAccentBrush" Color="#1565C0" />
+    <SolidColorBrush x:Key="HoverBrush" Color="#EAF3FB" />
+    <!-- List item with a clearly visible selection (also when the list has no focus): light blue
+         background and a blue bar on the left. Background stays bindable for severity tints. -->
+    <Style x:Key="ClearSelectionItem" TargetType="ListBoxItem">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="4,2" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+            <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="4,0,0,0"
+                    Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBrush}" />
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="{StaticResource SelectionBrush}" />
+                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource SelectionAccentBrush}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
     <!-- Severity badge: red circle with a cross for errors, yellow triangle with "!" for warnings,
          grey circle with "i" for hints. Bound to BadgeKind of the DataContext. -->
     <ControlTemplate x:Key="SeverityBadge" TargetType="ContentControl">
@@ -109,7 +138,7 @@
                  SelectionChanged="OnTriggerListSelectionChanged" HorizontalContentAlignment="Stretch"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
           <ListBox.ItemContainerStyle>
-            <Style TargetType="ListBoxItem">
+            <Style TargetType="ListBoxItem" BasedOn="{StaticResource ClearSelectionItem}">
               <Style.Triggers>
                 <DataTrigger Binding="{Binding BadgeKind}" Value="Error">
                   <Setter Property="Background" Value="#FDECEA" />
@@ -265,7 +294,7 @@
                  FontFamily="Consolas" HorizontalContentAlignment="Stretch" KeyDown="OnSectionPreviewKeyDown"
                  ToolTip="Strg+C kopiert die markierten Zeilen" ToolTipService.InitialShowDelay="2000">
           <ListBox.ItemContainerStyle>
-            <Style TargetType="ListBoxItem">
+            <Style TargetType="ListBoxItem" BasedOn="{StaticResource ClearSelectionItem}">
               <Setter Property="Padding" Value="0" />
               <Setter Property="Margin" Value="0" />
             </Style>
@@ -323,10 +352,21 @@
         <DataGrid x:Name="FindingsGrid" ItemsSource="{Binding FindingsView}" AutoGenerateColumns="False" IsReadOnly="True"
                   HeadersVisibility="Column" GridLinesVisibility="None" MouseDoubleClick="OnFindingDoubleClick"
                   EnableRowVirtualization="True">
+          <DataGrid.Resources>
+            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#CCE4F7" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="Black" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#CCE4F7" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="Black" />
+          </DataGrid.Resources>
           <DataGrid.RowStyle>
             <Style TargetType="DataGridRow">
               <Setter Property="ToolTip" Value="{Binding FullText}" />
+              <Setter Property="BorderThickness" Value="4,0,0,0" />
+              <Setter Property="BorderBrush" Value="Transparent" />
               <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                  <Setter Property="BorderBrush" Value="{StaticResource SelectionAccentBrush}" />
+                </Trigger>
                 <DataTrigger Binding="{Binding SeverityText}" Value="Fehler">
                   <Setter Property="Foreground" Value="Firebrick" />
                 </DataTrigger>
