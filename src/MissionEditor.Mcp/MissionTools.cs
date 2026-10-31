@@ -116,7 +116,7 @@ public sealed class MissionTools(MissionWorkspace workspace)
     [McpServerTool(Name = "get_mission_vocabulary", ReadOnly = true, OpenWorld = false, UseStructuredContent = true)]
     [Description("Bedingungs- und Aktionsnamen, die content.dll kennt. Pro Trigger gilt genau eine Bedingung (die letzte Cnd_*-Zeile); neue Storylogik muss vom Agenten begründet werden.")]
     public Vocabulary Vocabulary() => new(EngineVocabulary.Conditions.Order().ToArray(), EngineVocabulary.Actions.Order().ToArray(),
-        "Prüfungen decken Triggerverweise, Namensduplikate und Triggerstruktur ab. Objekt-, Ressourcen- und vollständige Storyprüfung sind nicht enthalten.");
+        "Prüfungen decken Triggerverweise, Namensduplikate, Triggerstruktur, nie aktivierte Trigger, unbekannte und nie benutzte Missionsobjekte, Cnd_Destroyed auf nie gespawnte Objekte und das Erfolgsende ab. Nicht enthalten: Abgleich mit Spieldaten (Systeme, Basen, Loadouts) und inhaltliche Storyprüfung.");
 
     // Expected failures become MCP tool errors with the German message; anything else stays a server fault.
     private static T Run<T>(Func<T> operation)

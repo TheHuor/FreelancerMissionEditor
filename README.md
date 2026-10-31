@@ -81,6 +81,16 @@ dotnet run --project src/MissionEditor.Cli -- hash <nickname>
 | `unknown-trigger` | `Act_ActTrig`, `Act_DeactTrig`, `Cnd_WatchTrigger`, `Act_Save` auf einen Trigger, den es nicht gibt – mit Vorschlag ähnlicher Namen |
 | `duplicate-nickname` | doppelte Namen bei Triggern, `[NPC]`, `[ObjList]`, `[Dialog]`, `[NNObjective]`, `[MsnShip]`/`[MsnFormation]`, `[MsnSolar]`, `[MsnLoot]`, `[MsnRandEnc]`; Namen, die sich nur in der Groß-/Kleinschreibung unterscheiden |
 | `trigger-structure` | `[Trigger]` ohne `nickname`, ohne oder mit mehreren Bedingungen, Zeilen vor `nickname`, falsch geschriebene `Cnd_`/`Act_`-Schlüssel |
+| `unreachable-trigger` | Trigger, die nie aktiv werden (nicht `InitState = ACTIVE`, kein `Act_ActTrig`/`Act_Save` aus einem laufenden Trigger). Hinweis; Warnung, wenn ein laufender Trigger per `Cnd_WatchTrigger` auf ihn wartet und deshalb hängt. Fehlt jeder Starttrigger, gibt es eine Warnung |
+| `unknown-object` | `Act_SpawnShip`/`SpawnShipRel`/`SpawnFormation`/`SpawnSolar`/`SpawnLoot` auf einen Namen, den es nicht gibt oder nur in anderer Schreibweise (exakter Vergleich wie im Spiel); unbekannte `[ObjList]` (`Act_GiveObjList`, Spawn, `init_objectives`; `no_ol` zählt nicht), `[Dialog]` (`Act_StartDialog`) und `[NNObjective]` (`Act_SetNNObj`/`SetNNState`/`SetNNHidden`) |
+| `impossible-condition` | `Cnd_Destroyed` auf ein Schiff, eine Formation, eine Station oder ein Label dieser Datei, das nie gespawnt wird – der Trigger löst nie aus |
+| `unused-object` | Schiffe, Formationen, Stationen und Beute, die nie gespawnt werden, nie vergebene Befehlslisten, nie gestartete Dialoge, nie gesetzte Ziele (Hinweis) |
+| `mission-end` | kein `Act_ChangeState = SUCCEED` (Hinweis) oder nur in Triggern, die nie aktiv werden (Warnung) |
+
+Funde in Triggern, die nie aktiv werden, sind nur Hinweise – dort wirkt ohnehin nichts. Gegen die
+14 Storymissionen des Originalspiels geprüft: Sie enthalten viel toten Code (z. B. eine ungenutzte
+Musik-Bibliothek in m10), aber auch echte Fehler, etwa `dock_with_Bw08_01` in m07 (die Liste heißt
+`dock_with_Bw09_02`) oder `Cnd_Destroyed` auf die nie gespawnten Schiffe `AlphaWing_3/4` in m13.
 
 ## Wie das Spiel die Datei liest
 

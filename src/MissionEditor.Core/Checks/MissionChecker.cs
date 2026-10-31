@@ -11,6 +11,11 @@ public static class MissionChecker
         new UnknownTriggerTargetCheck(),
         new DuplicateNicknameCheck(),
         new TriggerStructureCheck(),
+        new UnreachableTriggerCheck(),
+        new UnknownObjectCheck(),
+        new ImpossibleConditionCheck(),
+        new UnusedObjectCheck(),
+        new MissionEndCheck(),
     ];
 
     /// <summary>Runs every check and returns the findings sorted by line.</summary>

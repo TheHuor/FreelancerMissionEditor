@@ -107,7 +107,7 @@ public static partial class AgentPrompts
         text.AppendLine($"Datei: {missionReference}");
         text.AppendLine();
         text.AppendLine("Prüfe die Mission auf Lücken und Brüche im Ablauf – über die Prüfungen des Editors hinaus.");
-        text.AppendLine("1. check_mission (ab Warning) als Ausgangspunkt; dann den Ablauf ab den Triggern mit InitState = ACTIVE mit list_triggers und get_trigger_context nachverfolgen.");
+        text.AppendLine("1. check_mission (ab Info) als Ausgangspunkt – der Editor findet nie aktivierte Trigger, unbekannte oder nie gespawnte Objekte und ein fehlendes Erfolgsende schon selbst; bewerte diese Funde und such darüber hinaus, indem du den Ablauf ab den Triggern mit InitState = ACTIVE mit list_triggers und get_trigger_context nachverfolgst.");
         text.AppendLine("2. Such gezielt nach:");
         text.AppendLine("   - Triggern, die nie aktiviert werden (nicht ACTIVE und von keinem Act_ActTrig erreicht);");
         text.AppendLine("   - Sackgassen: Abschnitte, nach denen nichts mehr ausgelöst wird und die Mission weder gelingt noch scheitert;");
