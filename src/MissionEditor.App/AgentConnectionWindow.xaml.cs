@@ -22,11 +22,14 @@ public partial class AgentConnectionWindow : Window
         ServerBox.Text = rememberedExecutable is not null && File.Exists(rememberedExecutable)
             ? rememberedExecutable
             : AgentConnection.FindServerExecutable() ?? string.Empty;
-        // The remembered workspace wins when the open mission lies inside it (or no mission is open).
+        // A workspace already registered at a client (or remembered) wins when the open mission lies inside it
+        // or no mission is open; otherwise the mission's folder is suggested.
+        IEnumerable<string> known = AgentClientConfig.ConfiguredServers().Select(server => server.Workspace).Where(Directory.Exists);
+        if (rememberedWorkspace is not null && Directory.Exists(rememberedWorkspace))
+            known = known.Append(rememberedWorkspace);
+        (string? knownWorkspace, bool containsMission) = AgentPrompts.ChooseWorkspace(missionPath, known);
         string? missionFolder = missionPath is null ? null : Path.GetDirectoryName(missionPath);
-        bool rememberedFits = rememberedWorkspace is not null && Directory.Exists(rememberedWorkspace)
-            && (missionPath is null || AgentPrompts.RelativeToWorkspace(missionPath, rememberedWorkspace) is not null);
-        WorkspaceBox.Text = rememberedFits ? rememberedWorkspace! : missionFolder ?? string.Empty;
+        WorkspaceBox.Text = knownWorkspace is not null && (containsMission || missionPath is null) ? knownWorkspace : missionFolder ?? string.Empty;
         AllowWritesBox.IsChecked = allowWrites;
         UnsavedHint.Visibility = hasUnsavedChanges ? Visibility.Visible : Visibility.Collapsed;
         _hasClaudeCommand = AgentConnection.IsClaudeCommandAvailable();

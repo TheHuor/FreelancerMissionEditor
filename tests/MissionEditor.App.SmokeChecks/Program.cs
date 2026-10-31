@@ -156,6 +156,9 @@ internal static class Program
         const string Workspace = @"D:\Games\Freelancer\DATA\MISSIONS";
         Check(AgentPrompts.RelativeToWorkspace(@"D:\Games\Freelancer\DATA\MISSIONS\M13\m13.ini", Workspace) == @"M13\m13.ini", "prompt path is relative to the workspace");
         Check(AgentPrompts.RelativeToWorkspace(@"D:\Other\m13.ini", Workspace) is null, "prompt path outside the workspace is detected");
+        Check(AgentPrompts.ChooseWorkspace(@"D:\Games\Freelancer\DATA\MISSIONS\M13\m13.ini", [@"D:\Other", Workspace, Workspace + @"\M13"])
+            == (Workspace + @"\M13", true), "the innermost workspace containing the mission is chosen");
+        Check(AgentPrompts.ChooseWorkspace(@"D:\Other\x.ini", [Workspace]) == (Workspace, false), "a workspace not containing the mission is reported as such");
 
         var missing = new MissionEditor.Core.Checks.Finding(MissionEditor.Core.Checks.FindingSeverity.Error, "unknown-trigger", 5582, "check_capcf2",
             "Act_ActTrig auf unbekannten Trigger 'turn_off_music' – die Aktivierung passiert nie.", "Hinweis");
@@ -215,6 +218,12 @@ internal static class Program
             string toml = File.ReadAllText(codex);
             Check(!toml.Contains("old.exe") && toml.Contains("[mcp_servers.other]") && toml.Contains("model = \"o3\"")
                 && toml.Split("[mcp_servers.freelancer-missions]").Length == 2, "agent add replaces only the Codex table");
+
+            // The registered workspace and export flag are read back from every format.
+            Check(AgentClientConfig.ConfiguredServer(AgentClient.ClaudeCode, claudeJson) == (missionsPath, false), "registered workspace is read from .claude.json");
+            Check(AgentClientConfig.ConfiguredServer(AgentClient.ClaudeDesktop, desktop) == (missionsPath, true), "registered workspace and export flag are read from Claude Desktop");
+            Check(AgentClientConfig.ConfiguredServer(AgentClient.Codex, codex) == (missionsPath, false), "registered workspace is read from the Codex table");
+            Check(AgentClientConfig.ConfiguredServer(AgentClient.ClaudeDesktop, broken) is null, "no workspace from an invalid file");
 
             // Manual way: insert the snippet exactly where the instruction says and parse the result.
             string withoutServers = Path.Combine(folder, "plain.json");

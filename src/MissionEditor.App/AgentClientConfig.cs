@@ -61,6 +61,52 @@ public static partial class AgentClientConfig
         }
     }
 
+    /// <summary>The workspace and export flag given to the server in a client's configuration, or null when it has no entry.</summary>
+    public static (string Workspace, bool AllowWrites)? ConfiguredServer(AgentClient client, string configPath)
+    {
+        try
+        {
+            if (!File.Exists(configPath))
+                return null;
+            string text = File.ReadAllText(configPath);
+            IEnumerable<string> arguments;
+            if (client == AgentClient.Codex)
+            {
+                Match section = CodexSectionHeader().Match(text);
+                if (!section.Success)
+                    return null;
+                string body = text[(section.Index + section.Length)..];
+                int nextTable = Regex.Match(body, @"^\s*\[", RegexOptions.Multiline) is { Success: true } next ? next.Index : body.Length;
+                Match args = Regex.Match(body[..nextTable], @"^\s*args\s*=\s*\[(.*)\]", RegexOptions.Multiline);
+                if (!args.Success)
+                    return null;
+                arguments = Regex.Matches(args.Groups[1].Value, "\"((?:[^\"\\\\]|\\\\.)*)\"")
+                    .Select(match => match.Groups[1].Value.Replace("\\\"", "\"").Replace("\\\\", "\\"));
+            }
+            else
+            {
+                if (JsonNode.Parse(text)?["mcpServers"]?[AgentConnection.ServerName]?["args"] is not JsonArray array)
+                    return null;
+                arguments = array.Select(item => item?.GetValue<string>() ?? string.Empty);
+            }
+            List<string> list = arguments.ToList();
+            int index = list.IndexOf("--workspace");
+            return index >= 0 && index + 1 < list.Count ? (list[index + 1], list.Contains("--allow-writes")) : null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException or FormatException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The server entries of all clients that have it registered.</summary>
+    public static IReadOnlyList<(AgentClient Client, string Workspace, bool AllowWrites)> ConfiguredServers() =>
+        Enum.GetValues<AgentClient>()
+            .Select(client => (Client: client, Server: ConfiguredServer(client, ConfigPath(client))))
+            .Where(entry => entry.Server is not null)
+            .Select(entry => (entry.Client, entry.Server!.Value.Workspace, entry.Server!.Value.AllowWrites))
+            .ToList();
+
     /// <summary>
     /// What to paste by hand and where, depending on the current state of the client's file: a whole
     /// file, a <c>"mcpServers"</c> member for an object without one, or just the server entry.

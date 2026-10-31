@@ -23,6 +23,24 @@ public static partial class AgentPrompts
             : relative;
     }
 
+    /// <summary>
+    /// The workspace to name files against: of all workspaces registered at the clients (and the one the
+    /// editor remembered), the one that contains the mission; otherwise the first known one, or null.
+    /// </summary>
+    public static (string? Workspace, bool ContainsMission) ChooseWorkspace(string? missionPath, IEnumerable<string> workspaces)
+    {
+        List<string> known = workspaces.Where(workspace => workspace.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (missionPath is not null)
+        {
+            // The innermost folder gives the shortest relative path.
+            string? containing = known.Where(workspace => RelativeToWorkspace(missionPath, workspace) is not null)
+                .OrderByDescending(workspace => workspace.Length).FirstOrDefault();
+            if (containing is not null)
+                return (containing, true);
+        }
+        return (known.FirstOrDefault(), false);
+    }
+
     /// <summary>Asks the agent to explain one finding and propose a fix.</summary>
     public static string ForFinding(string missionReference, Finding finding)
     {

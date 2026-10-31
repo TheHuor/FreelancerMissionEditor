@@ -90,7 +90,7 @@ public partial class MainWindow : Window
 
     private void OnAskAgentForNewMission(object sender, RoutedEventArgs args)
     {
-        (_, string? workspace, bool allowWrites) = AgentConnection.LoadSettings();
+        (string? workspace, _, bool allowWrites) = ResolveAgentWorkspace(ViewModel.FilePath);
         var dialog = new NewMissionPromptWindow(ViewModel.FilePath, workspace, allowWrites) { Owner = this };
         if (dialog.ShowDialog() == true)
             ViewModel.ReportStatus("Auftrag für eine neue Mission kopiert – in Claude oder Codex mit Strg+V einfügen.");
@@ -105,19 +105,44 @@ public partial class MainWindow : Window
             ViewModel.ReportStatus("Erst eine Mission öffnen.");
             return;
         }
-        (_, string? workspace, _) = AgentConnection.LoadSettings();
+        (string? workspace, string clients, _) = ResolveAgentWorkspace(missionPath);
         string? relative = workspace is null ? null : AgentPrompts.RelativeToWorkspace(missionPath, workspace);
         Clipboard.SetText(buildPrompt(relative ?? missionPath));
 
-        string status = "Auftrag kopiert – in Claude oder Codex mit Strg+V einfügen.";
-        if (workspace is null)
-            status += " Achtung: Der MCP-Server ist noch nicht eingerichtet („KI-Agent ▾ → KI-Agent verbinden…“).";
-        else if (relative is null)
-            status += $" Achtung: Die Mission liegt nicht im Workspace des Agenten ({workspace}); er kann sie so nicht lesen.";
+        string status = workspace is null
+            ? "Auftrag kopiert. Achtung: Bei keinem Client (Claude Code, Claude Desktop, Codex) ist der MCP-Server eingetragen – „KI-Agent ▾ → KI-Agent verbinden…“."
+            : relative is null
+                ? $"Auftrag kopiert. Achtung: Die Mission liegt nicht im Workspace des Servers ({workspace}); der Agent kann sie so nicht lesen. Workspace im Verbinden-Dialog anpassen."
+                : $"Auftrag kopiert – in {clients} mit Strg+V einfügen (Workspace {workspace}).";
         if (ViewModel.IsModified)
             status += " Ungespeicherte Änderungen: erst speichern (Strg+S), der Agent sieht nur die Datei.";
         ViewModel.ReportStatus(status);
     }
+
+    // The workspace from the clients' server entries (plus the one remembered by the editor), preferring the one
+    // that contains the mission, with the names of the clients that use it and whether exports are allowed there.
+    private static (string? Workspace, string Clients, bool AllowWrites) ResolveAgentWorkspace(string? missionPath)
+    {
+        IReadOnlyList<(AgentClient Client, string Workspace, bool AllowWrites)> servers = AgentClientConfig.ConfiguredServers();
+        (_, string? remembered, bool rememberedWrites) = AgentConnection.LoadSettings();
+        IEnumerable<string> candidates = servers.Select(server => server.Workspace);
+        if (remembered is not null)
+            candidates = candidates.Append(remembered);
+        (string? workspace, _) = AgentPrompts.ChooseWorkspace(missionPath, candidates);
+        if (workspace is null)
+            return (null, string.Empty, false);
+        var matching = servers.Where(server => string.Equals(Path.GetFullPath(server.Workspace), Path.GetFullPath(workspace), StringComparison.OrdinalIgnoreCase)).ToList();
+        string clients = matching.Count == 0 ? "Claude oder Codex" : string.Join(" bzw. ", matching.Select(server => AgentClientName(server.Client)));
+        bool allowWrites = matching.Count > 0 ? matching.Any(server => server.AllowWrites) : rememberedWrites;
+        return (workspace, clients, allowWrites);
+    }
+
+    private static string AgentClientName(AgentClient client) => client switch
+    {
+        AgentClient.ClaudeCode => "Claude Code",
+        AgentClient.ClaudeDesktop => "Claude Desktop",
+        _ => "Codex",
+    };
 
     private void OnOpen(object sender, ExecutedRoutedEventArgs args)
     {
