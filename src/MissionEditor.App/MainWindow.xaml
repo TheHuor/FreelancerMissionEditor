@@ -234,7 +234,7 @@
           <RowDefinition Height="5" />
           <RowDefinition Height="2*" />
         </Grid.RowDefinitions>
-        <TextBlock Grid.Row="0" Text="{Binding SelectedTrigger.Name}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Grid.Row="0" Text="{Binding DetailsTitle}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
         <TextBlock Grid.Row="1" Text="{Binding SelectedSummary}" Foreground="Gray" Margin="0,2,0,6" TextWrapping="Wrap" />
         <Expander Grid.Row="2" Header="{Binding SelectedFindingsHeader}" IsExpanded="{Binding FindingsExpanded, Mode=TwoWay}" Margin="0,0,0,6" FontWeight="SemiBold"
                   Visibility="{Binding HasSelectedFindings, Converter={StaticResource BoolToVisibility}}">

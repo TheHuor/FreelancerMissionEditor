@@ -35,6 +35,8 @@ public sealed class MainViewModel : ObservableObject
     private bool _backupWritten;
     private FindingItem? _currentFinding;
     private bool _findingsExpanded = true;
+    private IniSection? _focusSection;
+    private IReadOnlyList<FindingItem> _focusFindings = [];
     private ILookup<int, FindingItem> _findingsByLine = Array.Empty<FindingItem>().ToLookup(finding => finding.LineNumber);
 
     /// <summary>Creates the view model.</summary>
@@ -135,28 +137,40 @@ public sealed class MainViewModel : ObservableObject
         {
             if (finding.Node != SelectedTrigger?.Node)
                 SelectNode(finding.Node);
+            else if (_focusSection is not null)
+                OnSelectionChanged();
             FindingsExpanded = true;
             CurrentFinding = finding;
         }
-        else if (Script is not null)
+        else if (Script is not null && Script.Document.FindSectionAt(finding.LineNumber) is { } section)
         {
-            CurrentFinding = null;
-            var parts = new List<(string? Caption, IniSection Section)>();
-            IniSection? section = Script.Document.FindSectionAt(finding.LineNumber);
-            if (section is not null)
-                parts.Add(($"Fundstelle [{section.Name}], Zeile {finding.LineNumber}", section));
+            // Not a trigger: the details show the section itself; the trigger selection goes away.
+            SelectNode(null);
+            var parts = new List<(string? Caption, IniSection Section)> { ($"Fundstelle [{section.Name}], Zeile {finding.LineNumber}", section) };
             if (finding.Finding.RelatedLineNumber is int related && Script.Document.FindSectionAt(related) is { } relatedSection && relatedSection != section)
                 parts.Add(($"Bezug: Zeile {related}", relatedSection));
+            _focusSection = section;
+            _focusFindings = parts.SelectMany(part => new[] { part.Section.Header }.Concat(part.Section.Lines))
+                .SelectMany(line => _findingsByLine[line.Number]).Distinct().ToList();
             SelectedSectionLines = BuildPreview(parts);
+            FindingsExpanded = true;
+            _currentFinding = finding;
+            NotifyDetailsChanged();
         }
         return SelectedSectionLines.FirstOrDefault(line => line.Number == finding.LineNumber);
     }
+
+    /// <summary>Title of the details pane: the trigger name or the shown section.</summary>
+    public string DetailsTitle => SelectedTrigger?.Name
+        ?? (_focusSection is { } section ? $"[{section.Name}] {section.Find("nickname")?.GetValue(0)}".TrimEnd() : string.Empty);
 
     /// <summary>Header text of the details pane.</summary>
     public string SelectedSummary
     {
         get
         {
+            if (SelectedTrigger is null && _focusSection is { } section)
+                return $"Zeile {section.FirstLineNumber}  ·  keine Trigger-Sektion – Graph und Verweise gibt es nur für Trigger";
             Trigger? trigger = SelectedTrigger?.Node.Trigger;
             if (trigger is null)
                 return SelectedTrigger is null ? string.Empty : "nicht definiert";
@@ -286,7 +300,7 @@ public sealed class MainViewModel : ObservableObject
         {
             var rows = new List<FindingRow>();
             string? previousHint = null;
-            foreach (FindingItem finding in SelectedTrigger?.Findings ?? [])
+            foreach (FindingItem finding in DetailFindingsSource)
             {
                 rows.Add(new FindingRow(finding, finding.Hint != previousHint, finding == CurrentFinding));
                 previousHint = finding.Hint;
@@ -314,10 +328,13 @@ public sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>Header of the findings area, e.g. "Funde (6)".</summary>
-    public string SelectedFindingsHeader => $"Funde ({SelectedTrigger?.Findings.Count ?? 0})";
+    public string SelectedFindingsHeader => $"Funde ({DetailFindingsSource.Count})";
 
     /// <summary>True when the selected trigger has findings.</summary>
-    public bool HasSelectedFindings => SelectedTrigger?.Findings.Count > 0;
+    public bool HasSelectedFindings => DetailFindingsSource.Count > 0;
+
+    // The findings the details pane lists: those of the selected trigger, or of the shown non-trigger section.
+    private IReadOnlyList<FindingItem> DetailFindingsSource => SelectedTrigger?.Findings ?? _focusFindings;
 
     /// <summary>The severities to choose from, with German names.</summary>
     public IReadOnlyList<KeyValuePair<FindingSeverity, string>> Severities { get; } =
@@ -544,6 +561,8 @@ public sealed class MainViewModel : ObservableObject
     private void OnSelectionChanged()
     {
         _currentFinding = null;
+        _focusSection = null;
+        _focusFindings = [];
         References.Clear();
         if (SelectedTrigger is not null)
         {
@@ -551,11 +570,17 @@ public sealed class MainViewModel : ObservableObject
                 References.Add(reference);
         }
         SelectedSectionLines = BuildTriggerPreview();
+        NotifyDetailsChanged();
+        UpdateLayout();
+    }
+
+    private void NotifyDetailsChanged()
+    {
+        OnPropertyChanged(nameof(DetailsTitle));
+        OnPropertyChanged(nameof(SelectedSummary));
         OnPropertyChanged(nameof(SelectedFindings));
         OnPropertyChanged(nameof(SelectedFindingsHeader));
         OnPropertyChanged(nameof(HasSelectedFindings));
-        OnPropertyChanged(nameof(SelectedSummary));
-        UpdateLayout();
     }
 
     private IReadOnlyList<SectionLineItem> BuildTriggerPreview()
