@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MissionEditor.App/MissionEditor.App.csproj" />
+    <Project Path="src/MissionEditor.Cli/MissionEditor.Cli.csproj" />
+    <Project Path="src/MissionEditor.Core/MissionEditor.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MissionEditor.Tests/MissionEditor.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Authors>TheHuor</Authors>
+    <Product>Freelancer Mission Editor</Product>
+  </PropertyGroup>
+</Project>
