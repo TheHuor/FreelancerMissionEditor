@@ -89,9 +89,9 @@ public class MissionScriptTests
     {
         List<Finding> findings = new DuplicateNicknameCheck().Run(Load()).ToList();
         Assert.Contains(findings, finding => finding.Subject == "Second" && finding.Severity == FindingSeverity.Warning);
-        Assert.Contains(findings, finding => finding.Subject == "Wing" && finding.Message.Contains("MsnShip/MsnFormation"));
+        Assert.Contains(findings, finding => finding.Subject == "Wing" && finding.Message.Contains("[MsnFormation]") && finding.Hint!.Contains("gemeinsamen Liste"));
         Assert.Contains(findings, finding => finding.Subject == "wing" && finding.Severity == FindingSeverity.Info);
-        Assert.Contains(findings, finding => finding.Subject == "FOLLOW" && finding.Message.Contains("ObjList"));
+        Assert.Contains(findings, finding => finding.Subject == "FOLLOW" && finding.Message.Contains("ObjList") && finding.Hint!.Contains("Zeile 11"));
     }
 
     [Fact]
