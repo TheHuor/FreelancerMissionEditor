@@ -93,6 +93,7 @@
         <Button Style="{StaticResource {x:Type Button}}" Command="{Binding UndoCommand}" Content="↶ Rückgängig" ToolTip="Letzte Änderung zurücknehmen (Strg+Z)" />
         <Separator />
         <Button Style="{StaticResource {x:Type Button}}" Command="{Binding BackCommand}" Content="◀ Zurück" ToolTip="Zum vorher gewählten Trigger (Alt+←)" />
+        <Button Content="▶ Durchspielen" Click="OnSimulate" Margin="6,0,0,0" ToolTip="Den Ablauf der Trigger Schritt für Schritt durchspielen, ohne das Spiel zu starten" />
         <Button x:Name="AgentMenuButton" Content="KI-Agent ▾" Click="OnAgentMenu" Margin="12,0,0,0" ToolTip="Aufträge für Claude oder Codex kopieren und den MCP-Server einrichten">
           <Button.ContextMenu>
             <ContextMenu>

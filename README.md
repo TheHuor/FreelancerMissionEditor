@@ -55,6 +55,7 @@ Der optionale zweite Parameter wählt beim Start einen Trigger aus. Dateien lass
 | Abschnitt ändern | „Bearbeiten“ über dem Abschnitt in der Vorschau, Übernehmen mit Strg+Enter |
 | Abschnitt löschen | „Löschen“ über dem Abschnitt |
 | Rückgängig / Speichern | Strg+Z / Strg+S |
+| Ablauf durchspielen | „▶ Durchspielen“: aktive Trigger von Hand auslösen, `Cnd_True` löst sofort aus; das Protokoll zeigt Aktivierungen, Abschaltungen, Spawns, Ziele, Speicherpunkte und das Missionsende. Bleibt nichts aktiv ohne Ende, sagt das Fenster, dass die Mission hier stehen bleibt. Bedingungen selbst werden nicht ausgewertet |
 
 Symbole: roter Kreis mit ✕ = Fehler, gelbes Dreieck mit ! = Warnung, grauer Kreis mit i = Hinweis.
 

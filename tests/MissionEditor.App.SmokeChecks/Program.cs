@@ -178,6 +178,8 @@ internal static class Program
         var compare = new CompareWindow(vm, draftPath, MissionEditor.Core.Ini.IniDocument.Load(draftPath)) { Owner = window };
         Assert(compare.Changes.Count == 1 && compare.Changes[0].Kind == MissionEditor.Core.Ini.SectionChangeKind.Changed
             && compare.Changes[0].Title.Contains(startTrigger.Nickname), "compare finds exactly the changed section of the draft");
+        compare.Show();
+        SavePreview(compare, "compare");
         compare.ApplyForTest(_ => true);
         Assert(vm.IsModified && vm.Script!.Document.Lines.Any(line => line.Text == "Act_DebugMsg = from_the_draft"), "compare takes the chosen section over (with undo)");
         vm.UndoCommand.Execute(null);
@@ -196,12 +198,42 @@ internal static class Program
         Assert(((TextBox)missionAdvice.FindName("AnswerBox")).Text == "1. Blockiert: …", "mission answer is shown in the editor");
         missionAdvice.Close();
 
+        // Stepping through the flow: the start triggers are active, firing one runs its actions.
+        var simulation = new SimulationWindow(vm) { Owner = window };
+        simulation.Show(); simulation.UpdateLayout();
+        Assert(simulation.Simulator.Active.Count > 0 || simulation.Simulator.Steps.Count > 0, "simulation starts with the active triggers");
+        if (simulation.Simulator.Active.FirstOrDefault() is { } firstActive)
+        {
+            int steps = simulation.Simulator.Steps.Count;
+            simulation.FireForTest(firstActive.Nickname);
+            Assert(simulation.Simulator.Steps.Count > steps && ((ListBox)simulation.FindName("LogList")).Items.Count > 0, "firing a trigger adds its step to the log");
+            Assert(vm.SelectedTrigger is not null, "simulation leaves a trigger selected in the main window");
+        }
+        SavePreview(simulation, "simulation");
+        simulation.Close();
+
         about.Close();
         Console.WriteLine("ALL CHECKS PASSED");
         File.Delete(tmp);
         File.Delete(tmp + ".bak");
         window.Close();
         app.Shutdown();
+    }
+
+    // With MISSION_EDITOR_PREVIEW_DIR set, saves a DPI-aware picture of the window there for a visual check.
+    private static void SavePreview(Window window, string name)
+    {
+        if (Environment.GetEnvironmentVariable("MISSION_EDITOR_PREVIEW_DIR") is not { Length: > 0 } folder)
+            return;
+        window.UpdateLayout();
+        var dpi = VisualTreeHelper.GetDpi(window);
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(window.ActualWidth * dpi.DpiScaleX), (int)(window.ActualHeight * dpi.DpiScaleY),
+            dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+        bitmap.Render(window);
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+        using var stream = File.Create(Path.Combine(folder, name + ".png"));
+        encoder.Save(stream);
     }
 
     // Requests for the agent name the file relative to the workspace, the finding and the right tools.

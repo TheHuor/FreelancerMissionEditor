@@ -119,6 +119,16 @@ public partial class MainWindow : Window
 
     private void OnAskAiForGapsAndBreaks(object sender, RoutedEventArgs args) => AskAiAboutMission(Ai.MissionQuestion.GapsAndBreaks);
 
+    private void OnSimulate(object sender, RoutedEventArgs args)
+    {
+        if (ViewModel.Script is null)
+        {
+            ViewModel.ReportStatus("Erst eine Mission öffnen.");
+            return;
+        }
+        new SimulationWindow(ViewModel) { Owner = this }.Show();
+    }
+
     private void AskAiAboutMission(Ai.MissionQuestion question)
     {
         if (ViewModel.Script is null)

@@ -31,7 +31,7 @@ public partial class CompareWindow : Window
         _before = Count(_baseDocument);
         HeaderText.Text = _items.Count == 0
             ? $"{Path.GetFileName(otherPath)} hat dieselben Abschnitte wie die geöffnete Mission."
-            : $"{_items.Count} Abschnitte unterscheiden sich von {otherPath}. Angehakte Abschnitte werden übernommen; "
+            : $"{(_items.Count == 1 ? "1 Abschnitt unterscheidet" : $"{_items.Count} Abschnitte unterscheiden")} sich von {otherPath}. Angehakte Abschnitte werden übernommen; "
               + "neue Abschnitte kommen hinter den Abschnitt, hinter dem sie in der anderen Datei stehen.";
         ChangeList.ItemsSource = _items;
         if (_items.Count > 0)
@@ -115,7 +115,7 @@ public partial class CompareWindow : Window
         List<SectionChange> chosen = _items.Where(item => item.IsChosen).Select(item => item.Change).ToList();
         try
         {
-            _viewModel.ApplyDocument(SectionDiff.Apply(_baseDocument, _other, chosen), $"{chosen.Count} Abschnitte aus dem Vergleich übernommen");
+            _viewModel.ApplyDocument(SectionDiff.Apply(_baseDocument, _other, chosen), chosen.Count == 1 ? "1 Abschnitt aus dem Vergleich übernommen" : $"{chosen.Count} Abschnitte aus dem Vergleich übernommen");
             Close();
         }
         catch (InvalidDataException exception)
