@@ -157,6 +157,33 @@ internal static class Program
         else
             Console.WriteLine("SKIP IDS texts (original game not installed)");
 
+        // A change by another program (the agent) shows the reload banner; the editor's own save does not.
+        vm.Load(tmp);
+        typeof(MainWindow).GetMethod("WatchFile", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, [tmp]);
+        window.CheckDiskState();
+        Assert(!window.IsChangedOnDiskBannerVisible, "no reload banner right after loading");
+        File.AppendAllText(tmp, "\r\n; changed by the agent\r\n");
+        File.SetLastWriteTimeUtc(tmp, DateTime.UtcNow.AddMinutes(1));
+        window.CheckDiskState();
+        Assert(window.IsChangedOnDiskBannerVisible, "a change on disk shows the reload banner");
+        vm.Load(tmp);
+        typeof(MainWindow).GetMethod("WatchFile", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, [tmp]);
+
+        // Compare with an exported draft and take over the changed section.
+        var startTrigger = vm.Script!.EffectiveTriggers.First();
+        string draftPath = tmp + ".draft.ini";
+        string draftText = File.ReadAllText(tmp, MissionEditor.Core.Ini.IniDocument.Windows1252)
+            .Replace(startTrigger.NicknameLine.Text, startTrigger.NicknameLine.Text + "\r\nAct_DebugMsg = from_the_draft");
+        File.WriteAllText(draftPath, draftText, MissionEditor.Core.Ini.IniDocument.Windows1252);
+        var compare = new CompareWindow(vm, draftPath, MissionEditor.Core.Ini.IniDocument.Load(draftPath)) { Owner = window };
+        Assert(compare.Changes.Count == 1 && compare.Changes[0].Kind == MissionEditor.Core.Ini.SectionChangeKind.Changed
+            && compare.Changes[0].Title.Contains(startTrigger.Nickname), "compare finds exactly the changed section of the draft");
+        compare.ApplyForTest(_ => true);
+        Assert(vm.IsModified && vm.Script!.Document.Lines.Any(line => line.Text == "Act_DebugMsg = from_the_draft"), "compare takes the chosen section over (with undo)");
+        vm.UndoCommand.Execute(null);
+        Assert(!vm.Script!.Document.Lines.Any(line => line.Text == "Act_DebugMsg = from_the_draft"), "undo reverts the taken-over sections");
+        File.Delete(draftPath);
+
         about.Close();
         Console.WriteLine("ALL CHECKS PASSED");
         File.Delete(tmp);

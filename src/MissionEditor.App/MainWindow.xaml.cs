@@ -47,6 +47,7 @@ public partial class MainWindow : Window
         {
             Mouse.OverrideCursor = Cursors.Wait;
             ViewModel.Load(path);
+            WatchFile(path);
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
         {
@@ -181,6 +182,26 @@ public partial class MainWindow : Window
             LoadFile(dialog.FileName);
     }
 
+    private void OnCompareWithFile(object sender, RoutedEventArgs args)
+    {
+        if (ViewModel.Script is null || ViewModel.FilePath is not { } current)
+        {
+            ViewModel.ReportStatus("Erst eine Mission öffnen.");
+            return;
+        }
+        var dialog = new OpenFileDialog { Filter = FileFilter, InitialDirectory = Path.GetDirectoryName(current), Title = "Datei zum Vergleichen wählen (z. B. ein exportierter Entwurf)" };
+        if (dialog.ShowDialog(this) != true)
+            return;
+        try
+        {
+            new CompareWindow(ViewModel, dialog.FileName, MissionEditor.Core.Ini.IniDocument.Load(dialog.FileName)) { Owner = this }.ShowDialog();
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, exception.Message, "Datei kann nicht geladen werden", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void OnReload(object sender, ExecutedRoutedEventArgs args)
     {
         if (ViewModel.FilePath is { } path)
@@ -195,6 +216,7 @@ public partial class MainWindow : Window
         try
         {
             ViewModel.SaveAs(dialog.FileName);
+            WatchFile(dialog.FileName);
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
         {
@@ -213,6 +235,7 @@ public partial class MainWindow : Window
         try
         {
             ViewModel.Save();
+            RememberDiskState();
             return true;
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)

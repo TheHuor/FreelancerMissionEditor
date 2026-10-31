@@ -101,6 +101,8 @@
               <MenuItem Header="Alle Funde erklären lassen" Click="OnAskAgentForAllFindings" ToolTip="Auftrag kopieren: Funde der Mission zusammenfassen, erklären und Korrekturen vorschlagen" />
               <MenuItem Header="Neue Mission mit KI…" Click="OnAskAgentForNewMission" />
               <Separator />
+              <MenuItem Header="Mit Datei vergleichen…" Click="OnCompareWithFile" ToolTip="Einen exportierten Entwurf (oder eine andere Fassung) abschnittsweise vergleichen und übernehmen" />
+              <Separator />
               <MenuItem Header="KI-Agent verbinden…" Click="OnConnectAgent" />
               <MenuItem Header="KI-Einstellungen…" Click="OnAiSettings" />
             </ContextMenu>
@@ -108,6 +110,15 @@
         </Button>
         <Button Content="Über…" Click="OnAbout" Margin="6,0,0,0" ToolTip="Versionen und Referenzen"/>
       </WrapPanel>
+    </Border>
+    <!-- Shown when another program (e.g. the AI agent) changed the open file on disk. -->
+    <Border x:Name="ChangedOnDiskBanner" DockPanel.Dock="Top" Visibility="Collapsed" Background="{StaticResource WarningSurfaceBrush}"
+            BorderBrush="{StaticResource WarningBrush}" BorderThickness="0,0,0,1" Padding="12,6">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="Ignorieren" Click="OnIgnoreDiskChange" Margin="6,0,0,0" Padding="10,3" />
+        <Button DockPanel.Dock="Right" Content="Neu laden" Click="OnReloadAfterDiskChange" Padding="10,3" FontWeight="SemiBold" />
+        <TextBlock x:Name="ChangedOnDiskText" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" />
+      </DockPanel>
     </Border>
     <StatusBar DockPanel.Dock="Bottom">
       <StatusBarItem Content="{Binding StatusText}" />

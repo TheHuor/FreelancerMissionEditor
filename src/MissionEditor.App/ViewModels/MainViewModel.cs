@@ -421,6 +421,13 @@ public sealed class MainViewModel : ObservableObject
             ApplyChange(Script.Document.ReplaceSection(section, newText), $"Sektion ab Zeile {section.FirstLineNumber} geändert");
     }
 
+    /// <summary>Replaces the whole document, e.g. with sections taken over from another file (with undo).</summary>
+    public void ApplyDocument(IniDocument document, string description)
+    {
+        if (Script is not null)
+            ApplyChange(document, description);
+    }
+
     /// <summary>Explains what deleting a section changes in the game, for the confirmation.</summary>
     public string DescribeDeletion(IniSection section)
     {
