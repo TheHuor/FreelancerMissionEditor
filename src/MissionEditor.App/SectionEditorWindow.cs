@@ -19,6 +19,9 @@ public sealed class SectionEditorWindow : Window
         Title = title;
         Width = 760;
         Height = 560;
+        MinWidth = 600;
+        MinHeight = 400;
+        SetResourceReference(StyleProperty, typeof(Window));
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ShowInTaskbar = false;
 
@@ -33,15 +36,15 @@ public sealed class SectionEditorWindow : Window
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Margin = new Thickness(0, 6, 0, 8),
         };
-        var okButton = new Button { Content = "Übernehmen", IsDefault = false, Padding = new Thickness(14, 3, 14, 3), Margin = new Thickness(0, 0, 8, 0) };
+        var okButton = new Button { Content = "Übernehmen · Strg+Enter", IsDefault = false, Padding = new Thickness(14, 3, 14, 3), Margin = new Thickness(0, 0, 8, 0) };
         okButton.Click += (_, _) => Accept();
         var cancelButton = new Button { Content = "Abbrechen", IsCancel = true, Padding = new Thickness(14, 3, 14, 3) };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         buttons.Children.Add(okButton);
         buttons.Children.Add(cancelButton);
 
-        var hint = new TextBlock { Text = note, TextWrapping = TextWrapping.Wrap, Foreground = Brushes.DimGray };
-        var layout = new DockPanel { Margin = new Thickness(10) };
+        var hint = new TextBlock { Text = note, TextWrapping = TextWrapping.Wrap, Foreground = (Brush)FindResource("MutedTextBrush") };
+        var layout = new DockPanel { Margin = new Thickness(16) };
         DockPanel.SetDock(hint, Dock.Top);
         DockPanel.SetDock(buttons, Dock.Bottom);
         layout.Children.Add(hint);

@@ -47,19 +47,15 @@ public sealed class TriggerGraphCanvas : Canvas
     }
 
     /// <summary>The brush of an edge kind; also used for the legend.</summary>
-    public static Brush BrushOf(TriggerReferenceKind kind) => kind switch
+    public static Brush BrushOf(TriggerReferenceKind kind) => ResourceBrush(kind switch
     {
-        TriggerReferenceKind.Activate => Freeze(new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32))),
-        TriggerReferenceKind.Deactivate => Freeze(new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E))),
-        TriggerReferenceKind.Watch => Freeze(new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0))),
-        _ => Freeze(new SolidColorBrush(Color.FromRgb(0xEF, 0x6C, 0x00))),
-    };
+        TriggerReferenceKind.Activate => "ActivateEdgeBrush",
+        TriggerReferenceKind.Deactivate => "DeactivateEdgeBrush",
+        TriggerReferenceKind.Watch => "WatchEdgeBrush",
+        _ => "SaveEdgeBrush",
+    });
 
-    private static Brush Freeze(SolidColorBrush brush)
-    {
-        brush.Freeze();
-        return brush;
-    }
+    private static Brush ResourceBrush(string key) => (Brush)Application.Current.FindResource(key);
 
     private void Redraw()
     {
@@ -125,24 +121,23 @@ public sealed class TriggerGraphCanvas : Canvas
     {
         TriggerNode node = layoutNode.Node!;
         Trigger? trigger = node.Trigger;
-        Brush background = node.IsMissing ? new SolidColorBrush(Color.FromRgb(0xFF, 0xEB, 0xEE))
-            : isCenter ? new SolidColorBrush(Color.FromRgb(0xE3, 0xF2, 0xFD))
-            : trigger!.InitialState == TriggerState.Active ? new SolidColorBrush(Color.FromRgb(0xE8, 0xF5, 0xE9))
-            : Brushes.White;
-        Brush border = node.IsMissing ? Brushes.Firebrick : isCenter ? BrushOf(TriggerReferenceKind.Watch) : Brushes.DimGray;
+        Brush background = ResourceBrush(node.IsMissing ? "ErrorSurfaceBrush" : isCenter ? "SelectionBrush" : "SurfaceBrush");
+        Brush border = ResourceBrush(node.IsMissing ? "ErrorBrush" : isCenter ? "AccentBrush" : "BorderBrush");
 
         var title = new TextBlock
         {
             Text = node.IsMissing ? $"? {node.Name}" : node.Name,
+            Foreground = ResourceBrush("TextBrush"),
+            FontSize = 14,
             FontWeight = FontWeights.SemiBold,
             TextTrimming = TextTrimming.CharacterEllipsis,
         };
         var subtitle = new TextBlock
         {
-            Text = trigger?.ConditionText ?? "nicht definiert",
+            Text = (trigger?.InitialState == TriggerState.Active ? "Aktiv · " : string.Empty) + (trigger?.ConditionText ?? "nicht definiert"),
             FontFamily = MonoFont,
-            FontSize = 10.5,
-            Foreground = Brushes.DimGray,
+            FontSize = 12,
+            Foreground = ResourceBrush("MutedTextBrush"),
             TextTrimming = TextTrimming.CharacterEllipsis,
         };
         var content = new DockPanel();
@@ -151,8 +146,8 @@ public sealed class TriggerGraphCanvas : Canvas
             var badge = new TextBlock
             {
                 Text = $"+{layoutNode.HiddenEdgeCount}",
-                FontSize = 10,
-                Foreground = Brushes.Gray,
+                FontSize = 12,
+                Foreground = ResourceBrush("MutedTextBrush"),
                 VerticalAlignment = VerticalAlignment.Top,
                 Margin = new Thickness(4, 0, 0, 0),
                 ToolTip = "Weitere Verweise außerhalb des gezeigten Ausschnitts",
@@ -238,8 +233,13 @@ public sealed class TriggerGraphCanvas : Canvas
             ToolTip = $"{edge.Edge.From.Name} → {edge.Edge.To.Name}\nZeile {edge.Edge.Reference.Line.Number}: {edge.Edge.Reference.Line.Text.Trim()}"
                 + (edge.IsBackward ? "\n(Rückwärtskante: schließt einen Kreis)" : string.Empty),
         };
-        if (kind is TriggerReferenceKind.Watch or TriggerReferenceKind.Deactivate)
-            path.StrokeDashArray = kind == TriggerReferenceKind.Watch ? [5, 3] : [2, 2];
+        path.StrokeDashArray = kind switch
+        {
+            TriggerReferenceKind.Watch => [5, 3],
+            TriggerReferenceKind.Save => [1, 3],
+            TriggerReferenceKind.Deactivate => [5, 2, 1, 2],
+            _ => null,
+        };
         return path;
     }
 

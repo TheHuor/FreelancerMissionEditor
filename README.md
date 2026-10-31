@@ -129,3 +129,20 @@ XML-Doku, Texte für Benutzer auf Deutsch; Formatierung nach `.editorconfig`.
   Spawns, Story-Fortschritt nur über Handelsstraßen, leere Zieltexte
 - mehrere Dateien gemeinsam prüfen (z. B. alle Kapitel einer Kampagne)
 - Test-Spielstände erzeugen, binäre INIs (BINI) lesen
+
+## Oberfläche und Layoutprüfung
+
+Die WPF-Oberfläche verwendet ein dunkles, von Freelancer inspiriertes Theme. Rechts teilen sich
+Funde und Verweise einen Registerbereich; darunter bleibt der horizontal verschiebbare Quelltext sichtbar.
+Die Prüfergebnisse unten lassen sich einklappen. Ein Sprung zu einem Fund öffnet sie wieder.
+Die Kantentypen im Graphen unterscheiden sich zusätzlich durch Linienmuster.
+
+Zusätzliche WPF-Smokechecks für einen interaktiven Windows-Desktop:
+
+```powershell
+dotnet run --project tests/MissionEditor.App.SmokeChecks
+```
+
+Die Checks öffnen kurz ein Fenster, verwenden die Repository-Beispielmission und prüfen unter anderem
+Fenstergrößen, Prüfleisten-Navigation, Kontraste sowie Bearbeiten/Rückgängig/Speichern auf einer
+temporären Kopie. Die Fixture bleibt unverändert. Diese Checks sind nicht Teil von `dotnet test`.
