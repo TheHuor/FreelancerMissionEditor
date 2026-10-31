@@ -261,6 +261,35 @@
       </Setter.Value>
     </Setter>
   </Style>
+  <Style TargetType="RadioButton" BasedOn="{StaticResource BaseControl}">
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RadioButton">
+          <DockPanel Background="Transparent">
+            <Grid Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center">
+              <Ellipse x:Name="Ring" Fill="{StaticResource InputBrush}" Stroke="{StaticResource MutedTextBrush}" StrokeThickness="1" />
+              <Ellipse x:Name="Dot" Width="8" Height="8" Fill="{StaticResource AccentBrush}" Visibility="Collapsed" />
+            </Grid>
+            <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="True" />
+          </DockPanel>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Dot" Property="Visibility" Value="Visible" />
+              <Setter TargetName="Ring" Property="Stroke" Value="{StaticResource AccentBrush}" />
+            </Trigger>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Ring" Property="Stroke" Value="{StaticResource AccentBrush}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Opacity" Value="0.45" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
   <Style TargetType="ListBox" BasedOn="{StaticResource BaseControl}">
     <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
     <Setter Property="BorderThickness" Value="0" />

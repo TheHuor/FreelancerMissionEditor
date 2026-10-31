@@ -232,6 +232,29 @@ internal static class Program
             }
             adviceWindow.Close();
 
+            var settingsWindow = new AiSettingsWindow { Owner = owner };
+            settingsWindow.Show();
+            settingsWindow.UpdateLayout();
+            var textBrush = ((SolidColorBrush)Application.Current.FindResource("TextBrush")).Color;
+            var radio = (System.Windows.Controls.RadioButton)settingsWindow.FindName("ClaudeCliOption");
+            Check(radio.Foreground is SolidColorBrush { Color: var radioColor } && radioColor == textBrush, "radio buttons use the readable theme text colour");
+            Check(ProgramLocator.CurrentPath().Contains(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "bin"), StringComparison.OrdinalIgnoreCase),
+                "program search includes the user's .local\\bin even without a refreshed PATH");
+            if (Environment.GetEnvironmentVariable("MISSION_EDITOR_AISETTINGS_PREVIEW") is { Length: > 0 } settingsPreview)
+            {
+                radio.IsChecked = true;
+                settingsWindow.UpdateLayout();
+                var dpi = VisualTreeHelper.GetDpi(settingsWindow);
+                var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(settingsWindow.ActualWidth * dpi.DpiScaleX), (int)(settingsWindow.ActualHeight * dpi.DpiScaleY),
+                    dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+                bitmap.Render(settingsWindow);
+                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+                using var previewStream = File.Create(settingsPreview);
+                encoder.Save(previewStream);
+            }
+            settingsWindow.Close();
+
             string settingsPath = Path.Combine(folder, "ai-settings.json");
             new MissionEditor.App.Ai.AiSettings { Provider = MissionEditor.App.Ai.AiProvider.CodexCli, ApiKey = "sk-test-not-a-real-key", Model = "claude-opus-5-5" }.Save(settingsPath);
             var loaded = MissionEditor.App.Ai.AiSettings.Load(settingsPath);

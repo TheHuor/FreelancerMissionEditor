@@ -107,17 +107,7 @@ public sealed class CliAdvisor(AiSettings settings, AiProvider provider) : IAiAd
     {
         if (settings.CliPath.Length > 0)
             return File.Exists(settings.CliPath) ? settings.CliPath : null;
-        string name = provider == AiProvider.ClaudeCli ? "claude" : "codex";
-        foreach (string directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-        {
-            foreach (string extension in new[] { ".exe", ".cmd", ".bat" })
-            {
-                string candidate = Path.Combine(directory.Trim('"'), name + extension);
-                if (File.Exists(candidate))
-                    return candidate;
-            }
-        }
-        return null;
+        return ProgramLocator.Find(provider == AiProvider.ClaudeCli ? "claude" : "codex");
     }
 
     /// <inheritdoc/>
@@ -144,6 +134,9 @@ public sealed class CliAdvisor(AiSettings settings, AiProvider provider) : IAiAd
             StandardOutputEncoding = Encoding.UTF8,
             WorkingDirectory = Path.GetTempPath(),
         };
+        // The agent (and e.g. Node.js behind an npm-installed claude.cmd) needs the current PATH, not the
+        // one this process was started with.
+        start.Environment["PATH"] = ProgramLocator.CurrentPath();
         using var process = Process.Start(start) ?? throw new InvalidOperationException($"{DisplayName} ließ sich nicht starten.");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         timeout.CancelAfter(Timeout);

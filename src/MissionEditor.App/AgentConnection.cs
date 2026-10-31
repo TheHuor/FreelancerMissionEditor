@@ -42,23 +42,7 @@ public static class AgentConnection
         McpServersJson(executable, workspace, allowWrites, includeType: true);
 
     /// <summary>True when a <c>claude</c> command is on the PATH, so the <c>claude mcp add</c> command works.</summary>
-    public static bool IsClaudeCommandAvailable()
-    {
-        string[] names = ["claude.exe", "claude.cmd", "claude.bat", "claude.ps1"];
-        foreach (string directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-        {
-            try
-            {
-                if (names.Any(name => File.Exists(Path.Combine(directory.Trim('"'), name))))
-                    return true;
-            }
-            catch (ArgumentException)
-            {
-                // A malformed PATH entry is skipped.
-            }
-        }
-        return false;
-    }
+    public static bool IsClaudeCommandAvailable() => ProgramLocator.Find("claude") is not null;
 
     private static string McpServersJson(string executable, string workspace, bool allowWrites, bool includeType)
     {
