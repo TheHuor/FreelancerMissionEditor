@@ -160,11 +160,28 @@ Netzwerkzugang, braucht keine API-Schlüssel und enthält kein eigenes Sprachmod
 
 Am einfachsten über den Editor: **„KI-Agent verbinden…“** in der Werkzeugleiste. Der Dialog
 findet die `MissionEditor.Mcp.exe` (neben dem Editor, in einem daneben entpackten Release-Ordner
-`mcp` oder in der Build-Ausgabe), schlägt den Ordner der geöffneten Mission als Workspace vor und
-zeigt die fertige Einrichtung für Claude Code, Claude Desktop und Codex zum Kopieren. „Prüfen“
-startet den Server testweise; der Schalter „Export erlauben“ ergänzt `--allow-writes`. Hat die
-geöffnete Mission ungespeicherte Änderungen, weist der Dialog darauf hin, denn der Agent sieht nur
-den gespeicherten Stand. Pfad und Export-Wahl merkt sich der Editor.
+`mcp` oder in der Build-Ausgabe) und schlägt den Ordner der geöffneten Mission als Workspace vor.
+„Prüfen“ startet den Server testweise; der Schalter „Export erlauben“ ergänzt `--allow-writes`.
+
+Je Client (Claude Code, Claude Desktop, Codex) zeigt der Dialog, ob der Server dort schon
+eingetragen ist. **„Hinzufügen“** trägt ihn direkt ein bzw. aktualisiert den Eintrag:
+
+| Client | Datei |
+|---|---|
+| Claude Code (Kommandozeile und Desktop-App) | `%USERPROFILE%\.claude.json` |
+| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Codex | `%USERPROFILE%\.codex\config.toml` |
+
+Nur der Eintrag `freelancer-missions` wird angelegt oder ersetzt, alles andere in der Datei bleibt.
+Die vorige Fassung bleibt als `<datei>.mission-editor.bak` erhalten; ist die Datei kein gültiges
+JSON, wird nichts geändert. Den Client am besten vorher schließen und danach neu starten.
+
+Als Alternativen zeigt der Dialog den Befehl `claude mcp add …` (braucht die Claude-Code-
+Kommandozeile; der Dialog sagt, ob sie installiert ist) und den Text zum Einfügen von Hand. Die
+Anleitung dafür richtet sich nach dem Zustand der Datei: neu anlegen, `"mcpServers"` ergänzen oder
+nur den Eintrag in ein vorhandenes `"mcpServers"` einfügen. Hat die geöffnete Mission
+ungespeicherte Änderungen, weist der Dialog darauf hin, denn der Agent sieht nur den gespeicherten
+Stand. Pfad und Export-Wahl merkt sich der Editor.
 
 Von Hand bauen bzw. starten:
 

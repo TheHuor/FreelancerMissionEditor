@@ -1,13 +1,15 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using Microsoft.Win32;
 
 namespace MissionEditor.App;
 
-/// <summary>Shows ready-to-paste configuration for connecting an AI agent to the MCP server.</summary>
+/// <summary>Connects an AI agent to the MCP server: adds the entry to a client's configuration or shows it for copying.</summary>
 public partial class AgentConnectionWindow : Window
 {
+    private readonly bool _hasClaudeCommand;
     private bool _initialized;
 
     /// <summary>Creates the dialog.</summary>
@@ -23,23 +25,28 @@ public partial class AgentConnectionWindow : Window
         WorkspaceBox.Text = missionPath is null ? string.Empty : Path.GetDirectoryName(missionPath) ?? string.Empty;
         AllowWritesBox.IsChecked = allowWrites;
         UnsavedHint.Visibility = hasUnsavedChanges ? Visibility.Visible : Visibility.Collapsed;
-        bool hasClaudeCommand = AgentConnection.IsClaudeCommandAvailable();
-        ClaudeCommandStatus.Text = hasClaudeCommand
-            ? "Die Kommandozeile claude ist auf diesem Rechner vorhanden."
-            : "Die Kommandozeile claude wurde auf diesem Rechner nicht gefunden – der Befehl meldet dann „claude wurde nicht erkannt“. Weg 2 verwenden.";
-        ClaudeCommandStatus.Foreground = (System.Windows.Media.Brush)FindResource(hasClaudeCommand ? "MutedTextBrush" : "WarningBrush");
+        _hasClaudeCommand = AgentConnection.IsClaudeCommandAvailable();
+        ClientTabs.SelectedIndex = 0;
         _initialized = true;
         Refresh();
     }
 
     /// <summary>The current Claude Code command (for tests).</summary>
-    public string ClaudeCodeText => ClaudeCodeBox.Text;
+    public string ClaudeCodeText => AgentConnection.ClaudeCodeCommand(ExecutableOrPlaceholder, WorkspaceOrPlaceholder, AllowWrites);
 
     private string Executable => ServerBox.Text.Trim();
 
     private string Workspace => WorkspaceBox.Text.Trim();
 
+    private string ExecutableOrPlaceholder => Executable.Length > 0 ? Executable : AgentConnection.ServerExecutable;
+
+    private string WorkspaceOrPlaceholder => Workspace.Length > 0 ? Workspace : "<Missionsverzeichnis>";
+
     private bool AllowWrites => AllowWritesBox.IsChecked == true;
+
+    private AgentClient SelectedClient => ClientTabs.SelectedItem is TabItem { Tag: string tag } && Enum.TryParse(tag, out AgentClient client)
+        ? client
+        : AgentClient.ClaudeCode;
 
     private void OnInputChanged(object sender, RoutedEventArgs args)
     {
@@ -47,36 +54,106 @@ public partial class AgentConnectionWindow : Window
             Refresh();
     }
 
+    private void OnClientTabChanged(object sender, SelectionChangedEventArgs args)
+    {
+        if (_initialized && ReferenceEquals(args.OriginalSource, ClientTabs))
+            Refresh();
+    }
+
     private void Refresh()
     {
-        string executable = Executable.Length > 0 ? Executable : AgentConnection.ServerExecutable;
-        string workspace = Workspace.Length > 0 ? Workspace : "<Missionsverzeichnis>";
-        ClaudeCodeBox.Text = AgentConnection.ClaudeCodeCommand(executable, workspace, AllowWrites);
-        ClaudeCodeJsonBox.Text = AgentConnection.ClaudeCodeJson(executable, workspace, AllowWrites);
-        ClaudeDesktopBox.Text = AgentConnection.JsonConfiguration(executable, workspace, AllowWrites);
-        CodexBox.Text = AgentConnection.CodexConfiguration(executable, workspace, AllowWrites);
+        RefreshServerStatus();
+        AgentClient client = SelectedClient;
+        string configPath = AgentClientConfig.ConfigPath(client);
+        string clientName = ClientName(client);
+        bool configured = AgentClientConfig.IsConfigured(client, configPath);
 
-        if (Executable.Length == 0)
-            ShowServerStatus(false, "Kein MCP-Server gefunden. Das Release-ZIP „MissionEditorMcp“ entpacken und hier die MissionEditor.Mcp.exe wählen.");
-        else if (!File.Exists(Executable))
-            ShowServerStatus(false, "Datei nicht gefunden.");
+        TargetText.Text = $"Trägt den Server direkt in {configPath} ein.";
+        bool ready = File.Exists(Executable) && Directory.Exists(Workspace);
+        AddButton.IsEnabled = ready;
+        AddButton.Content = configured ? "Aktualisieren" : "Hinzufügen";
+        if (!ready)
+            ShowStatus(TargetStatus, false, "Erst einen vorhandenen MCP-Server und ein Missionsverzeichnis wählen.");
+        else if (configured)
+            ShowStatus(TargetStatus, true, $"Ist schon eingetragen. „Aktualisieren“ ersetzt den Eintrag mit den Angaben oben. Danach {RestartHint(client)}");
         else
-            ShowServerStatus(true, "Gefunden. „Prüfen“ startet den Server testweise.");
-        if (Workspace.Length > 0 && !Directory.Exists(Workspace))
-            ShowServerStatus(false, "Das Missionsverzeichnis existiert nicht.");
+            ShowStatus(TargetStatus, true, $"Noch nicht eingetragen. Nach dem Hinzufügen {RestartHint(client)}");
+
+        CommandPanel.Visibility = client == AgentClient.ClaudeCode ? Visibility.Visible : Visibility.Collapsed;
+        ClaudeCodeBox.Text = ClaudeCodeText;
+        ShowStatus(ClaudeCommandStatus, _hasClaudeCommand, _hasClaudeCommand
+            ? "Die Kommandozeile claude ist vorhanden: den Befehl in einem Terminal ausführen."
+            : "Die Kommandozeile claude ist auf diesem Rechner nicht installiert (der Befehl meldet dann „nicht erkannt“). „Hinzufügen“ oben funktioniert trotzdem.");
+
+        (string instruction, string snippet) = AgentClientConfig.ManualSnippet(client, configPath, ExecutableOrPlaceholder, WorkspaceOrPlaceholder, AllowWrites);
+        string preparation = File.Exists(configPath) ? $"Vorher eine Kopie der Datei anlegen und {clientName} schließen." : $"{clientName} vorher schließen.";
+        ManualInstruction.Text = $"{instruction} {preparation} Danach {RestartHint(client)}";
+        ManualBox.Text = snippet;
         CopyStatus.Text = string.Empty;
     }
 
-    private void ShowServerStatus(bool good, string text)
+    private static string ClientName(AgentClient client) => client switch
     {
-        ServerStatus.Text = text;
-        ServerStatus.Foreground = (System.Windows.Media.Brush)FindResource(good ? "MutedTextBrush" : "WarningBrush");
+        AgentClient.ClaudeCode => "Claude Code",
+        AgentClient.ClaudeDesktop => "Claude Desktop",
+        _ => "Codex",
+    };
+
+    private static string RestartHint(AgentClient client) => client switch
+    {
+        AgentClient.ClaudeCode => "eine neue Claude-Code-Sitzung starten; /mcp zeigt den Status.",
+        AgentClient.ClaudeDesktop => "Claude Desktop ganz beenden (auch im Infobereich) und neu starten.",
+        _ => "Codex neu starten.",
+    };
+
+    private void RefreshServerStatus()
+    {
+        if (Executable.Length == 0)
+            ShowStatus(ServerStatus, false, "Kein MCP-Server gefunden. Das Release-ZIP „MissionEditorMcp“ entpacken und hier die MissionEditor.Mcp.exe wählen.");
+        else if (!File.Exists(Executable))
+            ShowStatus(ServerStatus, false, "Datei nicht gefunden.");
+        else if (Workspace.Length > 0 && !Directory.Exists(Workspace))
+            ShowStatus(ServerStatus, false, "Das Missionsverzeichnis existiert nicht.");
+        else
+            ShowStatus(ServerStatus, true, "Gefunden. „Prüfen“ startet den Server testweise.");
+    }
+
+    private void ShowStatus(TextBlock target, bool good, string text)
+    {
+        target.Text = text;
+        target.Foreground = (Brush)FindResource(good ? "MutedTextBrush" : "WarningBrush");
+    }
+
+    private void OnAdd(object sender, RoutedEventArgs args)
+    {
+        AgentClient client = SelectedClient;
+        string configPath = AgentClientConfig.ConfigPath(client);
+        string clientName = ClientName(client);
+        string question = $"Den MCP-Server „{AgentConnection.ServerName}“ in die Konfiguration von {clientName} eintragen?\n\n"
+            + $"Datei: {configPath}\n"
+            + (File.Exists(configPath) ? $"Sicherung: {configPath}{AgentClientConfig.BackupSuffix}\n" : "Die Datei wird neu angelegt.\n")
+            + $"Workspace: {Workspace}\nExport erlaubt: {(AllowWrites ? "ja" : "nein")}\n\n"
+            + $"Nur der Eintrag „{AgentConnection.ServerName}“ wird angelegt oder ersetzt, alles andere bleibt. "
+            + $"Am sichersten ist es, {clientName} vorher zu schließen, damit es die Datei nicht mit einem älteren Stand überschreibt.";
+        if (MessageBox.Show(this, question, "KI-Agent verbinden", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
+            return;
+        try
+        {
+            string? backup = AgentClientConfig.AddServer(client, configPath, Executable, Workspace, AllowWrites);
+            AgentConnection.SaveSettings(Executable, AllowWrites);
+            Refresh();
+            ShowStatus(TargetStatus, true, $"Eingetragen{(backup is null ? string.Empty : $" (Sicherung: {Path.GetFileName(backup)})")}. Jetzt {RestartHint(client)}");
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            MessageBox.Show(this, exception.Message, "Eintragen fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void OnProbe(object sender, RoutedEventArgs args)
     {
         (bool success, string text) = AgentConnection.ProbeServer(Executable);
-        ShowServerStatus(success, success ? $"Server läuft: Version {text}." : $"Server-Test fehlgeschlagen: {text}");
+        ShowStatus(ServerStatus, success, success ? $"Server läuft: Version {text}." : $"Server-Test fehlgeschlagen: {text}");
     }
 
     private void OnBrowseServer(object sender, RoutedEventArgs args)
@@ -103,16 +180,9 @@ public partial class AgentConnectionWindow : Window
 
     private void OnCopy(object sender, RoutedEventArgs args)
     {
-        if (sender is not Button { Tag: string client })
+        if (sender is not Button { Tag: string source })
             return;
-        TextBox source = client switch
-        {
-            "ClaudeCode" => ClaudeCodeBox,
-            "ClaudeCodeJson" => ClaudeCodeJsonBox,
-            "ClaudeDesktop" => ClaudeDesktopBox,
-            _ => CodexBox,
-        };
-        Clipboard.SetText(source.Text);
+        Clipboard.SetText(source == "Command" ? ClaudeCodeBox.Text : ManualBox.Text);
         CopyStatus.Text = Executable.Length == 0 || Workspace.Length == 0
             ? "Kopiert – Platzhalter vor dem Einfügen noch ersetzen."
             : "In die Zwischenablage kopiert.";

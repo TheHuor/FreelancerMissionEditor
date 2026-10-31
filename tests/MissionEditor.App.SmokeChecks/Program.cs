@@ -134,6 +134,7 @@ internal static class Program
             var server = claudeJson.RootElement.GetProperty("mcpServers").GetProperty(AgentConnection.ServerName);
             Assert(server.GetProperty("type").GetString() == "stdio" && server.GetProperty("command").GetString() == ServerPath, "Claude Code .claude.json entry is a stdio server with the path");
         }
+        CheckAgentClientConfig(ServerPath, MissionsPath);
         var agentWindow = new AgentConnectionWindow(tmp, hasUnsavedChanges: false) { Owner = window };
         agentWindow.Show(); agentWindow.UpdateLayout();
         Assert(agentWindow.ClaudeCodeText.Contains($"--workspace \"{Path.GetDirectoryName(tmp)}\""), "agent dialog suggests the folder of the open mission");
@@ -145,5 +146,68 @@ internal static class Program
         File.Delete(tmp + ".bak");
         window.Close();
         app.Shutdown();
+    }
+
+    // Adding the server keeps everything else in the client files; the manual instructions yield valid files.
+    private static void CheckAgentClientConfig(string serverPath, string missionsPath)
+    {
+        static void Check(bool value, string message) { if (!value) throw new Exception(message); Console.WriteLine("PASS " + message); }
+        string folder = Path.Combine(Path.GetTempPath(), "mission-agent-config-" + Guid.NewGuid());
+        Directory.CreateDirectory(folder);
+        try
+        {
+            string claudeJson = Path.Combine(folder, ".claude.json");
+            File.WriteAllText(claudeJson, "{\n  \"numStartups\": 7,\n  \"mcpServers\": {\n    \"other\": { \"command\": \"x.exe\" }\n  }\n}");
+            string? backup = AgentClientConfig.AddServer(AgentClient.ClaudeCode, claudeJson, serverPath, missionsPath, false);
+            using (var updated = System.Text.Json.JsonDocument.Parse(File.ReadAllText(claudeJson)))
+            {
+                var root = updated.RootElement;
+                Check(root.GetProperty("numStartups").GetInt32() == 7 && root.GetProperty("mcpServers").TryGetProperty("other", out _),
+                    "agent add keeps other settings and servers");
+                Check(root.GetProperty("mcpServers").GetProperty(AgentConnection.ServerName).GetProperty("type").GetString() == "stdio", "agent add writes the stdio entry");
+            }
+            Check(backup is not null && File.ReadAllText(backup).Contains("\"other\""), "agent add keeps a backup of the previous file");
+            Check(AgentClientConfig.IsConfigured(AgentClient.ClaudeCode, claudeJson), "agent add is detected as configured");
+
+            string broken = Path.Combine(folder, "broken.json");
+            File.WriteAllText(broken, "{ not json");
+            bool rejected = false;
+            try { AgentClientConfig.AddServer(AgentClient.ClaudeDesktop, broken, serverPath, missionsPath, false); }
+            catch (InvalidDataException) { rejected = true; }
+            Check(rejected && File.ReadAllText(broken) == "{ not json", "agent add leaves invalid JSON untouched");
+
+            string desktop = Path.Combine(folder, "Claude", "claude_desktop_config.json");
+            AgentClientConfig.AddServer(AgentClient.ClaudeDesktop, desktop, serverPath, missionsPath, true);
+            Check(File.ReadAllText(desktop).Contains("--allow-writes") && !File.ReadAllText(desktop).Contains("\"type\""), "agent add creates a missing Claude Desktop file");
+
+            string codex = Path.Combine(folder, "config.toml");
+            File.WriteAllText(codex, "model = \"o3\"\n\n[mcp_servers.freelancer-missions]\ncommand = \"old.exe\"\nargs = []\n\n[mcp_servers.other]\ncommand = \"y.exe\"\n");
+            AgentClientConfig.AddServer(AgentClient.Codex, codex, serverPath, missionsPath, false);
+            string toml = File.ReadAllText(codex);
+            Check(!toml.Contains("old.exe") && toml.Contains("[mcp_servers.other]") && toml.Contains("model = \"o3\"")
+                && toml.Split("[mcp_servers.freelancer-missions]").Length == 2, "agent add replaces only the Codex table");
+
+            // Manual way: insert the snippet exactly where the instruction says and parse the result.
+            string withoutServers = Path.Combine(folder, "plain.json");
+            File.WriteAllText(withoutServers, "{\n  \"theme\": \"dark\"\n}");
+            (string instruction, string snippet) = AgentClientConfig.ManualSnippet(AgentClient.ClaudeCode, withoutServers, serverPath, missionsPath, false);
+            string pasted = File.ReadAllText(withoutServers).Insert(2, snippet + "\n");
+            using (var parsed = System.Text.Json.JsonDocument.Parse(pasted))
+                Check(instruction.Contains("ersten Zeile") && parsed.RootElement.GetProperty("mcpServers").TryGetProperty(AgentConnection.ServerName, out _)
+                    && parsed.RootElement.GetProperty("theme").GetString() == "dark", "manual snippet fits a file without mcpServers");
+
+            string withServers = Path.Combine(folder, "servers.json");
+            File.WriteAllText(withServers, "{\n  \"mcpServers\": {\n    \"other\": { \"command\": \"x.exe\" }\n  }\n}");
+            (instruction, snippet) = AgentClientConfig.ManualSnippet(AgentClient.ClaudeCode, withServers, serverPath, missionsPath, false);
+            string original = File.ReadAllText(withServers);
+            int afterServers = original.IndexOf("\"mcpServers\": {", StringComparison.Ordinal) + "\"mcpServers\": {".Length + 1;
+            using (var parsed = System.Text.Json.JsonDocument.Parse(original.Insert(afterServers, snippet + "\n")))
+                Check(instruction.Contains("\"mcpServers\": {") && parsed.RootElement.GetProperty("mcpServers").EnumerateObject().Count() == 2,
+                    "manual snippet fits an existing mcpServers block");
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
     }
 }

@@ -39,43 +39,40 @@
         </Border>
 
         <TextBlock Text="EINRICHTUNG IM AGENTEN" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,22,0,6" />
-        <TabControl x:Name="ClientTabs" MinHeight="260">
-          <TabItem Header="Claude Code">
-            <StackPanel Margin="10">
-              <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold"
-                         Text="Weg 1 – mit der Kommandozeile claude: Befehl in einem Terminal ausführen." />
-              <TextBlock x:Name="ClaudeCommandStatus" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,8" />
-              <TextBox x:Name="ClaudeCodeBox" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" MinHeight="54"
-                       AutomationProperties.Name="Befehl für Claude Code" />
-              <Button Content="Befehl kopieren" Tag="ClaudeCode" Click="OnCopy" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,4" />
-              <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" Margin="0,18,0,0"
-                         Text="Weg 2 – ohne Kommandozeile (z. B. Claude Code in der Desktop-App): von Hand eintragen." />
-              <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,8"
-                         Text="%USERPROFILE%\.claude.json bei geschlossenem Claude in einem Texteditor öffnen. Gibt es oben auf der obersten Ebene schon &quot;mcpServers&quot;, nur den Eintrag freelancer-missions dort hineinkopieren, sonst den ganzen Block als weiteren Eintrag der obersten Ebene. Vorher eine Kopie der Datei anlegen. Danach eine neue Sitzung starten; /mcp zeigt den Status." />
-              <TextBox x:Name="ClaudeCodeJsonBox" IsReadOnly="True" FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" MinHeight="120"
-                       AutomationProperties.Name="Eintrag für .claude.json" />
-              <Button Content="JSON kopieren" Tag="ClaudeCodeJson" Click="OnCopy" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,4" />
-            </StackPanel>
-          </TabItem>
-          <TabItem Header="Claude Desktop">
-            <DockPanel Margin="10">
-              <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{StaticResource TextBrush}"
-                         Text="In Claude Desktop unter Einstellungen → Entwickler → Konfiguration bearbeiten in claude_desktop_config.json einfügen. Gibt es dort schon mcpServers, nur den Eintrag freelancer-missions übernehmen. Danach Claude Desktop neu starten." />
-              <Button DockPanel.Dock="Bottom" Content="JSON kopieren" Tag="ClaudeDesktop" Click="OnCopy" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,4" />
-              <TextBox x:Name="ClaudeDesktopBox" IsReadOnly="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                       AutomationProperties.Name="Konfiguration für Claude Desktop" />
-            </DockPanel>
-          </TabItem>
-          <TabItem Header="Codex">
-            <DockPanel Margin="10">
-              <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{StaticResource TextBrush}"
-                         Text="In %USERPROFILE%\.codex\config.toml anhängen und Codex neu starten." />
-              <Button DockPanel.Dock="Bottom" Content="TOML kopieren" Tag="Codex" Click="OnCopy" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,4" />
-              <TextBox x:Name="CodexBox" IsReadOnly="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                       AutomationProperties.Name="Konfiguration für Codex" />
-            </DockPanel>
-          </TabItem>
+        <TabControl x:Name="ClientTabs" MinHeight="0" Padding="0" BorderThickness="0" SelectionChanged="OnClientTabChanged">
+          <TabItem Header="Claude Code" Tag="ClaudeCode" />
+          <TabItem Header="Claude Desktop" Tag="ClaudeDesktop" />
+          <TabItem Header="Codex" Tag="Codex" />
         </TabControl>
+        <!-- One shared panel below the tabs; it shows the selected client. -->
+        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1,0,1,1" Padding="14,12">
+          <StackPanel>
+            <DockPanel>
+              <Button x:Name="AddButton" DockPanel.Dock="Right" Content="Hinzufügen" Click="OnAdd" Padding="16,6" Margin="12,0,0,0" VerticalAlignment="Top"
+                      FontWeight="SemiBold" ToolTip="Den Server direkt in die Konfiguration dieses Clients eintragen (mit Sicherung)" />
+              <StackPanel>
+                <TextBlock x:Name="TargetText" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" />
+                <TextBlock x:Name="TargetStatus" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,0" />
+              </StackPanel>
+            </DockPanel>
+
+            <StackPanel x:Name="CommandPanel" Margin="0,18,0,0">
+              <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold"
+                         Text="Alternativ mit der Kommandozeile claude" />
+              <TextBlock x:Name="ClaudeCommandStatus" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,8" />
+              <TextBox x:Name="ClaudeCodeBox" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap"
+                       AutomationProperties.Name="Befehl für Claude Code" />
+              <Button Content="Befehl kopieren" Tag="Command" Click="OnCopy" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,4" />
+            </StackPanel>
+
+            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" Margin="0,18,0,0"
+                       Text="Alternativ von Hand eintragen" />
+            <TextBlock x:Name="ManualInstruction" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,8" LineHeight="18" />
+            <TextBox x:Name="ManualBox" IsReadOnly="True" FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" MaxHeight="220"
+                     VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Text zum Einfügen" />
+            <Button Content="Text kopieren" Tag="Manual" Click="OnCopy" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,4" />
+          </StackPanel>
+        </Border>
         <TextBlock x:Name="CopyStatus" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0" />
         <TextBlock FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,10,0,0" TextWrapping="Wrap" LineHeight="18"
                    Text="Beispielauftrag an den Agenten: „Prüfe m13\m13.ini mit dem Mission Editor und erkläre die Fehler.“ Missionsinhalte behandelt der Server als Daten, nicht als Anweisungen." />
