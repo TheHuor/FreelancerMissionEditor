@@ -143,6 +143,20 @@ internal static class Program
         Assert(!agentWindow.ClaudeCodeText.Contains("--allow-root") && !agentWindow.ClaudeCodeText.Contains("--workspace"), "agent dialog suggests no folder limit by default");
         agentWindow.Close();
 
+        // IDS texts need the game's resource DLLs; checked only where the original game is installed.
+        const string VanillaMission = @"D:\Games\Freelancer\DATA\MISSIONS\M01A\m01a.ini";
+        if (File.Exists(VanillaMission) && MissionEditor.Core.Model.GameData.ForMission(VanillaMission) is { } gameData)
+        {
+            var vanilla = MissionEditor.Core.Model.MissionScript.Load(VanillaMission);
+            var named = vanilla.Document.Sections.SelectMany(section => section.Entries.Select(line => (section.Name, line)))
+                .First(entry => entry.line.IsKey("individual_name"));
+            Assert(gameData.DescribeIds(named.line, named.Name) is { Length: > 2 }, "IDS texts are read from the game's resource DLLs");
+            var objective = vanilla.Document.Sections.First(section => section.Is("NNObjective")).Find("type")!;
+            Assert(gameData.DescribeIds(objective, "NNObjective") is { Length: > 2 }, "objective texts are read for [NNObjective] type = ids");
+        }
+        else
+            Console.WriteLine("SKIP IDS texts (original game not installed)");
+
         about.Close();
         Console.WriteLine("ALL CHECKS PASSED");
         File.Delete(tmp);

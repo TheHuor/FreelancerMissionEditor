@@ -128,8 +128,17 @@ public sealed class FindingRow(FindingItem item, bool showHint, bool isCurrent)
 }
 
 /// <summary>One line of the section preview, marked when a finding points at it.</summary>
-public sealed class SectionLineItem(int number, string text, IReadOnlyList<FindingItem> findings, bool isCaption = false, IniSection? section = null)
+public sealed class SectionLineItem(int number, string text, IReadOnlyList<FindingItem> findings, bool isCaption = false, IniSection? section = null, string? note = null)
 {
+    /// <summary>The text behind the line's IDS numbers, or null.</summary>
+    public string? Note { get; } = note;
+
+    /// <summary>True when there is a note to show.</summary>
+    public bool HasNote => Note is not null;
+
+    /// <summary>The note as shown after the line.</summary>
+    public string NoteText => Note is null ? string.Empty : "→ " + Note;
+
     /// <summary>For a caption: the section below it, which the buttons edit or delete.</summary>
     public IniSection? Section { get; } = section;
 

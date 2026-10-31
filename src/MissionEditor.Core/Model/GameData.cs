@@ -51,6 +51,38 @@ public sealed class GameData
     /// <summary>The DATA folder.</summary>
     public string DataFolder { get; }
 
+    /// <summary>The texts behind IDS numbers (resource DLLs of the installation).</summary>
+    public GameText? Texts { get; private init; }
+
+    /// <summary>
+    /// The texts of the IDS numbers in a mission line, e.g. "„Fliegen Sie nach Manhattan“", or null when the line
+    /// has none or they cannot be read. Known places: string_id, individual_name, ids_name, ids_info, the
+    /// [NNObjective] type (ids / rep_inst), Act_SetTitle, Act_SetOffer, Act_NNIds, Act_EtherComm (name) and Act_PopUpDialog.
+    /// </summary>
+    public string? DescribeIds(IniLine line, string sectionName)
+    {
+        if (Texts is null || line.Key is not { } key)
+            return null;
+        int[] indexes = key.ToLowerInvariant() switch
+        {
+            "string_id" or "individual_name" or "ids_name" or "ids_info" => [0],
+            "type" when sectionName.Equals("NNObjective", StringComparison.OrdinalIgnoreCase) =>
+                line.GetValue(0).Equals("ids", StringComparison.OrdinalIgnoreCase) ? [1]
+                : line.GetValue(0).Equals("rep_inst", StringComparison.OrdinalIgnoreCase) ? [2]
+                : [],
+            "act_settitle" or "act_setoffer" or "act_nnids" => [0],
+            "act_ethercomm" => [1],
+            "act_popupdialog" => [0, 1],
+            _ => [],
+        };
+        string[] texts = indexes
+            .Select(index => int.TryParse(line.GetValue(index), out int ids) ? Texts.Get(ids) : null)
+            .OfType<string>()
+            .Select(text => $"„{text.Replace("\n", " ¶ ")}“")
+            .ToArray();
+        return texts.Length == 0 ? null : string.Join(" – ", texts);
+    }
+
     /// <summary>All nicknames of a kind.</summary>
     public IReadOnlySet<string> Nicknames(GameDataKind kind) => _nicknames[kind];
 
@@ -94,7 +126,7 @@ public sealed class GameData
         IniDocument freelancer = IniDocument.Load(Path.Combine(exe, "freelancer.ini"));
         string dataPath = freelancer.Sections.FirstOrDefault(section => section.Is("Freelancer"))?.Find("data path")?.GetValue(0) ?? @"..\data";
         string dataFolder = Path.GetFullPath(Path.Combine(exe, dataPath));
-        var data = new GameData(root, dataFolder);
+        var data = new GameData(root, dataFolder) { Texts = GameText.FromFreelancerIni(freelancer, exe) };
         foreach (IniLine entry in freelancer.Sections.Where(section => section.Is("Data")).SelectMany(section => section.Entries))
         {
             string file = Path.Combine(dataFolder, entry.GetValue(0));

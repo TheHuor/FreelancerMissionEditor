@@ -603,6 +603,8 @@ public sealed class MainViewModel : ObservableObject
     private List<SectionLineItem> BuildPreview(List<(string? Caption, IniSection Section)> parts)
     {
         var items = new List<SectionLineItem>();
+        // IDS numbers get their text when the mission lies inside a game installation.
+        GameData? gameData = GameData.ForMission(FilePath);
         foreach ((string? caption, IniSection section) in parts)
         {
             if (caption is not null)
@@ -611,7 +613,8 @@ public sealed class MainViewModel : ObservableObject
             // Trailing blank lines belong to the section in the file but not in the preview.
             while (lines.Count > 1 && lines[^1].Kind == IniLineKind.Blank)
                 lines.RemoveAt(lines.Count - 1);
-            items.AddRange(lines.Select(line => new SectionLineItem(line.Number, line.Text, _findingsByLine[line.Number].ToList())));
+            items.AddRange(lines.Select(line => new SectionLineItem(line.Number, line.Text, _findingsByLine[line.Number].ToList(),
+                note: gameData?.DescribeIds(line, section.Name))));
         }
         return items;
     }

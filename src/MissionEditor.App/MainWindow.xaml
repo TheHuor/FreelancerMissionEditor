@@ -337,7 +337,12 @@
                       <Button Content="Bearbeiten" Padding="6,0" Margin="0,0,4,0" FontFamily="Segoe UI" Click="OnEditSection" ToolTip="Diesen Abschnitt im Textfenster bearbeiten" />
                       <Button Content="Löschen" Style="{StaticResource DangerButton}" Padding="6,0" FontFamily="Segoe UI" Click="OnDeleteSection" ToolTip="Diesen Abschnitt aus der Datei entfernen (Strg+Z macht es rückgängig)" />
                     </StackPanel>
-                    <TextBlock Grid.Column="2" x:Name="LineText" Text="{Binding Text}" VerticalAlignment="Center" TextWrapping="NoWrap" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                      <TextBlock x:Name="LineText" Text="{Binding Text}" TextWrapping="NoWrap" />
+                      <!-- The text behind IDS numbers, from the resource DLLs of the game. -->
+                      <TextBlock Text="{Binding NoteText}" Margin="16,0,0,0" FontFamily="Segoe UI" FontStyle="Italic" Foreground="{StaticResource MutedTextBrush}" TextWrapping="NoWrap"
+                                 Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}" ToolTip="Text aus den Ressourcen-DLLs des Spiels" />
+                    </StackPanel>
                   </Grid>
                 </Border>
                 <DataTemplate.Triggers>

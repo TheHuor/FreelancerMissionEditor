@@ -100,7 +100,7 @@ public sealed class MissionWorkspace
     public SourcePage ReadSource(string path, int firstLine = 1, int lineCount = 120)
     {
         var loaded = Load(path);
-        return Source(loaded.Script.Document, firstLine, lineCount);
+        return Source(loaded.Script.Document, firstLine, lineCount, loaded.Path);
     }
 
     /// <summary>Returns a bounded graph neighborhood with conditions, actions and references.</summary>
@@ -172,7 +172,7 @@ public sealed class MissionWorkspace
     /// <summary>Reads a staged document for review without changing disk contents.</summary>
     public SourcePage ReadDraft(string id, int firstLine = 1, int lineCount = 120)
     {
-        lock (_draftGate) return Source(GetDraft(id).Document, firstLine, lineCount);
+        lock (_draftGate) { var draft = GetDraft(id); return Source(draft.Document, firstLine, lineCount, draft.Source); }
     }
 
     /// <summary>Exports a reviewed draft to a new path only; original and existing files are never replaced.</summary>
@@ -268,10 +268,24 @@ public sealed class MissionWorkspace
     // Paths below the first root (the base for relative paths) are reported relative to it, all others in full.
     private string Relative(string path) => _roots.Length > 0 && IsInside(_roots[0], path) ? Path.GetRelativePath(_roots[0], path) : path;
     private static void LimitText(string text) { ArgumentNullException.ThrowIfNull(text); if (text.Length > MaxFileBytes) throw new InvalidDataException("Entwurfstext ist zu groß."); }
-    private static SourcePage Source(IniDocument document, int firstLine, int lineCount)
+    // Lines carry the text behind their IDS numbers when the mission lies inside a game installation.
+    private static SourcePage Source(IniDocument document, int firstLine, int lineCount, string? missionPath)
     {
         if (firstLine < 1 || lineCount < 1 || lineCount > 500) throw new ArgumentOutOfRangeException(nameof(firstLine), "Erste Zeile mindestens 1; Zeilenanzahl zwischen 1 und 500.");
-        return new(document.Lines.Count, document.IsBini, document.Lines.Skip(firstLine - 1).Take(lineCount).Select(line => new SourceLine(line.Number, line.Text)).ToArray());
+        GameData? gameData = GameData.ForMission(missionPath);
+        var sectionOfLine = new Dictionary<int, string>();
+        if (gameData is not null)
+        {
+            foreach (IniSection section in document.Sections)
+            {
+                foreach (IniLine line in section.Entries)
+                    sectionOfLine[line.Number] = section.Name;
+            }
+        }
+        return new(document.Lines.Count, document.IsBini, document.Lines.Skip(firstLine - 1).Take(lineCount)
+            .Select(line => new SourceLine(line.Number, line.Text,
+                gameData is not null && sectionOfLine.TryGetValue(line.Number, out string? section) ? gameData.DescribeIds(line, section) : null))
+            .ToArray());
     }
     private static Page<T> Paginate<T>(IReadOnlyList<T> items, int offset, int limit)
     {
@@ -284,7 +298,8 @@ public sealed class MissionWorkspace
 public sealed record MissionSummary(string Path, string Format, string Sha256, int LineCount, int SectionCount, int TriggerCount, int ObjectCount, int Errors, int Warnings);
 public sealed record Page<T>(int Total, int Offset, IReadOnlyList<T> Items);
 public sealed record SourcePage(int TotalLines, bool SyntheticBiniLines, IReadOnlyList<SourceLine> Lines);
-public sealed record SourceLine(int Number, string Text);
+/// <summary>A source line; Note is the text behind its IDS numbers (from the game installation), if any.</summary>
+public sealed record SourceLine(int Number, string Text, string? Note);
 public sealed record SectionInfo(int Index, string Name, string? Nickname, int FirstLine, int LastLine);
 public sealed record TriggerInfo(string Name, int SectionIndex, int LineNumber, string InitialState, string Condition, bool Shadowed);
 public sealed record FindingInfo(string Severity, string CheckId, int LineNumber, string? Subject, string Message, string? Hint, int? RelatedLineNumber)
