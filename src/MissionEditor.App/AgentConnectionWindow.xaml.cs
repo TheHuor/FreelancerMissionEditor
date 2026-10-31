@@ -18,11 +18,15 @@ public partial class AgentConnectionWindow : Window
     public AgentConnectionWindow(string? missionPath, bool hasUnsavedChanges)
     {
         InitializeComponent();
-        (string? rememberedExecutable, bool allowWrites) = AgentConnection.LoadSettings();
+        (string? rememberedExecutable, string? rememberedWorkspace, bool allowWrites) = AgentConnection.LoadSettings();
         ServerBox.Text = rememberedExecutable is not null && File.Exists(rememberedExecutable)
             ? rememberedExecutable
             : AgentConnection.FindServerExecutable() ?? string.Empty;
-        WorkspaceBox.Text = missionPath is null ? string.Empty : Path.GetDirectoryName(missionPath) ?? string.Empty;
+        // The remembered workspace wins when the open mission lies inside it (or no mission is open).
+        string? missionFolder = missionPath is null ? null : Path.GetDirectoryName(missionPath);
+        bool rememberedFits = rememberedWorkspace is not null && Directory.Exists(rememberedWorkspace)
+            && (missionPath is null || AgentPrompts.RelativeToWorkspace(missionPath, rememberedWorkspace) is not null);
+        WorkspaceBox.Text = rememberedFits ? rememberedWorkspace! : missionFolder ?? string.Empty;
         AllowWritesBox.IsChecked = allowWrites;
         UnsavedHint.Visibility = hasUnsavedChanges ? Visibility.Visible : Visibility.Collapsed;
         _hasClaudeCommand = AgentConnection.IsClaudeCommandAvailable();
@@ -140,7 +144,7 @@ public partial class AgentConnectionWindow : Window
         try
         {
             string? backup = AgentClientConfig.AddServer(client, configPath, Executable, Workspace, AllowWrites);
-            AgentConnection.SaveSettings(Executable, AllowWrites);
+            AgentConnection.SaveSettings(Executable, Workspace, AllowWrites);
             Refresh();
             ShowStatus(TargetStatus, true, $"Eingetragen{(backup is null ? string.Empty : $" (Sicherung: {Path.GetFileName(backup)})")}. Jetzt {RestartHint(client)}");
         }
@@ -187,7 +191,7 @@ public partial class AgentConnectionWindow : Window
             ? "Kopiert – Platzhalter vor dem Einfügen noch ersetzen."
             : "In die Zwischenablage kopiert.";
         if (File.Exists(Executable))
-            AgentConnection.SaveSettings(Executable, AllowWrites);
+            AgentConnection.SaveSettings(Executable, Workspace, AllowWrites);
     }
 
     private void OnClose(object sender, RoutedEventArgs args) => Close();

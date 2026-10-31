@@ -93,7 +93,16 @@
         <Button Style="{StaticResource {x:Type Button}}" Command="{Binding UndoCommand}" Content="↶ Rückgängig" ToolTip="Letzte Änderung zurücknehmen (Strg+Z)" />
         <Separator />
         <Button Style="{StaticResource {x:Type Button}}" Command="{Binding BackCommand}" Content="◀ Zurück" ToolTip="Zum vorher gewählten Trigger (Alt+←)" />
-        <Button Content="KI-Agent verbinden…" Click="OnConnectAgent" Margin="12,0,0,0" ToolTip="Einrichtung für Claude Code, Claude Desktop oder Codex über den MCP-Server"/>
+        <Button x:Name="AgentMenuButton" Content="KI-Agent ▾" Click="OnAgentMenu" Margin="12,0,0,0" ToolTip="Aufträge für Claude oder Codex kopieren und den MCP-Server einrichten">
+          <Button.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="Alle Funde erklären lassen" Click="OnAskAgentForAllFindings" ToolTip="Auftrag kopieren: Funde der Mission zusammenfassen, erklären und Korrekturen vorschlagen" />
+              <MenuItem Header="Neue Mission mit KI…" Click="OnAskAgentForNewMission" />
+              <Separator />
+              <MenuItem Header="KI-Agent verbinden…" Click="OnConnectAgent" />
+            </ContextMenu>
+          </Button.ContextMenu>
+        </Button>
         <Button Content="Über…" Click="OnAbout" Margin="6,0,0,0" ToolTip="Versionen und Referenzen"/>
       </WrapPanel>
     </Border>
@@ -242,13 +251,14 @@
         <TextBlock Grid.Row="1" Text="{Binding SelectedSummary}" MaxHeight="48" ToolTip="{Binding SelectedSummary}" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,6" TextWrapping="Wrap" />
         <TabControl x:Name="DetailTabs" Grid.Row="2" Grid.RowSpan="2">
           <TabItem Header="{Binding SelectedFindingsHeader}">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontWeight="Normal" Margin="0,4,0,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontWeight="Normal" Margin="0,4,0,0" TextElement.Foreground="{StaticResource TextBrush}">
               <ItemsControl x:Name="DetailFindings" ItemsSource="{Binding SelectedFindings}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate DataType="viewModels:FindingRow">
                     <Border x:Name="Box" Background="{StaticResource WarningSurfaceBrush}" BorderBrush="{StaticResource WarningBrush}" BorderThickness="3,0,0,0" Padding="6,3" Margin="0,0,0,3" Cursor="Hand" MouseLeftButtonUp="OnDetailFindingClicked" ToolTip="{Binding FullText}">
                       <StackPanel>
                         <DockPanel>
+                          <Button DockPanel.Dock="Right" Content="An KI ›" Click="OnAskAgentForDetailFinding" Padding="6,0" Margin="6,0,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Auftrag für Claude oder Codex kopieren: Fund erklären und Korrektur als Entwurf vorschlagen" />
                           <ContentControl DockPanel.Dock="Left" Template="{StaticResource SeverityBadge}" Margin="0,1,6,0" VerticalAlignment="Top" />
                           <TextBlock TextWrapping="Wrap">
                             <Run Text="{Binding LineNumber, Mode=OneWay, StringFormat={}Zeile {0}:}" Foreground="{StaticResource MutedTextBrush}" />
@@ -365,6 +375,11 @@
             <TextBlock Text="Doppelklick öffnet die Fundstelle" Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center" />
           </StackPanel>
           <DataGrid x:Name="FindingsGrid" ItemsSource="{Binding FindingsView}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="None" MouseDoubleClick="OnFindingDoubleClick" EnableRowVirtualization="True">
+            <DataGrid.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="An KI-Agent übergeben (Auftrag kopieren)" Click="OnAskAgentForGridFinding" />
+              </ContextMenu>
+            </DataGrid.ContextMenu>
             <DataGrid.Resources>
               <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#173C56" />
               <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#E4EDF5" />

@@ -181,7 +181,22 @@ Kommandozeile; der Dialog sagt, ob sie installiert ist) und den Text zum Einfüg
 Anleitung dafür richtet sich nach dem Zustand der Datei: neu anlegen, `"mcpServers"` ergänzen oder
 nur den Eintrag in ein vorhandenes `"mcpServers"` einfügen. Hat die geöffnete Mission
 ungespeicherte Änderungen, weist der Dialog darauf hin, denn der Agent sieht nur den gespeicherten
-Stand. Pfad und Export-Wahl merkt sich der Editor.
+Stand. Pfad, Workspace und Export-Wahl merkt sich der Editor.
+
+### Aufträge aus dem Editor
+
+Gearbeitet wird im Chat von Claude oder Codex; der Editor liefert fertige Aufträge dafür.
+„Kopieren“ legt sie in die Zwischenablage, im Agenten mit Strg+V einfügen:
+
+| Wo | Auftrag |
+|---|---|
+| „An KI ›“ an einem Fund (Details) bzw. Rechtsklick in der Prüfliste | Fund erklären und eine Korrektur als Entwurf vorschlagen; bei unbekannten Trigger-Zielen: prüfen, ob es ein Tippfehler ist oder ein Trigger fehlt, und ihn im Stil der Nachbarn entwerfen |
+| „KI-Agent ▾ → Alle Funde erklären lassen“ | Funde zusammenfassen, je Art erklären, Reihenfolge zum Beheben vorschlagen |
+| „KI-Agent ▾ → Neue Mission mit KI…“ | aus einer Beschreibung eine Mission schreiben, mit dem Server prüfen und erst nach Zustimmung exportieren |
+
+Die Aufträge nennen die Datei relativ zum Workspace, die Meldung samt Erklärung des Editors und die
+passenden Tools, und sie verlangen Entwürfe statt direkter Änderungen. Liegt die Mission außerhalb
+des Workspace oder hat sie ungespeicherte Änderungen, sagt die Statusleiste das beim Kopieren.
 
 Von Hand bauen bzw. starten:
 

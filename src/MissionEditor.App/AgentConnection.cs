@@ -138,29 +138,30 @@ public static class AgentConnection
         }
     }
 
-    /// <summary>The remembered server path and export choice, or empty values.</summary>
-    public static (string? Executable, bool AllowWrites) LoadSettings()
+    /// <summary>The remembered server path, workspace and export choice, or empty values.</summary>
+    public static (string? Executable, string? Workspace, bool AllowWrites) LoadSettings()
     {
         try
         {
             if (!File.Exists(SettingsPath))
-                return (null, false);
+                return (null, null, false);
             JsonNode? settings = JsonNode.Parse(File.ReadAllText(SettingsPath));
-            return (settings?["executable"]?.GetValue<string>(), settings?["allowWrites"]?.GetValue<bool>() ?? false);
+            return (settings?["executable"]?.GetValue<string>(), settings?["workspace"]?.GetValue<string>(),
+                settings?["allowWrites"]?.GetValue<bool>() ?? false);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
         {
-            return (null, false);
+            return (null, null, false);
         }
     }
 
-    /// <summary>Remembers the server path and export choice; failures are ignored (it is a convenience).</summary>
-    public static void SaveSettings(string executable, bool allowWrites)
+    /// <summary>Remembers the server path, workspace and export choice; failures are ignored (it is a convenience).</summary>
+    public static void SaveSettings(string executable, string workspace, bool allowWrites)
     {
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
-            var settings = new JsonObject { ["executable"] = executable, ["allowWrites"] = allowWrites };
+            var settings = new JsonObject { ["executable"] = executable, ["workspace"] = workspace, ["allowWrites"] = allowWrites };
             File.WriteAllText(SettingsPath, settings.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)

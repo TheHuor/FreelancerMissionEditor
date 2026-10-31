@@ -102,6 +102,9 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _statusText, value);
     }
 
+    /// <summary>Shows a message from the window (e.g. "copied") in the status bar.</summary>
+    public void ReportStatus(string message) => StatusText = message;
+
     /// <summary>The selected trigger row.</summary>
     public TriggerItem? SelectedTrigger
     {

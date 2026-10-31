@@ -63,6 +63,62 @@ public partial class MainWindow : Window
     private void OnConnectAgent(object sender, RoutedEventArgs args) =>
         new AgentConnectionWindow(ViewModel.FilePath, ViewModel.IsModified) { Owner = this }.ShowDialog();
 
+    // The toolbar button opens its menu on a normal click.
+    private void OnAgentMenu(object sender, RoutedEventArgs args)
+    {
+        ContextMenu menu = AgentMenuButton.ContextMenu!;
+        menu.PlacementTarget = AgentMenuButton;
+        menu.Placement = PlacementMode.Bottom;
+        menu.IsOpen = true;
+    }
+
+    private void OnAskAgentForDetailFinding(object sender, RoutedEventArgs args)
+    {
+        if (sender is FrameworkElement { DataContext: FindingRow row })
+            CopyAgentPrompt(reference => AgentPrompts.ForFinding(reference, row.Item.Finding));
+    }
+
+    private void OnAskAgentForGridFinding(object sender, RoutedEventArgs args)
+    {
+        if (FindingsGrid.SelectedItem is FindingItem finding)
+            CopyAgentPrompt(reference => AgentPrompts.ForFinding(reference, finding.Finding));
+        else
+            ViewModel.ReportStatus("Erst einen Fund in der Prüfliste auswählen.");
+    }
+
+    private void OnAskAgentForAllFindings(object sender, RoutedEventArgs args) => CopyAgentPrompt(AgentPrompts.ForAllFindings);
+
+    private void OnAskAgentForNewMission(object sender, RoutedEventArgs args)
+    {
+        (_, string? workspace, bool allowWrites) = AgentConnection.LoadSettings();
+        var dialog = new NewMissionPromptWindow(ViewModel.FilePath, workspace, allowWrites) { Owner = this };
+        if (dialog.ShowDialog() == true)
+            ViewModel.ReportStatus("Auftrag für eine neue Mission kopiert – in Claude oder Codex mit Strg+V einfügen.");
+    }
+
+    // Builds a request for the open mission and puts it on the clipboard. The file is named relative to
+    // the workspace the agent was given; outside of it the agent cannot read the file, which the status says.
+    private void CopyAgentPrompt(Func<string, string> buildPrompt)
+    {
+        if (ViewModel.FilePath is not { } missionPath)
+        {
+            ViewModel.ReportStatus("Erst eine Mission öffnen.");
+            return;
+        }
+        (_, string? workspace, _) = AgentConnection.LoadSettings();
+        string? relative = workspace is null ? null : AgentPrompts.RelativeToWorkspace(missionPath, workspace);
+        Clipboard.SetText(buildPrompt(relative ?? missionPath));
+
+        string status = "Auftrag kopiert – in Claude oder Codex mit Strg+V einfügen.";
+        if (workspace is null)
+            status += " Achtung: Der MCP-Server ist noch nicht eingerichtet („KI-Agent ▾ → KI-Agent verbinden…“).";
+        else if (relative is null)
+            status += $" Achtung: Die Mission liegt nicht im Workspace des Agenten ({workspace}); er kann sie so nicht lesen.";
+        if (ViewModel.IsModified)
+            status += " Ungespeicherte Änderungen: erst speichern (Strg+S), der Agent sieht nur die Datei.";
+        ViewModel.ReportStatus(status);
+    }
+
     private void OnOpen(object sender, ExecutedRoutedEventArgs args)
     {
         var dialog = new OpenFileDialog { Filter = FileFilter };

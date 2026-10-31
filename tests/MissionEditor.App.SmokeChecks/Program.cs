@@ -135,6 +135,7 @@ internal static class Program
             Assert(server.GetProperty("type").GetString() == "stdio" && server.GetProperty("command").GetString() == ServerPath, "Claude Code .claude.json entry is a stdio server with the path");
         }
         CheckAgentClientConfig(ServerPath, MissionsPath);
+        CheckAgentPrompts(window);
         var agentWindow = new AgentConnectionWindow(tmp, hasUnsavedChanges: false) { Owner = window };
         agentWindow.Show(); agentWindow.UpdateLayout();
         Assert(agentWindow.ClaudeCodeText.Contains($"--workspace \"{Path.GetDirectoryName(tmp)}\""), "agent dialog suggests the folder of the open mission");
@@ -146,6 +147,34 @@ internal static class Program
         File.Delete(tmp + ".bak");
         window.Close();
         app.Shutdown();
+    }
+
+    // Requests for the agent name the file relative to the workspace, the finding and the right tools.
+    private static void CheckAgentPrompts(Window owner)
+    {
+        static void Check(bool value, string message) { if (!value) throw new Exception(message); Console.WriteLine("PASS " + message); }
+        const string Workspace = @"D:\Games\Freelancer\DATA\MISSIONS";
+        Check(AgentPrompts.RelativeToWorkspace(@"D:\Games\Freelancer\DATA\MISSIONS\M13\m13.ini", Workspace) == @"M13\m13.ini", "prompt path is relative to the workspace");
+        Check(AgentPrompts.RelativeToWorkspace(@"D:\Other\m13.ini", Workspace) is null, "prompt path outside the workspace is detected");
+
+        var missing = new MissionEditor.Core.Checks.Finding(MissionEditor.Core.Checks.FindingSeverity.Error, "unknown-trigger", 5582, "check_capcf2",
+            "Act_ActTrig auf unbekannten Trigger 'turn_off_music' – die Aktivierung passiert nie.", "Hinweis");
+        string missingPrompt = AgentPrompts.ForFinding(@"M13\m13.ini", missing);
+        Check(missingPrompt.Contains("suggest_missing_trigger für „turn_off_music“") && missingPrompt.Contains(@"Datei: M13\m13.ini")
+            && missingPrompt.Contains(AgentConnection.ServerName), "missing-trigger prompt asks for evidence about the missing trigger");
+
+        var duplicate = new MissionEditor.Core.Checks.Finding(MissionEditor.Core.Checks.FindingSeverity.Warning, "duplicate-nickname", 4843, "follow_player",
+            "[ObjList] 'follow_player' ist doppelt (erste Definition Zeile 4384).", "Die Engine verwirft die zweite Liste.", 4384);
+        string findingPrompt = AgentPrompts.ForFinding(@"M13\m13.ini", duplicate);
+        Check(findingPrompt.Contains("Zeile 4843") && findingPrompt.Contains("Erklärung des Editors: Die Engine verwirft") && findingPrompt.Contains("Bezugsstelle: Zeile 4384")
+            && findingPrompt.Contains("prepare_section_edit"), "finding prompt carries line, explanation, related line and the draft rule");
+
+        var dialog = new NewMissionPromptWindow(@"D:\Games\Freelancer\DATA\MISSIONS\M13\m13.ini", Workspace, exportAllowed: false) { Owner = owner };
+        dialog.Show(); dialog.UpdateLayout();
+        string newMission = dialog.BuildPrompt("Drei Piraten greifen am Wegpunkt an.");
+        Check(newMission.Contains("Drei Piraten") && newMission.Contains(@"M13\m13.ini als Vorlage") && newMission.Contains("prepare_new_mission")
+            && newMission.Contains("nicht freigeschaltet"), "new-mission prompt has description, template and export state");
+        dialog.Close();
     }
 
     // Adding the server keeps everything else in the client files; the manual instructions yield valid files.
