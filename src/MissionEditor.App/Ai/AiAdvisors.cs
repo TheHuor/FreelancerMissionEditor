@@ -150,7 +150,7 @@ public sealed class CliAdvisor(AiSettings settings, AiProvider provider) : IAiAd
             string stdout = await output;
             string stderr = await errors;
             if (process.ExitCode != 0)
-                throw new InvalidOperationException($"{DisplayName} endete mit Fehler {process.ExitCode}: {LastLine(stderr.Length > 0 ? stderr : stdout)}");
+                throw new InvalidOperationException(DescribeFailure(process.ExitCode, stdout, stderr));
             if (answerFile is not null)
                 return File.Exists(answerFile) ? await File.ReadAllTextAsync(answerFile, timeout.Token) : stdout;
             // claude -p --output-format json wraps the answer: {"result": "...", ...}
@@ -172,6 +172,33 @@ public sealed class CliAdvisor(AiSettings settings, AiProvider provider) : IAiAd
             if (answerFile is not null && File.Exists(answerFile))
                 File.Delete(answerFile);
         }
+    }
+
+    /// <summary>
+    /// A readable message for a failed run. <c>claude -p --output-format json</c> reports errors as the
+    /// same JSON object as answers, with the message in "result".
+    /// </summary>
+    public string DescribeFailure(int exitCode, string stdout, string stderr)
+    {
+        string message = LastLine(stderr.Length > 0 ? stderr : stdout);
+        try
+        {
+            using JsonDocument wrapper = JsonDocument.Parse(stdout);
+            if (wrapper.RootElement.ValueKind == JsonValueKind.Object
+                && wrapper.RootElement.TryGetProperty("result", out JsonElement result) && result.ValueKind == JsonValueKind.String)
+                message = result.GetString() ?? message;
+        }
+        catch (JsonException)
+        {
+            // Not JSON: keep the last line of the output.
+        }
+
+        string login = provider == AiProvider.ClaudeCli ? "claude" : "codex login";
+        if (message.Contains("not logged in", StringComparison.OrdinalIgnoreCase) || message.Contains("/login", StringComparison.Ordinal))
+            return $"{DisplayName} ist nicht angemeldet. Einmal in einer Konsole „{login}“ starten"
+                + (provider == AiProvider.ClaudeCli ? " und dort /login ausführen" : string.Empty)
+                + ", danach „Erneut fragen“.";
+        return $"{DisplayName} endete mit Fehler {exitCode}: {message}";
     }
 
     private static string LastLine(string text) => text.Trim().Split('\n').LastOrDefault()?.Trim() ?? string.Empty;

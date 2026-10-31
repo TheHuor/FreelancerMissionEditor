@@ -185,6 +185,10 @@ internal static class Program
     private static void CheckAiAdvice(Window owner)
     {
         static void Check(bool value, string message) { if (!value) throw new Exception(message); Console.WriteLine("PASS " + message); }
+        var claudeCli = new MissionEditor.App.Ai.CliAdvisor(new MissionEditor.App.Ai.AiSettings { Provider = MissionEditor.App.Ai.AiProvider.ClaudeCli }, MissionEditor.App.Ai.AiProvider.ClaudeCli);
+        string notLoggedIn = claudeCli.DescribeFailure(1, "{\"type\":\"result\",\"is_error\":true,\"result\":\"Not logged in · Please run /login\",\"usage\":{}}", string.Empty);
+        Check(notLoggedIn.Contains("nicht angemeldet") && notLoggedIn.Contains("/login") && !notLoggedIn.Contains("usage"), "a not-logged-in claude CLI gets a short login hint instead of its JSON");
+        Check(claudeCli.DescribeFailure(2, "{\"result\":\"Credit balance too low\"}", string.Empty) == "Claude Code (lokal) endete mit Fehler 2: Credit balance too low", "other CLI errors show only the message from the JSON");
         string folder = Path.Combine(Path.GetTempPath(), "mission-ai-" + Guid.NewGuid());
         Directory.CreateDirectory(folder);
         try
