@@ -56,6 +56,28 @@ public sealed class WorkspaceTests : IDisposable
     }
 
     [Fact]
+    public void GameNicknamesComeFromTheInstallationOfTheMission()
+    {
+        var workspace = new MissionWorkspace([]);
+        Assert.Throws<InvalidOperationException>(() => workspace.GameNicknames(Path.Combine(_root, "sample.ini"), "System"));
+
+        string game = Path.Combine(_root, "game");
+        Directory.CreateDirectory(Path.Combine(game, "EXE"));
+        Directory.CreateDirectory(Path.Combine(game, "DATA", "universe"));
+        Directory.CreateDirectory(Path.Combine(game, "DATA", "missions"));
+        File.WriteAllText(Path.Combine(game, "EXE", "freelancer.ini"), "[Data]\nuniverse = universe\\universe.ini\n");
+        File.WriteAllText(Path.Combine(game, "DATA", "universe", "universe.ini"), "[System]\nnickname = Li01\n[System]\nnickname = Br01\n[Base]\nnickname = Li01_01_Base\n");
+        File.WriteAllText(Path.Combine(game, "DATA", "missions", "npcships.ini"), "[NPCShipArch]\nnickname = shared_fighter\n");
+        string mission = Path.Combine(game, "DATA", "missions", "m.ini");
+        File.Copy(Path.Combine(_root, "sample.ini"), mission);
+
+        Assert.Equal(["Br01", "Li01"], workspace.GameNicknames(mission, "system").Items);
+        Assert.Equal(["Li01_01_Base"], workspace.GameNicknames(mission, "Base", "li01").Items);
+        Assert.Equal(["shared_fighter"], workspace.GameNicknames(mission, "NpcShipArchetype").Items);
+        Assert.Throws<ArgumentException>(() => workspace.GameNicknames(mission, "Planet"));
+    }
+
+    [Fact]
     public void SeveralRootsAreAllowedAndTheErrorNamesThem()
     {
         string first = Path.Combine(_root, "first");

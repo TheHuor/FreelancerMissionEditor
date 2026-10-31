@@ -142,7 +142,7 @@ public static partial class AgentPrompts
         text.AppendLine(exportAllowed
             ? $"5. Mir den Entwurf zeigen und erst nach meiner Zustimmung als {targetReference} exportieren (export_mission_draft)."
             : "5. Mir den fertigen Text zeigen (Export ist am Server nicht freigeschaltet).");
-        text.Append("Nicknames für Systeme, Basen, Schiffe, Loadouts und Fraktionen nicht erfinden: aus der Vorlage übernehmen oder als Annahme kennzeichnen.");
+        text.Append("Nicknames für Systeme, Basen, Schiffe, Loadouts und Fraktionen nicht erfinden: mit list_game_nicknames nachschlagen oder aus der Vorlage übernehmen; was sich nicht belegen lässt, als Annahme kennzeichnen.");
         return text.ToString();
     }
 

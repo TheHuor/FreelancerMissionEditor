@@ -16,6 +16,7 @@ public static class MissionChecker
         new ImpossibleConditionCheck(),
         new UnusedObjectCheck(),
         new MissionEndCheck(),
+        new GameDataCheck(),
     ];
 
     /// <summary>Runs every check and returns the findings sorted by line.</summary>

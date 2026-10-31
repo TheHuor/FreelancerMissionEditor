@@ -86,6 +86,8 @@ dotnet run --project src/MissionEditor.Cli -- hash <nickname>
 | `impossible-condition` | `Cnd_Destroyed` auf ein Schiff, eine Formation, eine Station oder ein Label dieser Datei, das nie gespawnt wird – der Trigger löst nie aus |
 | `unused-object` | Schiffe, Formationen, Stationen und Beute, die nie gespawnt werden, nie vergebene Befehlslisten, nie gestartete Dialoge, nie gesetzte Ziele (Hinweis) |
 | `mission-end` | kein `Act_ChangeState = SUCCEED` (Hinweis) oder nur in Triggern, die nie aktiv werden (Warnung) |
+| `unknown-game-nickname` | nur wenn die Mission in einer Spielinstallation liegt (ein Ordner darüber enthält `EXEreelancer.ini`): Fraktionen (`affiliation`, `faction`, `Act_SetRep`), Systeme und Basen (`[MsnSolar]`, `Cnd_BaseEnter`/`Exit`, `Act_ForceLand`), Stationstypen, Loadouts, Schiffstypen (`Act_SetShipAndLoadout`), Beute-Archetypen und `npc_ship_arch` (eigene `npc_ship_file`, dann `missions
+pcships.ini`), die das Spiel nicht kennt. Die Dateien kommen aus `[Data]` in `freelancer.ini` |
 
 Funde in Triggern, die nie aktiv werden, sind nur Hinweise – dort wirkt ohnehin nichts. Gegen die
 14 Storymissionen des Originalspiels geprüft: Sie enthalten viel toten Code (z. B. eine ungenutzte
@@ -168,6 +170,7 @@ Netzwerkzugang, braucht keine API-Schlüssel und enthält kein eigenes Sprachmod
 | `get_trigger_context` | Umgebung eines Triggers mit Bedingungen, Aktionen und Verweisen |
 | `suggest_missing_trigger` | ähnliche Namen und aufrufende Stellen für einen fehlenden Trigger |
 | `get_mission_vocabulary` | die `Cnd_`/`Act_`-Namen, die das Spiel kennt |
+| `list_game_nicknames` | gültige Systeme, Basen, Fraktionen, Schiffs-/Stationstypen, Loadouts, Ausrüstung und NPC-Schiffe der Spielinstallation |
 | `prepare_section_edit` | Sektionsänderung als Entwurf |
 | `prepare_new_mission` | vom Agenten geschriebene neue Mission als Entwurf |
 | `read_mission_draft` / `discard_mission_draft` | Entwurf lesen oder verwerfen |

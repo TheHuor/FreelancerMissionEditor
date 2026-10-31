@@ -112,11 +112,22 @@ public sealed class MissionTools(MissionWorkspace workspace)
         [Description("Neuer .ini-Pfad (absolut, wie bei path); der Ordner muss existieren, die Datei darf noch nicht existieren.")] string outputPath) =>
         Run(() => workspace.WriteDraft(id, outputPath));
 
+    /// <summary>Valid nicknames of the game installation.</summary>
+    [McpServerTool(Name = "list_game_nicknames", ReadOnly = true, OpenWorld = false, UseStructuredContent = true)]
+    [Description("Gültige Nicknames der Spielinstallation, in der die Mission liegt (aus EXE\\freelancer.ini [Data]): Systeme, Basen, Fraktionen, Schiffs- und Stationstypen, Loadouts, Ausrüstung, NPC-Schiffe der Mission. Vor dem Schreiben von Nicknames nachschlagen statt erfinden.")]
+    public Page<string> GameNicknames(
+        [Description(PathDescription)] string path,
+        [Description("Art: System, Base, Faction, ShipArchetype, SolarArchetype, Loadout, Equipment oder NpcShipArchetype.")] string kind,
+        [Description("Teil des Nicknames (ohne Groß-/Kleinschreibung); leer für alle.")] string filter = "",
+        [Description(OffsetDescription)] int offset = 0,
+        [Description(LimitDescription)] int limit = 100) =>
+        Run(() => workspace.GameNicknames(path, kind, filter, offset, limit));
+
     /// <summary>The condition and action names the engine knows.</summary>
     [McpServerTool(Name = "get_mission_vocabulary", ReadOnly = true, OpenWorld = false, UseStructuredContent = true)]
     [Description("Bedingungs- und Aktionsnamen, die content.dll kennt. Pro Trigger gilt genau eine Bedingung (die letzte Cnd_*-Zeile); neue Storylogik muss vom Agenten begründet werden.")]
     public Vocabulary Vocabulary() => new(EngineVocabulary.Conditions.Order().ToArray(), EngineVocabulary.Actions.Order().ToArray(),
-        "Prüfungen decken Triggerverweise, Namensduplikate, Triggerstruktur, nie aktivierte Trigger, unbekannte und nie benutzte Missionsobjekte, Cnd_Destroyed auf nie gespawnte Objekte und das Erfolgsende ab. Nicht enthalten: Abgleich mit Spieldaten (Systeme, Basen, Loadouts) und inhaltliche Storyprüfung.");
+        "Prüfungen decken Triggerverweise, Namensduplikate, Triggerstruktur, nie aktivierte Trigger, unbekannte und nie benutzte Missionsobjekte, Cnd_Destroyed auf nie gespawnte Objekte, das Erfolgsende und, wenn die Mission in einer Spielinstallation liegt, die Nicknames der Spieldaten ab (list_game_nicknames). Nicht enthalten: Objekte innerhalb der Systemdateien, Wegpunkt-Ziele und inhaltliche Storyprüfung.");
 
     // Expected failures become MCP tool errors with the German message; anything else stays a server fault.
     private static T Run<T>(Func<T> operation)

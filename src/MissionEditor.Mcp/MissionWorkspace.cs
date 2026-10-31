@@ -72,6 +72,30 @@ public sealed class MissionWorkspace
                 || (section.Nickname?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false))
             .ToArray(), offset, limit);
 
+    /// <summary>
+    /// Pages valid game nicknames of a kind from the installation the mission lies in (System, Base, Faction,
+    /// ShipArchetype, SolarArchetype, Loadout, Equipment, NpcShipArchetype).
+    /// </summary>
+    public Page<string> GameNicknames(string path, string kind, string filter = "", int offset = 0, int limit = 100)
+    {
+        var loaded = Load(path);
+        GameData gameData = GameData.ForMission(loaded.Path)
+            ?? throw new InvalidOperationException($"{loaded.Path} liegt in keiner Freelancer-Installation (kein EXE\\freelancer.ini in einem übergeordneten Ordner).");
+        IEnumerable<string> names;
+        if (kind.Equals("NpcShipArchetype", StringComparison.OrdinalIgnoreCase))
+        {
+            string? own = loaded.Script.Document.Sections.FirstOrDefault(section => section.Is("Mission"))?.Find("npc_ship_file")?.GetValue(0);
+            names = (string.IsNullOrEmpty(own) ? [] : gameData.NpcShipArchetypes(own) ?? (IEnumerable<string>)[])
+                .Concat(gameData.NpcShipArchetypes(@"missions\npcships.ini") ?? (IEnumerable<string>)[]);
+        }
+        else if (Enum.TryParse(kind, true, out GameDataKind parsed) && Enum.IsDefined(parsed))
+            names = gameData.Nicknames(parsed);
+        else
+            throw new ArgumentException("Art muss System, Base, Faction, ShipArchetype, SolarArchetype, Loadout, Equipment oder NpcShipArchetype sein.");
+        return Paginate(names.Where(name => name.Contains(filter, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray(), offset, limit);
+    }
+
     /// <summary>Reads rendered source lines; BINI line numbers refer to its decoded view.</summary>
     public SourcePage ReadSource(string path, int firstLine = 1, int lineCount = 120)
     {
