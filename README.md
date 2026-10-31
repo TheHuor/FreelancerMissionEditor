@@ -13,7 +13,7 @@ Entstanden beim Aufteilen der Crossfire-Kampagne (ein 36 000-Zeilen-Skript) in e
 
 ## Funktionen
 
-- **Laden ohne Verlust**: Text-INIs in Windows-1252 (oder UTF-8 mit BOM); Kommentare, Leerzeilen,
+- **Laden ohne Verlust**: Text-INIs in Windows-1252 (oder UTF-8 mit BOM) sowie binäre BINI-v1-Dateien; Kommentare, Leerzeilen,
   Abstände und Zeilenenden bleiben erhalten.
 - **Trigger-Liste** mit Filter, Fundsymbolen und dem Filter „Nur Trigger mit Funden“.
 - **Trigger-Graph** um den gewählten Trigger: Schichten von links nach rechts, Kanten für
@@ -128,7 +128,7 @@ XML-Doku, Texte für Benutzer auf Deutsch; Formatierung nach `.editorconfig`.
 - weitere Prüfungen: nie aktivierte Trigger, Schiffsnamen in Spawn-Aktionen, Mehrfach-Aktivierung von
   Spawns, Story-Fortschritt nur über Handelsstraßen, leere Zieltexte
 - mehrere Dateien gemeinsam prüfen (z. B. alle Kapitel einer Kampagne)
-- Test-Spielstände erzeugen, binäre INIs (BINI) lesen
+- Test-Spielstände erzeugen
 
 ## Oberfläche und Layoutprüfung
 
@@ -146,3 +146,72 @@ dotnet run --project tests/MissionEditor.App.SmokeChecks
 Die Checks öffnen kurz ein Fenster, verwenden die Repository-Beispielmission und prüfen unter anderem
 Fenstergrößen, Prüfleisten-Navigation, Kontraste sowie Bearbeiten/Rückgängig/Speichern auf einer
 temporären Kopie. Die Fixture bleibt unverändert. Diese Checks sind nicht Teil von `dotnet test`.
+
+### Binäre Missionsdateien (BINI)
+
+BINI v1 wird anhand der Signatur automatisch erkannt. Öffnen, Bearbeiten, Löschen, Rückgängig,
+Speichern und Speichern unter behalten das ursprüngliche Format bei: BINI bleibt BINI, Text bleibt
+Text. Unveränderte BINI-Dateien werden byteidentisch geschrieben; nach Änderungen bleiben die
+Datentypen und Werte unveränderter Parameter erhalten. Die Statusleiste kennzeichnet BINI.
+
+Die Quelltextansicht einer BINI-Datei ist eine editierbare Darstellung mit synthetischen
+Zeilennummern. Strings stehen in doppelten Anführungszeichen; Escape-Sequenzen entsprechen JSON
+(z. B. `\n`, `\"`, `\\`). So bleiben Kommas und Semikolons innerhalb eines Strings erhalten.
+Neue unquotierte Ganzzahlen beziehungsweise Dezimalzahlen werden als BINI-Zahlen gespeichert;
+Zahlen außerhalb des unterstützten Wertebereichs bleiben Strings. Kommentare haben in BINI
+keine Repräsentation und werden vor dem Übernehmen mit einer Meldung abgewiesen. Die Eingabe
+bleibt im Bearbeitungsdialog erhalten. Die ursprüngliche `.bak`-Sicherung bleibt ebenfalls binär.
+
+Eine unabhängig gepackte kleine BINI-Beispielmission liegt unter
+`tests/Fixtures/Missions/bini-sample.ini`. Codec-Tests verwenden zusätzlich unabhängig erzeugte
+Bytefolgen einschließlich beschädigter Daten; WPF-Smokechecks prüfen den tatsächlichen
+Editor-Speicherpfad einschließlich Save As, Backup und Undo.
+
+### Fenster und Grafik
+
+Eine dunklere eigene Titelleiste integriert Icon und Fensterbuttons ins Theme. Native
+Fensterfunktionen (Verschieben, Größenänderung und Maximieren) bleiben über WPF WindowChrome
+verfügbar; Schließen verwendet weiterhin die bestehende Rückfrage für ungespeicherte Änderungen.
+Der Graph zeigt ein dezentes Sternenfeld mit Nebel. Assets und ihre Erzeugung sind unter
+`src/MissionEditor.App/Assets/README.md` dokumentiert.
+
+## Versionierung und Releases
+
+Alle Projekte (GUI, Core, CLI und Tests) erhalten ihre Version zentral über MinVer 8.0.0 in
+`Directory.Build.props`. Die gemeinsame Repository-Version berücksichtigt jeden neuen Commit,
+auch wenn nur Core oder CLI verändert wurden. Ohne Release-Tag entsteht beispielsweise
+`0.1.0-preview.0.15`; der nächste Commit erhöht den Entwicklungsstand. Die vollständige
+Assembly-Produktversion enthält zusätzlich die Git-Revision. Die numerische Assembly-/Dateiversion
+folgt MinVers Standard; Entwicklungsversionen unterscheiden sich über die Produktversion.
+
+Versionen werden beim Build berechnet, ohne zusätzliche Versionscommits oder Git-Hooks.
+Erneutes Pushen oder Bauen desselben Commits ändert seine Version nicht. Die GUI zeigt die
+semantische Version im Titel. Unter „Über…“ stehen GUI-, Core- und gemeinsame CLI-Build-Version,
+Laufzeit und Referenzen; „Build-Infos kopieren“ übernimmt die vollständigen Versionsangaben.
+
+`build.yml` läuft bei Branch-Pushes und Pull Requests, lädt die vollständige Git-Historie und
+stellt versionierte Build-Artefakte bereit. Diese CI-Artefakte benötigen die passende .NET-Laufzeit.
+
+Ein Release wird durch einen SemVer-Tag mit Präfix `v` ausgelöst:
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+`release.yml` baut und testet den getaggten Commit, veröffentlicht GUI und CLI für Windows x64
+mit enthaltener .NET-Laufzeit und erstellt zwei ZIPs sowie SHA-256-Prüfsummen. Es prüft, dass
+Tag und berechnete MinVer-Version übereinstimmen und alle ausgelieferten Module dieselbe
+Produktversion haben. Bei Tags wie `v0.2.0-rc.1` wird das GitHub-Release als Vorabversion markiert.
+Die benötigten Rechte kommen vom eingebauten `GITHUB_TOKEN`; ein eigener PAT ist nicht nötig.
+Manuell auf einem Branch gestartet erzeugt der Workflow nur Artefakte, kein GitHub-Release.
+
+Der Verpackungsschritt lässt sich lokal ausführen:
+
+```powershell
+./.github/scripts/Publish-Release.ps1
+```
+
+Die Ausgaben liegen im ignorierten Verzeichnis `artifacts/`. Für eine andere Ausgabestelle kann
+`-OutputDirectory` angegeben werden. Die ZIPs enthalten jeweils den Inhalt des entsprechenden
+GUI-/CLI-Verzeichnisses und können ohne vorherige .NET-Installation entpackt gestartet werden.

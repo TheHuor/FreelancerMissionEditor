@@ -63,6 +63,15 @@ public sealed class IniLine
     /// <summary>Returns the value at <paramref name="index"/> or an empty string.</summary>
     public string GetValue(int index) => index < Values.Count ? Values[index] : string.Empty;
 
+    /// <summary>Reads a boolean while honoring BINI's typed numeric parameters.</summary>
+    public bool GetBoolean(int index)
+    {
+        if (BinaryParameters is { } parameters)
+            return index >= 0 && index < parameters.Count && parameters[index].BooleanValue;
+        string value = GetValue(index);
+        return value.Equals("true", StringComparison.OrdinalIgnoreCase) || (int.TryParse(value, out int number) && number != 0);
+    }
+
     /// <summary>True when this is an entry with the given key (case-insensitive, like is_value).</summary>
     public bool IsKey(string key) => Kind == IniLineKind.Entry && string.Equals(Key, key, StringComparison.OrdinalIgnoreCase);
 
@@ -115,6 +124,38 @@ public sealed class IniLine
             : line.RawValue.Split(',').Select(value => value.Trim()).ToArray();
         return line;
     }
+
+    internal IReadOnlyList<BiniParameter>? BinaryParameters { get; private set; }
+
+    internal static IniLine BinaryHeader(int number, string name) => new(number, $"[{name}]", "\r\n")
+    {
+        Kind = IniLineKind.Header,
+        SectionName = name,
+    };
+
+    internal static IniLine BinaryEntry(int number, string key, IReadOnlyList<BiniParameter> parameters)
+    {
+        string display = string.Join(", ", parameters.Select(value => value.Display));
+        return new IniLine(number, parameters.Count == 0 ? key : $"{key} = {display}", "\r\n")
+        {
+            Kind = IniLineKind.Entry,
+            Key = key,
+            Values = parameters.Select(value => value.Value).ToArray(),
+            RawValue = string.Join(", ", parameters.Select(value => value.Value)),
+            BinaryParameters = parameters,
+        };
+    }
+
+    internal IniLine AtLine(int number) => new(number, Text, LineEnding)
+    {
+        Kind = Kind,
+        SectionName = SectionName,
+        Key = Key,
+        Values = Values,
+        Comment = Comment,
+        RawValue = RawValue,
+        BinaryParameters = BinaryParameters,
+    };
 
     /// <inheritdoc/>
     public override string ToString() => $"{Number}: {Text}";

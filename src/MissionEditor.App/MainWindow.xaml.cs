@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -58,6 +58,8 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnAbout(object sender, RoutedEventArgs args) => new AboutWindow { Owner = this }.ShowDialog();
+
     private void OnOpen(object sender, ExecutedRoutedEventArgs args)
     {
         var dialog = new OpenFileDialog { Filter = FileFilter };
@@ -82,7 +84,7 @@ public partial class MainWindow : Window
         {
             ViewModel.SaveAs(dialog.FileName);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
         {
             MessageBox.Show(this, exception.Message, "Speichern fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -101,7 +103,7 @@ public partial class MainWindow : Window
             ViewModel.Save();
             return true;
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
         {
             MessageBox.Show(this, exception.Message, "Speichern fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error);
             return false;
@@ -138,12 +140,25 @@ public partial class MainWindow : Window
             $"[{section.Name}] ab Zeile {section.FirstLineNumber} bearbeiten",
             Core.Ini.IniDocument.GetEditableText(section),
             "Text der Sektion von der Kopfzeile bis zur letzten Angabe. Bei [Trigger] muss 'nickname' direkt nach der Kopfzeile stehen. "
-            + "Übernehmen (Strg+Enter) prüft die Datei neu; gespeichert wird erst mit Strg+S, Strg+Z macht die Änderung rückgängig.")
+            + (ViewModel.Script?.Document.IsBini == true ? "BINI: Strings in Anführungszeichen; Kommentare können nicht gespeichert werden. " : string.Empty)
+            + "Übernehmen (Strg+Enter) prüft die Datei neu; gespeichert wird erst mit Strg+S, Strg+Z macht die Änderung rückgängig.",
+            ViewModel.Script?.Document.IsBini == true ? text =>
+            {
+                try { ViewModel.Script.Document.ReplaceSection(section, text).ToBytes(); return null; }
+                catch (InvalidDataException exception) { return exception.Message; }
+            }
+        : null)
         {
             Owner = this,
         };
         if (editor.ShowDialog() == true && editor.Text != Core.Ini.IniDocument.GetEditableText(section))
-            ViewModel.ReplaceSection(section, editor.Text);
+        {
+            try { ViewModel.ReplaceSection(section, editor.Text); }
+            catch (InvalidDataException exception)
+            {
+                MessageBox.Show(this, exception.Message, "Ungültige BINI-Eingabe", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
     }
 
     private void OnDeleteSection(object sender, RoutedEventArgs args)

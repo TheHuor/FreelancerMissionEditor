@@ -67,6 +67,30 @@ internal static class Program
         vm.Save();
         Assert(File.Exists(tmp+".bak") && File.ReadAllText(tmp).Contains("layout verification"),"save and backup work on temporary copy");
         Console.WriteLine("Temporary validation file: "+tmp);
+        string binaryFixture=Path.Combine(repository!.FullName,"tests","Fixtures","Missions","bini-sample.ini");
+        string binaryCopy=Path.Combine(Path.GetTempPath(),"mission-bini-check-"+Guid.NewGuid()+".ini");
+        string binarySaveAs=binaryCopy+".saved.ini";
+        File.Copy(binaryFixture,binaryCopy);
+        try
+        {
+            vm.Load(binaryCopy);
+            Assert(vm.Script!.Document.IsBini && vm.Script.Triggers.Count==2,"BINI mission loads into editor graph");
+            var binarySection=vm.Script.Document.Sections[0];
+            vm.ReplaceSection(binarySection,IniDocumentText(binarySection).Replace("Cnd_Timer = 5","Cnd_Timer = 7"));
+            vm.Save();
+            Assert(MissionEditor.Core.Ini.IniDocument.Load(binaryCopy).IsBini,"editor Save retains BINI");
+            Assert(File.ReadAllBytes(binaryFixture).SequenceEqual(File.ReadAllBytes(binaryCopy+".bak")),"BINI backup preserves original bytes");
+            vm.SaveAs(binarySaveAs);
+            Assert(MissionEditor.Core.Ini.IniDocument.Load(binarySaveAs).IsBini,"editor Save As retains BINI");
+            vm.UndoCommand.Execute(null);
+            Assert(vm.Script.Document.IsBini && vm.IsModified,"BINI undo retains format and marks saved edit undone");
+            vm.Load(fixture);
+        }
+        finally
+        {
+            File.Delete(binaryCopy); File.Delete(binaryCopy+".bak"); File.Delete(binarySaveAs);
+        }
+        static string IniDocumentText(MissionEditor.Core.Ini.IniSection section) => MissionEditor.Core.Ini.IniDocument.GetEditableText(section);
         foreach(var fg in new[]{"TextBrush","MutedTextBrush","AccentBrush","ErrorBrush","WarningBrush"})
         {
             double L(Color c) {double Ch(byte b) {var v=b/255.0;return v<=0.04045?v/12.92:Math.Pow((v+0.055)/1.055,2.4);}return .2126*Ch(c.R)+.7152*Ch(c.G)+.0722*Ch(c.B);}
@@ -76,6 +100,21 @@ internal static class Program
                 Assert(contrast>=4.5,$"contrast {fg}/{bg}: {contrast:F2}");
             }
         }
+        Assert(vm.WindowTitle.Contains(AboutWindow.DisplayVersion), "main caption contains build version");
+        var about = new AboutWindow { Owner = window };
+        about.Show(); about.UpdateLayout();
+        Assert(about.Modules.Count == 3 && about.Modules.All(module => module.Version == AboutWindow.DisplayVersion), "About lists consistent GUI, Core and CLI repository versions");
+        if (Environment.GetEnvironmentVariable("MISSION_EDITOR_ABOUT_PREVIEW") is { Length: > 0 } previewPath)
+        {
+            var dpi = VisualTreeHelper.GetDpi(about);
+            var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(about.ActualWidth*dpi.DpiScaleX), (int)(about.ActualHeight*dpi.DpiScaleY), dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+            bitmap.Render(about);
+            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+            using var previewStream = File.Create(previewPath);
+            encoder.Save(previewStream);
+        }
+        about.Close();
         Console.WriteLine("ALL CHECKS PASSED");
         File.Delete(tmp);
         File.Delete(tmp + ".bak");

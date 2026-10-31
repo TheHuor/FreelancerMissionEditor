@@ -120,7 +120,7 @@ public sealed class MissionScript
             else if (entry.IsKey("InitState"))
                 trigger.InitialState = ParseState(entry.GetValue(0), trigger.InitialState);
             else if (entry.IsKey("repeatable"))
-                trigger.Repeatable |= ParseBool(entry.GetValue(0));
+                trigger.Repeatable |= entry.GetBoolean(0);
             else if (entry.IsKey("system"))
                 trigger.System = entry.GetValue(0);
             else if (EngineVocabulary.LooksLikeCondition(key) || EngineVocabulary.LooksLikeAction(key))
@@ -161,7 +161,4 @@ public sealed class MissionScript
         _ => current,
     };
 
-    // INI_Reader::get_value_bool: "true" (case-insensitive) or a non-zero number.
-    private static bool ParseBool(string value) =>
-        value.Equals("true", StringComparison.OrdinalIgnoreCase) || (int.TryParse(value, out int number) && number != 0);
 }

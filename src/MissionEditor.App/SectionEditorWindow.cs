@@ -9,13 +9,16 @@ namespace MissionEditor.App;
 public sealed class SectionEditorWindow : Window
 {
     private readonly TextBox _editor;
+    private readonly Func<string, string?>? _validate;
 
     /// <summary>Creates the dialog.</summary>
     /// <param name="title">Window title.</param>
     /// <param name="text">The section text to edit.</param>
     /// <param name="note">A line of advice shown above the text.</param>
-    public SectionEditorWindow(string title, string text, string note)
+    /// <param name="validate">Optional validation error; the dialog remains open on invalid input.</param>
+    public SectionEditorWindow(string title, string text, string note, Func<string, string?>? validate = null)
     {
+        _validate = validate;
         Title = title;
         Width = 760;
         Height = 560;
@@ -60,7 +63,15 @@ public sealed class SectionEditorWindow : Window
     /// <summary>The edited text (valid after the dialog returned true).</summary>
     public string Text => _editor.Text;
 
-    private void Accept() => DialogResult = true;
+    private void Accept()
+    {
+        if (_validate?.Invoke(_editor.Text) is { } error)
+        {
+            MessageBox.Show(this, error, "Ungültige Eingabe", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        DialogResult = true;
+    }
 
     private sealed class ActionCommand(Action action) : ICommand
     {

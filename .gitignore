@@ -12,3 +12,6 @@ TestResults/
 
 # Backups the editor writes next to saved files
 *.bak
+
+# Local release packages
+artifacts/

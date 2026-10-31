@@ -1,0 +1,58 @@
+<Window x:Class="MissionEditor.App.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Style="{StaticResource {x:Type Window}}"
+        Title="Über Mission Editor" Width="680" Height="650" MinWidth="580" MinHeight="520"
+        ShowInTaskbar="False" WindowStartupLocation="CenterOwner">
+  <DockPanel Margin="28,20,28,24">
+    <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,16,0,0" Margin="0,20,0,0">
+      <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <Button Content="Build-Infos kopieren" Click="OnCopy" HorizontalAlignment="Left" Padding="12,6"/>
+        <Button Grid.Column="1" Content="Schließen" IsCancel="True" IsDefault="True" Click="OnClose" MinWidth="100" Padding="12,6"/>
+      </Grid>
+    </Border>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel>
+        <Grid Margin="0,4,0,24">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="88"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <Image Source="Assets/MissionEditor.png" Width="68" Height="68" HorizontalAlignment="Left" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="Mission Editor"/>
+          <StackPanel Grid.Column="1" VerticalAlignment="Center">
+            <TextBlock Text="Mission Editor" FontSize="28" FontWeight="SemiBold"/>
+            <TextBlock Text="Für Freelancer und Crossfire" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,10"/>
+            <StackPanel Orientation="Horizontal">
+              <Border Background="{StaticResource SelectionBrush}" CornerRadius="3" Padding="8,3"><TextBlock Text="{Binding VersionLabel}" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold"/></Border>
+              <TextBlock Text="{Binding RevisionLabel}" ToolTip="{Binding FullBuildVersion}" Foreground="{StaticResource MutedTextBrush}" FontSize="12" Margin="12,0,0,0" VerticalAlignment="Center"/>
+            </StackPanel>
+          </StackPanel>
+        </Grid>
+        <TextBlock Text="MODULE" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
+        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4" Padding="12,4">
+          <ItemsControl ItemsSource="{Binding Modules}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid Margin="0,10">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="64"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                  <TextBlock Grid.Column="1" Text="{Binding Description}" Foreground="{StaticResource MutedTextBrush}" TextTrimming="CharacterEllipsis" Margin="8,0"/>
+                  <TextBlock Grid.Column="2" Text="{Binding Version}" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" ToolTip="{Binding FullVersion}"/>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Border>
+        <TextBlock Text="Alle Module verwenden dieselbe Git-basierte Repository-Version." Foreground="{StaticResource MutedTextBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        <TextBlock Text="LAUFZEIT" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,24,0,8"/>
+        <TextBlock Text="{Binding RuntimeLabel}"/>
+        <TextBlock Text="{Binding WpfLabel}" Foreground="{StaticResource MutedTextBrush}" FontSize="12" Margin="0,4,0,0"/>
+        <TextBlock Text="PROJEKT UND REFERENZEN" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,24,0,8"/>
+        <WrapPanel>
+          <Button Content="GitHub-Projekt" Tag="https://github.com/TheHuor/FreelancerMissionEditor" Click="OnOpenReference" Margin="0,0,8,8"/>
+          <Button Content="MinVer 8.0.0" Tag="https://github.com/adamralph/minver" Click="OnOpenReference" Margin="0,0,8,8"/>
+          <Button Content=".NET / WPF" Tag="https://github.com/dotnet/wpf" Click="OnOpenReference" Margin="0,0,0,8"/>
+        </WrapPanel>
+        <TextBlock Text="Entwickelt von TheHuor. Icon und Weltraumhintergrund wurden mit Image Gen für dieses Projekt erstellt." TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" FontSize="12" Margin="0,4,0,0" LineHeight="18"/>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>
