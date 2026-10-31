@@ -32,7 +32,7 @@ public sealed class MissionWorkspace
         return new(Relative(loaded.Path), loaded.Script.Document.IsBini ? "BINI" : "Text", loaded.Hash,
             loaded.Script.Document.Lines.Count, loaded.Script.Document.Sections.Count,
             loaded.Script.Triggers.Count, loaded.Script.Objects.Count,
-            findings.Count(f => f.Severity == FindingSeverity.Error), findings.Count(f => f.Severity == FindingSeverity.Warning));
+            findings.Count(finding => finding.Severity == FindingSeverity.Error), findings.Count(finding => finding.Severity == FindingSeverity.Warning));
     }
 
     /// <summary>Pages the existing checker's findings, including explanations.</summary>
@@ -40,13 +40,22 @@ public sealed class MissionWorkspace
     {
         if (!Enum.TryParse<FindingSeverity>(minimumSeverity, true, out var severity) || !Enum.IsDefined(severity))
             throw new ArgumentException("Schwere muss Info, Warning oder Error sein.");
-        return Paginate(MissionChecker.Run(Load(path).Script).Where(f => f.Severity >= severity).Select(FindingInfo.From).ToArray(), offset, limit);
+        return Paginate(MissionChecker.Run(Load(path).Script).Where(finding => finding.Severity >= severity).Select(FindingInfo.From).ToArray(), offset, limit);
     }
 
     /// <summary>Pages named trigger definitions, including shadowed duplicates.</summary>
     public Page<TriggerInfo> ListTriggers(string path, string filter = "", int offset = 0, int limit = 100) =>
-        Paginate(Load(path).Script.Triggers.Where(t => t.Nickname.Contains(filter, StringComparison.OrdinalIgnoreCase))
-            .Select(t => new TriggerInfo(t.Nickname, t.Section.Index, t.LineNumber, t.InitialState.ToString(), t.ConditionText, t.IsShadowed)).ToArray(), offset, limit);
+        Paginate(Load(path).Script.Triggers.Where(trigger => trigger.Nickname.Contains(filter, StringComparison.OrdinalIgnoreCase))
+            .Select(trigger => new TriggerInfo(trigger.Nickname, trigger.Section.Index, trigger.LineNumber, trigger.InitialState.ToString(), trigger.ConditionText, trigger.IsShadowed)).ToArray(), offset, limit);
+
+    /// <summary>Pages all sections with index, name, nickname and line range (the index prepare_section_edit expects).</summary>
+    public Page<SectionInfo> ListSections(string path, string filter = "", int offset = 0, int limit = 100) =>
+        Paginate(Load(path).Script.Document.Sections
+            .Select(section => new SectionInfo(section.Index, section.Name, section.Find("nickname")?.GetValue(0), section.FirstLineNumber, section.LastLineNumber))
+            .Where(section => filter.Length == 0
+                || section.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                || (section.Nickname?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false))
+            .ToArray(), offset, limit);
 
     /// <summary>Reads rendered source lines; BINI line numbers refer to its decoded view.</summary>
     public SourcePage ReadSource(string path, int firstLine = 1, int lineCount = 120)
@@ -76,24 +85,24 @@ public sealed class MissionWorkspace
                 nodes.Add(other); queue.Enqueue((other, item.Depth + 1));
             }
         }
-        var contextEdges = graph.Edges.Where(e => nodes.Contains(e.From) && nodes.Contains(e.To)).ToArray();
-        return new(nodes.Select(n => new ContextNode(n.Name, n.IsMissing, n.Trigger?.LineNumber,
-            n.Trigger?.ConditionText, n.Trigger?.Actions.Take(100).Select(a => a.Text).ToArray() ?? [],
-            (n.Trigger?.Actions.Count ?? 0) > 100)).ToArray(),
+        var contextEdges = graph.Edges.Where(edge => nodes.Contains(edge.From) && nodes.Contains(edge.To)).ToArray();
+        return new(nodes.Select(node => new ContextNode(node.Name, node.IsMissing, node.Trigger?.LineNumber,
+            node.Trigger?.ConditionText, node.Trigger?.Actions.Take(100).Select(action => action.Text).ToArray() ?? [],
+            (node.Trigger?.Actions.Count ?? 0) > 100)).ToArray(),
             contextEdges.Take(500)
-                .Select(e => new ReferenceInfo(e.From.Name, e.To.Name, e.Kind.ToString(), e.Reference.Line.Number, e.Reference.IsEffective)).ToArray(), truncated, contextEdges.Length > 500);
+                .Select(edge => new ReferenceInfo(edge.From.Name, edge.To.Name, edge.Kind.ToString(), edge.Reference.Line.Number, edge.Reference.IsEffective)).ToArray(), truncated, contextEdges.Length > 500);
     }
 
     /// <summary>Provides lexical candidates and actual calling references, without asserting intent.</summary>
     public MissingSuggestion SuggestMissing(string path, string name)
     {
         var script = Load(path).Script;
-        if (script.EffectiveTriggers.Any(t => t.Nickname.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        if (script.EffectiveTriggers.Any(trigger => trigger.Nickname.Equals(name, StringComparison.OrdinalIgnoreCase)))
             throw new ArgumentException("Dieser Trigger ist bereits definiert.");
-        var references = script.Triggers.SelectMany(t => t.References).Where(r => r.TargetName.Equals(name, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var references = script.Triggers.SelectMany(trigger => trigger.References).Where(reference => reference.TargetName.Equals(name, StringComparison.OrdinalIgnoreCase)).ToArray();
         if (references.Length == 0) throw new KeyNotFoundException("Dieser fehlende Trigger wird nicht referenziert.");
-        return new(name, NameSimilarity.FindClosest(name, script.EffectiveTriggers.Select(t => t.Nickname)),
-            references.Take(100).Select(r => new ReferenceInfo(r.Source.Nickname, r.TargetName, r.Kind.ToString(), r.Line.Number, r.IsEffective)).ToArray(),
+        return new(name, NameSimilarity.FindClosest(name, script.EffectiveTriggers.Select(trigger => trigger.Nickname)),
+            references.Take(100).Select(reference => new ReferenceInfo(reference.Source.Nickname, reference.TargetName, reference.Kind.ToString(), reference.Line.Number, reference.IsEffective)).ToArray(),
             references.Length,
             "Nur Namensähnlichkeit, kein Nachweis der beabsichtigten Funktion. Aufrufkontext und Ablauf prüfen; keine Trigger erfinden.");
     }
@@ -116,7 +125,7 @@ public sealed class MissionWorkspace
         LimitText(text);
         var strict = Encoding.GetEncoding(IniDocument.Windows1252.CodePage, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
         var document = IniDocument.Parse(strict.GetBytes(text));
-        if (document.Sections.Count == 0 || document.LeadingLines.Any(l => l.Kind == IniLineKind.Entry))
+        if (document.Sections.Count == 0 || document.LeadingLines.Any(line => line.Kind == IniLineKind.Entry))
             throw new InvalidDataException("Eine neue Mission braucht Sektionen; Werte vor der ersten Sektion sind nicht zulässig.");
         return Stage(document, null, null, "", text);
     }
@@ -211,7 +220,7 @@ public sealed class MissionWorkspace
     private static SourcePage Source(IniDocument document, int firstLine, int lineCount)
     {
         if (firstLine < 1 || lineCount < 1 || lineCount > 500) throw new ArgumentOutOfRangeException(nameof(firstLine), "Erste Zeile mindestens 1; Zeilenanzahl zwischen 1 und 500.");
-        return new(document.Lines.Count, document.IsBini, document.Lines.Skip(firstLine - 1).Take(lineCount).Select(l => new SourceLine(l.Number, l.Text)).ToArray());
+        return new(document.Lines.Count, document.IsBini, document.Lines.Skip(firstLine - 1).Take(lineCount).Select(line => new SourceLine(line.Number, line.Text)).ToArray());
     }
     private static Page<T> Paginate<T>(IReadOnlyList<T> items, int offset, int limit)
     {
@@ -225,6 +234,7 @@ public sealed record MissionSummary(string Path, string Format, string Sha256, i
 public sealed record Page<T>(int Total, int Offset, IReadOnlyList<T> Items);
 public sealed record SourcePage(int TotalLines, bool SyntheticBiniLines, IReadOnlyList<SourceLine> Lines);
 public sealed record SourceLine(int Number, string Text);
+public sealed record SectionInfo(int Index, string Name, string? Nickname, int FirstLine, int LastLine);
 public sealed record TriggerInfo(string Name, int SectionIndex, int LineNumber, string InitialState, string Condition, bool Shadowed);
 public sealed record FindingInfo(string Severity, string CheckId, int LineNumber, string? Subject, string Message, string? Hint, int? RelatedLineNumber)
 {

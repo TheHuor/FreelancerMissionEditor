@@ -102,6 +102,20 @@ public sealed class WorkspaceTests : IDisposable
     }
 
     [Fact]
+    public void ListSectionsGivesTheIndexForSectionEdits()
+    {
+        File.WriteAllText(Path.Combine(_root, "objects.ini"),
+            "[ObjList]\nnickname = follow\nFollow = Player, 100\n\n[Trigger]\nnickname = go\nCnd_True = no_params\n");
+        var workspace = new MissionWorkspace(_root);
+        SectionInfo objList = Assert.Single(workspace.ListSections("objects.ini", "objlist").Items);
+        Assert.Equal((0, "ObjList", "follow", 1), (objList.Index, objList.Name, objList.Nickname, objList.FirstLine));
+        Assert.Equal(2, workspace.ListSections("objects.ini").Total);
+        DraftPreview draft = workspace.PrepareSectionEdit("objects.ini", workspace.Inspect("objects.ini").Sha256, objList.Index,
+            "[ObjList]\nnickname = follow\nFollow = Player, 200");
+        Assert.Contains("Follow = Player, 200", draft.After);
+    }
+
+    [Fact]
     public void SectionDraftRejectsCharactersUnrepresentableInOriginalEncoding()
     {
         var workspace = new MissionWorkspace(_root, true);
