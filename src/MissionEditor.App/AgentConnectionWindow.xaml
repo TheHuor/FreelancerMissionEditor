@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Style="{StaticResource {x:Type Window}}"
-        Title="KI-Agent verbinden" Width="760" Height="760" MinWidth="620" MinHeight="560"
+        Title="KI-Agent verbinden" Width="780" Height="860" MinWidth="620" MinHeight="560"
         ShowInTaskbar="False" WindowStartupLocation="CenterOwner">
   <DockPanel Margin="28,20,28,24">
     <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,16,0,0" Margin="0,16,0,0">
@@ -39,15 +39,23 @@
         </Border>
 
         <TextBlock Text="EINRICHTUNG IM AGENTEN" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,22,0,6" />
-        <TabControl x:Name="ClientTabs" MinHeight="230">
+        <TabControl x:Name="ClientTabs" MinHeight="260">
           <TabItem Header="Claude Code">
-            <DockPanel Margin="10">
-              <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{StaticResource TextBrush}"
-                         Text="Befehl in einem Terminal ausführen. Danach steht der Server in allen Claude-Code-Sitzungen zur Verfügung (/mcp zeigt den Status)." />
-              <Button DockPanel.Dock="Bottom" Content="Befehl kopieren" Tag="ClaudeCode" Click="OnCopy" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,4" />
-              <TextBox x:Name="ClaudeCodeBox" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+            <StackPanel Margin="10">
+              <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold"
+                         Text="Weg 1 – mit der Kommandozeile claude: Befehl in einem Terminal ausführen." />
+              <TextBlock x:Name="ClaudeCommandStatus" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,8" />
+              <TextBox x:Name="ClaudeCodeBox" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" MinHeight="54"
                        AutomationProperties.Name="Befehl für Claude Code" />
-            </DockPanel>
+              <Button Content="Befehl kopieren" Tag="ClaudeCode" Click="OnCopy" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,4" />
+              <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" Margin="0,18,0,0"
+                         Text="Weg 2 – ohne Kommandozeile (z. B. Claude Code in der Desktop-App): von Hand eintragen." />
+              <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,8"
+                         Text="%USERPROFILE%\.claude.json bei geschlossenem Claude in einem Texteditor öffnen. Gibt es oben auf der obersten Ebene schon &quot;mcpServers&quot;, nur den Eintrag freelancer-missions dort hineinkopieren, sonst den ganzen Block als weiteren Eintrag der obersten Ebene. Vorher eine Kopie der Datei anlegen. Danach eine neue Sitzung starten; /mcp zeigt den Status." />
+              <TextBox x:Name="ClaudeCodeJsonBox" IsReadOnly="True" FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" MinHeight="120"
+                       AutomationProperties.Name="Eintrag für .claude.json" />
+              <Button Content="JSON kopieren" Tag="ClaudeCodeJson" Click="OnCopy" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,4" />
+            </StackPanel>
           </TabItem>
           <TabItem Header="Claude Desktop">
             <DockPanel Margin="10">

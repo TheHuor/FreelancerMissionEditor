@@ -31,13 +31,42 @@ public static class AgentConnection
         + string.Join(' ', Arguments(workspace, allowWrites).Select(argument => argument.StartsWith("--", StringComparison.Ordinal) ? argument : Quote(argument)));
 
     /// <summary>The <c>mcpServers</c> JSON block (Claude Desktop and other clients with that format).</summary>
-    public static string JsonConfiguration(string executable, string workspace, bool allowWrites)
+    public static string JsonConfiguration(string executable, string workspace, bool allowWrites) =>
+        McpServersJson(executable, workspace, allowWrites, includeType: false);
+
+    /// <summary>
+    /// The <c>mcpServers</c> block as Claude Code stores it in <c>%USERPROFILE%\.claude.json</c>, for adding
+    /// the server by hand when the <c>claude</c> command line is not installed (e.g. only the desktop app).
+    /// </summary>
+    public static string ClaudeCodeJson(string executable, string workspace, bool allowWrites) =>
+        McpServersJson(executable, workspace, allowWrites, includeType: true);
+
+    /// <summary>True when a <c>claude</c> command is on the PATH, so the <c>claude mcp add</c> command works.</summary>
+    public static bool IsClaudeCommandAvailable()
     {
-        var server = new JsonObject
+        string[] names = ["claude.exe", "claude.cmd", "claude.bat", "claude.ps1"];
+        foreach (string directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
-            ["command"] = executable,
-            ["args"] = new JsonArray(Arguments(workspace, allowWrites).Select(argument => (JsonNode?)JsonValue.Create(argument)).ToArray()),
-        };
+            try
+            {
+                if (names.Any(name => File.Exists(Path.Combine(directory.Trim('"'), name))))
+                    return true;
+            }
+            catch (ArgumentException)
+            {
+                // A malformed PATH entry is skipped.
+            }
+        }
+        return false;
+    }
+
+    private static string McpServersJson(string executable, string workspace, bool allowWrites, bool includeType)
+    {
+        var server = new JsonObject();
+        if (includeType)
+            server["type"] = "stdio";
+        server["command"] = executable;
+        server["args"] = new JsonArray(Arguments(workspace, allowWrites).Select(argument => (JsonNode?)JsonValue.Create(argument)).ToArray());
         var root = new JsonObject { ["mcpServers"] = new JsonObject { [ServerName] = server } };
         return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
     }

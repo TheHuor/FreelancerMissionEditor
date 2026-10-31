@@ -23,6 +23,11 @@ public partial class AgentConnectionWindow : Window
         WorkspaceBox.Text = missionPath is null ? string.Empty : Path.GetDirectoryName(missionPath) ?? string.Empty;
         AllowWritesBox.IsChecked = allowWrites;
         UnsavedHint.Visibility = hasUnsavedChanges ? Visibility.Visible : Visibility.Collapsed;
+        bool hasClaudeCommand = AgentConnection.IsClaudeCommandAvailable();
+        ClaudeCommandStatus.Text = hasClaudeCommand
+            ? "Die Kommandozeile claude ist auf diesem Rechner vorhanden."
+            : "Die Kommandozeile claude wurde auf diesem Rechner nicht gefunden – der Befehl meldet dann „claude wurde nicht erkannt“. Weg 2 verwenden.";
+        ClaudeCommandStatus.Foreground = (System.Windows.Media.Brush)FindResource(hasClaudeCommand ? "MutedTextBrush" : "WarningBrush");
         _initialized = true;
         Refresh();
     }
@@ -47,6 +52,7 @@ public partial class AgentConnectionWindow : Window
         string executable = Executable.Length > 0 ? Executable : AgentConnection.ServerExecutable;
         string workspace = Workspace.Length > 0 ? Workspace : "<Missionsverzeichnis>";
         ClaudeCodeBox.Text = AgentConnection.ClaudeCodeCommand(executable, workspace, AllowWrites);
+        ClaudeCodeJsonBox.Text = AgentConnection.ClaudeCodeJson(executable, workspace, AllowWrites);
         ClaudeDesktopBox.Text = AgentConnection.JsonConfiguration(executable, workspace, AllowWrites);
         CodexBox.Text = AgentConnection.CodexConfiguration(executable, workspace, AllowWrites);
 
@@ -102,6 +108,7 @@ public partial class AgentConnectionWindow : Window
         TextBox source = client switch
         {
             "ClaudeCode" => ClaudeCodeBox,
+            "ClaudeCodeJson" => ClaudeCodeJsonBox,
             "ClaudeDesktop" => ClaudeDesktopBox,
             _ => CodexBox,
         };

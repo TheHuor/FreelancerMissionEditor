@@ -129,6 +129,11 @@ internal static class Program
         Assert(AgentConnection.CodexConfiguration(ServerPath, MissionsPath, false).Contains(@"command = ""C:\\Program Files\\Mission Editor\\MissionEditor.Mcp.exe"""), "agent TOML escapes backslashes");
         Assert(!AgentConnection.CodexConfiguration(ServerPath, MissionsPath, false).Contains("--allow-writes"), "agent TOML is read-only by default");
         Assert(AgentConnection.ClaudeCodeCommand(ServerPath, MissionsPath, false).Contains($"-- \"{ServerPath}\" --workspace \"{MissionsPath}\""), "Claude Code command quotes paths");
+        using (var claudeJson = System.Text.Json.JsonDocument.Parse(AgentConnection.ClaudeCodeJson(ServerPath, MissionsPath, false)))
+        {
+            var server = claudeJson.RootElement.GetProperty("mcpServers").GetProperty(AgentConnection.ServerName);
+            Assert(server.GetProperty("type").GetString() == "stdio" && server.GetProperty("command").GetString() == ServerPath, "Claude Code .claude.json entry is a stdio server with the path");
+        }
         var agentWindow = new AgentConnectionWindow(tmp, hasUnsavedChanges: false) { Owner = window };
         agentWindow.Show(); agentWindow.UpdateLayout();
         Assert(agentWindow.ClaudeCodeText.Contains($"--workspace \"{Path.GetDirectoryName(tmp)}\""), "agent dialog suggests the folder of the open mission");
