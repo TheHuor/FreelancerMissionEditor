@@ -33,7 +33,7 @@ public partial class AgentConnectionWindow : Window
   }
 
   /// <summary>The current Claude Code command (for tests).</summary>
-  public string ClaudeCodeText => AgentConnection.ClaudeCodeCommand (ExecutableOrPlaceholder, Workspace, AllowWrites);
+  public string ClaudeCodeText => AgentConnection.ClaudeCodeCommand (ExecutableOrPlaceholder, Workspace, AllowWrites, GameFolder);
 
   private string Executable => ServerBox.Text.Trim ();
 
@@ -42,6 +42,9 @@ public partial class AgentConnectionWindow : Window
   private string ExecutableOrPlaceholder => Executable.Length > 0 ? Executable : AgentConnection.ServerExecutable;
 
   private bool AllowWrites => AllowWritesBox.IsChecked == true;
+
+  // The agent uses the same installation as the editor: a fixed game folder from the status bar setting is passed on.
+  private static string GameFolder => GameFolderSettings.Load ().GameFolder;
 
   private AgentClient SelectedClient => ClientTabs.SelectedItem is TabItem { Tag: string tag } && Enum.TryParse (tag, out AgentClient client)
       ? client
@@ -85,7 +88,7 @@ public partial class AgentConnectionWindow : Window
         ? "Die Kommandozeile claude ist vorhanden: den Befehl in einem Terminal ausführen."
         : "Die Kommandozeile claude ist auf diesem Rechner nicht installiert (der Befehl meldet dann „nicht erkannt“). „Hinzufügen“ oben funktioniert trotzdem.");
 
-    (string instruction, string snippet) = AgentClientConfig.ManualSnippet (client, configPath, ExecutableOrPlaceholder, Workspace, AllowWrites);
+    (string instruction, string snippet) = AgentClientConfig.ManualSnippet (client, configPath, ExecutableOrPlaceholder, Workspace, AllowWrites, GameFolder);
     string preparation = File.Exists (configPath) ? $"Vorher eine Kopie der Datei anlegen und {clientName} schließen." : $"{clientName} vorher schließen.";
     ManualInstruction.Text = $"{instruction} {preparation} Danach {RestartHint (client)}";
     ManualBox.Text = snippet;
@@ -133,6 +136,7 @@ public partial class AgentConnectionWindow : Window
         + string.Concat (configPaths.Select (configPath => $"Datei: {configPath}\n"
             + (File.Exists (configPath) ? $"Sicherung: {configPath}{AgentClientConfig.BackupSuffix}\n" : "Die Datei wird neu angelegt.\n")))
         + $"Freigegebener Ordner: {(Workspace.Length > 0 ? Workspace : "keine Beschränkung (Missionen per vollständigem Pfad)")}\n"
+        + $"Spieldaten: {(GameFolder.Length > 0 ? GameFolder : "aus dem Pfad der jeweiligen Mission")}\n"
         + $"Export erlaubt: {(AllowWrites ? "ja" : "nein")}\n\n"
         + $"Nur der Eintrag „{AgentConnection.ServerName}“ wird angelegt oder ersetzt, alles andere bleibt. "
         + $"Am sichersten ist es, {clientName} vorher zu schließen, damit es die Datei nicht mit einem älteren Stand überschreibt.";
@@ -143,7 +147,7 @@ public partial class AgentConnectionWindow : Window
       List<string> backups = [];
       foreach (string configPath in configPaths)
       {
-        if (AgentClientConfig.AddServer (client, configPath, Executable, Workspace, AllowWrites) is { } backup)
+        if (AgentClientConfig.AddServer (client, configPath, Executable, Workspace, AllowWrites, GameFolder) is { } backup)
           backups.Add (Path.GetFileName (backup));
       }
       AgentConnection.SaveSettings (Executable, Workspace, AllowWrites);

@@ -170,7 +170,7 @@ public static class AiAdvice
   /// the checks to show whether the finding goes away and whether new ones appear.
   /// </summary>
   /// <exception cref="InvalidDataException">The fix targets another section or cannot be applied.</exception>
-  public static CheckedFix CheckFix (MissionScript script, AdviceRequest request, Finding finding, Advice advice)
+  public static CheckedFix CheckFix (MissionScript script, AdviceRequest request, Finding finding, Advice advice, GameData? gameData = null)
   {
     if (!advice.HasFix || advice.ReplacementText.Trim ().Length == 0)
       throw new InvalidDataException ("Die Antwort enthält keine Korrektur.");
@@ -181,8 +181,9 @@ public static class AiAdvice
       throw new InvalidDataException ("Der Korrekturtext beginnt nicht mit einer Sektions-Kopfzeile.");
 
     IniDocument edited = script.Document.ReplaceSection (section, advice.ReplacementText);
-    IReadOnlyList<Finding> before = MissionChecker.Run (script).Where (item => item.Severity >= FindingSeverity.Warning).ToList ();
-    IReadOnlyList<Finding> after = MissionChecker.Run (MissionScript.FromDocument (edited)).Where (item => item.Severity >= FindingSeverity.Warning).ToList ();
+    // Both sides with the same game data, so its findings neither vanish nor appear because of the edit.
+    IReadOnlyList<Finding> before = MissionChecker.Run (script, gameData).Where (item => item.Severity >= FindingSeverity.Warning).ToList ();
+    IReadOnlyList<Finding> after = MissionChecker.Run (MissionScript.FromDocument (edited, script.FilePath), gameData).Where (item => item.Severity >= FindingSeverity.Warning).ToList ();
     // Line numbers shift after the edit, so findings are compared by check, subject and message.
     static string Key (Finding item) => $"{item.CheckId}|{item.Subject}|{item.Message}";
     var beforeKeys = before.Select (Key).ToHashSet ();

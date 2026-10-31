@@ -44,7 +44,7 @@ internal static class Program
         drawer.IsExpanded=true; window.UpdateLayout();
         var workspace=(Grid)drawer.Parent;
         Assert(row.Height.Value <= workspace.ActualHeight-workspace.RowDefinitions[0].MinHeight-6,
-            "drawer restoration respects remaining workspace height after resize");
+            $"drawer restoration respects remaining workspace height after resize (row {row.Height.Value}, workspace {workspace.ActualHeight}, window {window.ActualHeight})");
         window.Height=1080; window.UpdateLayout();
         tabs.SelectedIndex=1;
         drawer.IsExpanded=false;
@@ -156,6 +156,26 @@ internal static class Program
         }
         else
             Console.WriteLine("SKIP IDS texts (original game not installed)");
+
+        // A fixed game folder applies to a mission outside any installation (the fixture copy lies in the temp folder).
+        if (File.Exists(VanillaMission))
+        {
+            vm.ApplyGameFolder(new GameFolderSettings { GameFolder = @"D:\Games\Freelancer" });
+            Assert(vm.GameData is not null && vm.GameDataText.Contains(@"D:\Games\Freelancer") && vm.GameDataText.Contains("fest eingestellt"),
+                "a fixed game folder applies to a mission outside the installation");
+            var gameDialog = new GameFolderWindow(new GameFolderSettings(), vm.FilePath) { Owner = window };
+            gameDialog.Show();
+            gameDialog.ChooseFolderForTest(Path.GetTempPath());
+            Assert(gameDialog.StatusForTest.Contains("kein EXE"), "the game folder dialog rejects a folder without freelancer.ini");
+            gameDialog.ChooseFolderForTest(@"D:\Games\Freelancer");
+            Assert(gameDialog.StatusForTest.StartsWith("Gelesen"), "the game folder dialog reads a valid installation");
+            SavePreview(gameDialog, "gamefolder");
+            gameDialog.Close();
+            vm.ApplyGameFolder(new GameFolderSettings());
+            Assert(vm.GameData is null && vm.GameDataText.Contains("keine Installation"), "automatic finds no installation for a mission in the temp folder");
+        }
+        else
+            Console.WriteLine("SKIP game folder (original game not installed)");
 
         // A change by another program (the agent) shows the reload banner; the editor's own save does not.
         vm.Load(tmp);

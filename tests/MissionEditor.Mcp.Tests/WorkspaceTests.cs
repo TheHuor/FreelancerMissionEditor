@@ -75,6 +75,13 @@ public sealed class WorkspaceTests : IDisposable
     Assert.Equal (["Li01_01_Base"], workspace.GameNicknames (mission, "Base", "li01").Items);
     Assert.Equal (["shared_fighter"], workspace.GameNicknames (mission, "NpcShipArchetype").Items);
     Assert.Throws<ArgumentException> (() => workspace.GameNicknames (mission, "Planet"));
+
+    // --game: a mission outside the installation uses the given one; a folder without freelancer.ini is refused.
+    string outside = Path.Combine (_root, "sample.ini");
+    var withGame = new MissionWorkspace ([], gameFolder: game);
+    Assert.Equal (game, withGame.GameFolder);
+    Assert.Equal (["Br01", "Li01"], withGame.GameNicknames (outside, "System").Items);
+    Assert.Throws<DirectoryNotFoundException> (() => new MissionWorkspace ([], gameFolder: _root));
   }
 
   [Fact]

@@ -119,6 +119,16 @@ public partial class MainWindow : Window
 
   private void OnAskAiForGapsAndBreaks (object sender, RoutedEventArgs args) => AskAiAboutMission (Ai.MissionQuestion.GapsAndBreaks);
 
+  private void OnGameFolder (object sender, RoutedEventArgs args)
+  {
+    var dialog = new GameFolderWindow (GameFolderSettings.Load (), ViewModel.FilePath) { Owner = this };
+    if (dialog.ShowDialog () == true)
+    {
+      ViewModel.ApplyGameFolder (dialog.Result);
+      ViewModel.ReportStatus ($"{ViewModel.GameDataText} · {ViewModel.StatusText}");
+    }
+  }
+
   private void OnSimulate (object sender, RoutedEventArgs args)
   {
     if (ViewModel.Script is null)
@@ -475,7 +485,8 @@ public partial class MainWindow : Window
   {
     if (FindingsExpander is not { IsExpanded: true, Parent: Grid grid } || grid.ActualHeight <= 0)
       return;
-    double maximum = Math.Max (100, grid.ActualHeight - grid.RowDefinitions[0].MinHeight - 6);
+    // Rounded down: with DPI scaling the grid can end up a fraction of a pixel smaller after layout.
+    double maximum = Math.Max (100, Math.Floor (grid.ActualHeight - grid.RowDefinitions[0].MinHeight - 6));
     if (FindingsRow.Height.IsAbsolute && FindingsRow.Height.Value > maximum)
       FindingsRow.Height = new GridLength (maximum);
   }

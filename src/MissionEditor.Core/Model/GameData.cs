@@ -102,23 +102,25 @@ public sealed class GameData
   /// The game data for a mission file, or null when the file does not lie inside a Freelancer installation.
   /// Results are cached per installation until freelancer.ini changes.
   /// </summary>
-  public static GameData? ForMission (string? missionPath)
+  public static GameData? ForMission (string? missionPath) => Locate (missionPath, null);
+
+  /// <summary>
+  /// The game data to use for a mission: the configured installation folder when one is given (several versions
+  /// of the game can live side by side), otherwise the installation the mission file lies in. Null when neither
+  /// yields a readable installation.
+  /// </summary>
+  public static GameData? Locate (string? missionPath, string? gameFolder)
   {
+    if (!string.IsNullOrWhiteSpace (gameFolder))
+      return ForRoot (gameFolder);
     if (missionPath is null)
       return null;
     try
     {
       for (DirectoryInfo? folder = new FileInfo (Path.GetFullPath (missionPath)).Directory; folder is not null; folder = folder.Parent)
       {
-        string freelancerIni = Path.Combine (folder.FullName, "EXE", "freelancer.ini");
-        if (!File.Exists (freelancerIni))
-          continue;
-        DateTime stamp = File.GetLastWriteTimeUtc (freelancerIni);
-        if (Cache.TryGetValue (folder.FullName, out var cached) && cached.Stamp == stamp)
-          return cached.Data;
-        GameData data = Load (folder.FullName);
-        Cache[folder.FullName] = (stamp, data);
-        return data;
+        if (IsInstallation (folder.FullName))
+          return ForRoot (folder.FullName);
       }
     }
     catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
@@ -127,6 +129,45 @@ public sealed class GameData
     }
     return null;
   }
+
+  /// <summary>True when the folder is a Freelancer installation (it contains EXE\freelancer.ini).</summary>
+  public static bool IsInstallation (string folder)
+  {
+    try
+    {
+      return File.Exists (Path.Combine (folder, "EXE", "freelancer.ini"));
+    }
+    catch (ArgumentException)
+    {
+      return false;
+    }
+  }
+
+  /// <summary>The game data of an installation folder (cached until freelancer.ini changes), or null when it is none or unreadable.</summary>
+  public static GameData? ForRoot (string root)
+  {
+    try
+    {
+      string full = Path.TrimEndingDirectorySeparator (Path.GetFullPath (root));
+      string freelancerIni = Path.Combine (full, "EXE", "freelancer.ini");
+      if (!File.Exists (freelancerIni))
+        return null;
+      DateTime stamp = File.GetLastWriteTimeUtc (freelancerIni);
+      if (Cache.TryGetValue (full, out var cached) && cached.Stamp == stamp)
+        return cached.Data;
+      GameData data = Load (full);
+      Cache[full] = (stamp, data);
+      return data;
+    }
+    catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException)
+    {
+      return null;
+    }
+  }
+
+  /// <summary>A short description for the user, e.g. "D:\Freelancer (48 Systeme, 312 Basen, 61 Fraktionen)".</summary>
+  public string Summary =>
+    $"{Root} ({Nicknames (GameDataKind.System).Count} Systeme, {Nicknames (GameDataKind.Base).Count} Basen, {Nicknames (GameDataKind.Faction).Count} Fraktionen)";
 
   /// <summary>Reads the game data of an installation folder.</summary>
   public static GameData Load (string root)

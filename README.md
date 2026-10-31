@@ -59,7 +59,23 @@ Der optionale zweite Parameter wählt beim Start einen Trigger aus. Dateien lass
 
 Symbole: roter Kreis mit ✕ = Fehler, gelbes Dreieck mit ! = Warnung, grauer Kreis mit i = Hinweis.
 
-Liegt die Mission in einer Spielinstallation, zeigt die Vorschau hinter Zeilen mit Text-IDs grau den
+### Spieldaten
+
+Nicknames (Prüfung `unknown-game-nickname`) und Texte kommen aus einer Freelancer-Installation – dem Ordner
+mit `EXE\freelancer.ini`. Gelesen werden die Dateien, die dort unter `[Data]` (universe, groups, ships,
+solar, loadouts, equipment) und `[Resources]` stehen; das passiert beim ersten Prüfen und bleibt bis zu
+einer Änderung an `freelancer.ini` im Speicher. Welche Installation gilt, steht rechts in der Statusleiste
+(„Spieldaten: … (53 Systeme, 197 Basen, …)“). Über **„Spielordner…“** daneben:
+
+- **Automatisch** (Standard): die Installation, in der die geöffnete Mission liegt – der Editor geht vom
+  Ordner der Datei aufwärts bis zu einem Ordner mit `EXE\freelancer.ini`.
+- **Fester Ordner**: für mehrere Spielversionen nebeneinander oder Missionen außerhalb des Spielordners.
+  Zuletzt benutzte Ordner stehen zur Auswahl. Die Wahl gilt auch für den MCP-Server, wenn er über
+  „KI-Agent verbinden…“ eingetragen wird (`--game <Ordner>`), und die Kommandozeile kennt `check … --game <Ordner>`.
+
+Ohne Installation entfallen diese Prüfung und die Texte; alles andere funktioniert wie gewohnt.
+
+Mit Spieldaten zeigt die Vorschau hinter Zeilen mit Text-IDs grau den
 Text dazu – Namen (`individual_name`, `string_id`), Ziele (`[NNObjective] type = ids, …` bzw.
 `rep_inst`), `Act_SetTitle`, `Act_SetOffer`, `Act_NNIds`, den Sprecher von `Act_EtherComm` und Popups.
 Die Texte kommen aus `resources.dll` und den DLLs unter `[Resources]` in `freelancer.ini`
@@ -94,7 +110,7 @@ dotnet run --project src/MissionEditor.Cli -- hash <nickname>
 | `impossible-condition` | `Cnd_Destroyed` auf ein Schiff, eine Formation, eine Station oder ein Label dieser Datei, das nie gespawnt wird – der Trigger löst nie aus |
 | `unused-object` | Schiffe, Formationen, Stationen und Beute, die nie gespawnt werden, nie vergebene Befehlslisten, nie gestartete Dialoge, nie gesetzte Ziele (Hinweis) |
 | `mission-end` | kein `Act_ChangeState = SUCCEED` (Hinweis) oder nur in Triggern, die nie aktiv werden (Warnung) |
-| `unknown-game-nickname` | nur wenn die Mission in einer Spielinstallation liegt (ein Ordner darüber enthält `EXE\freelancer.ini`): Fraktionen (`affiliation`, `faction`, `Act_SetRep`), Systeme und Basen (`[MsnSolar]`, `Cnd_BaseEnter`/`Exit`, `Act_ForceLand`), Stationstypen, Loadouts, Schiffstypen (`Act_SetShipAndLoadout`), Beute-Archetypen und `npc_ship_arch` (eigene `npc_ship_file`, dann `missions\npcships.ini`), die das Spiel nicht kennt. Die Dateien kommen aus `[Data]` in `freelancer.ini` |
+| `unknown-game-nickname` | nur mit Spieldaten (siehe „Spieldaten“: fest eingestellter Spielordner oder die Installation, in der die Mission liegt): Fraktionen (`affiliation`, `faction`, `Act_SetRep`), Systeme und Basen (`[MsnSolar]`, `Cnd_BaseEnter`/`Exit`, `Act_ForceLand`), Stationstypen, Loadouts, Schiffstypen (`Act_SetShipAndLoadout`), Beute-Archetypen und `npc_ship_arch` (eigene `npc_ship_file`, dann `missions\npcships.ini`), die das Spiel nicht kennt. Die Dateien kommen aus `[Data]` in `freelancer.ini` |
 
 Funde in Triggern, die nie aktiv werden, sind nur Hinweise – dort wirkt ohnehin nichts. Gegen die
 14 Storymissionen des Originalspiels geprüft: Sie enthalten viel toten Code (z. B. eine ungenutzte
@@ -278,7 +294,7 @@ Von Hand bauen bzw. starten:
 
 ```
 dotnet build src/MissionEditor.Mcp -c Release
-dotnet run --project src/MissionEditor.Mcp -- [--allow-root <Ordner>]... [--allow-writes]
+dotnet run --project src/MissionEditor.Mcp -- [--allow-root <Ordner>]... [--game <Ordner>] [--allow-writes]
 ```
 
 Ein Release enthält zusätzlich `MissionEditorMcp-<version>-win-x64.zip` mit
@@ -311,7 +327,8 @@ command = "C:\\Tools\\MissionEditorMcp\\MissionEditor.Mcp.exe"
 args = []
 ```
 
-Für Exporte `"--allow-writes"` in die Argumente aufnehmen, für eine Beschränkung
+Für Exporte `"--allow-writes"` in die Argumente aufnehmen, für eine bestimmte Spielinstallation
+`"--game", "D:\\Freelancer"`, für eine Beschränkung
 `"--allow-root", "D:\\freelancer crossfire\\DATA\\MISSIONS"` (mehrfach möglich). Ohne installierte
 exe geht statt `command` auch `dotnet` mit dem Pfad zur `MissionEditor.Mcp.dll` als erstem Argument.
 Im Chat dann einfach den Pfad nennen, z. B. „Prüfe D:\freelancer crossfire\DATA\MISSIONS\M13\m13.ini“.

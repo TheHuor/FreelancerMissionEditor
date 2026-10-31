@@ -63,9 +63,10 @@ public partial class NewMissionPromptWindow : Window
       DescriptionBox.Focus ();
       return;
     }
-    if (!TargetBox.Text.Trim ().EndsWith (".ini", StringComparison.OrdinalIgnoreCase) || Path.IsPathRooted (TargetBox.Text.Trim ()))
+    // The server takes absolute paths (relative ones only with a folder limit), so the suggested full path is fine.
+    if (!TargetBox.Text.Trim ().EndsWith (".ini", StringComparison.OrdinalIgnoreCase))
     {
-      ShowHint (false, "Die Zieldatei muss ein relativer Pfad auf .ini sein, z. B. test\\neue_mission.ini.");
+      ShowHint (false, "Die Zieldatei muss auf .ini enden, z. B. D:\\Freelancer\\DATA\\MISSIONS\\neue_mission.ini.");
       return;
     }
     Prompt = BuildPrompt (description);

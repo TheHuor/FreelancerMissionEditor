@@ -44,7 +44,7 @@ public static class MissionAdvice
         """;
 
   /// <summary>The request for a question about the mission.</summary>
-  public static AdviceRequest Build (MissionScript script, MissionQuestion question, string missionName)
+  public static AdviceRequest Build (MissionScript script, MissionQuestion question, string missionName, GameData? gameData)
   {
     var user = new StringBuilder ();
     user.AppendLine (question switch
@@ -66,17 +66,16 @@ public static class MissionAdvice
                 """,
     });
     user.AppendLine ();
-    string digest = Digest (script, missionName);
+    string digest = Digest (script, missionName, gameData);
     if (digest.Length > MaxDigestLength)
       digest = digest[..MaxDigestLength] + "\n… (Auszug hier abgeschnitten – die Mission ist länger.)";
     user.Append (digest);
     return new AdviceRequest (SystemPrompt, user.ToString (), new HashSet<int> (), AnswerSchema: null);
   }
 
-  /// <summary>The compact text form of the mission sent to the model.</summary>
-  public static string Digest (MissionScript script, string missionName)
+  /// <summary>The compact text form of the mission sent to the model; texts and checks use the given game data.</summary>
+  public static string Digest (MissionScript script, string missionName, GameData? gameData)
   {
-    GameData? gameData = GameData.ForMission (script.FilePath);
     var text = new StringBuilder ();
     text.AppendLine ($"Mission: {missionName} ({script.Document.Lines.Count} Zeilen, {script.EffectiveTriggers.Count ()} Trigger)");
 
@@ -111,7 +110,7 @@ public static class MissionAdvice
       }
     }
 
-    IReadOnlyList<Finding> findings = MissionChecker.Run (script);
+    IReadOnlyList<Finding> findings = MissionChecker.Run (script, gameData);
     text.AppendLine ();
     text.AppendLine ($"Funde des Editors ({findings.Count}):");
     foreach (Finding finding in findings.OrderByDescending (finding => finding.Severity).ThenBy (finding => finding.LineNumber).Take (400))

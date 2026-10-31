@@ -98,7 +98,7 @@ public partial class AiAdviceWindow : Window
     FixPanel.Visibility = Visibility.Visible;
     try
     {
-      _fix = AiAdvice.CheckFix (_viewModel.Script!, _request!, _finding, advice);
+      _fix = AiAdvice.CheckFix (_viewModel.Script!, _request!, _finding, advice, _viewModel.GameData);
       BeforeBox.Text = _fix.Before;
       AfterBox.Text = advice.ReplacementText.Replace ("\r\n", "\n").Replace ("\n", Environment.NewLine);
       ShowCheck (_fix);
@@ -132,7 +132,7 @@ public partial class AiAdviceWindow : Window
       _fix = AiAdvice.CheckFix (_viewModel.Script!, _request, _finding, _advice with
       {
         ReplacementText = AfterBox.Text
-      });
+      }, _viewModel.GameData);
       ShowCheck (_fix);
     }
     catch (InvalidDataException exception)

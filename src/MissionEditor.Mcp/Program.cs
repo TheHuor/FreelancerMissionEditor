@@ -13,11 +13,13 @@ namespace MissionEditor.Mcp;
 public static class Program
 {
   private const string Usage =
-      "MissionEditor.Mcp [--allow-root <Ordner>]... [--allow-writes]\n"
+      "MissionEditor.Mcp [--allow-root <Ordner>]... [--game <Ordner>] [--allow-writes]\n"
       + "Stdio-MCP für Freelancer-Missionsskripte. Missionen werden per absolutem Pfad angegeben.\n"
       + "  --allow-root <Ordner>  nur .ini-Dateien in diesem Ordner zulassen (mehrfach möglich); relative Pfade gelten\n"
       + "                         dann relativ zum ersten Ordner. Ohne die Option sind alle lokalen .ini-Dateien erlaubt.\n"
       + "  --workspace <Ordner>   ältere Schreibweise für --allow-root.\n"
+      + "  --game <Ordner>        Freelancer-Installation (mit EXE\\freelancer.ini) für Nicknames und Texte; ohne die\n"
+      + "                         Option die Installation, in der die jeweilige Mission liegt.\n"
       + "  --allow-writes         Entwürfe dürfen als neue .ini-Dateien exportiert werden; bestehende Dateien nie.";
 
   /// <summary>The instructions for the agent, including what the server was started with.</summary>
@@ -28,6 +30,9 @@ public static class Program
       + (workspace.Roots.Count == 0
           ? "Missionen mit absolutem Pfad angeben; jede lokale .ini-Datei ist erlaubt. "
           : $"Nur .ini-Dateien in diesen Ordnern sind erlaubt: {string.Join ("; ", workspace.Roots)}. Relative Pfade gelten relativ zu {workspace.Roots[0]}. ")
+      + (workspace.GameFolder is { } game
+          ? $"Spieldaten (Nicknames, Texte) kommen aus {game}. "
+          : "Spieldaten (Nicknames, Texte) kommen aus der Installation, in der die Mission liegt. ")
       + (workspace.AllowWrites
           ? "export_mission_draft schreibt nur neue Dateien und erst nach ausdrücklicher Zustimmung des Benutzers. "
           : "Export ist abgeschaltet (Server ohne --allow-writes); fertige Entwürfe dem Benutzer zeigen. ")
@@ -48,6 +53,7 @@ public static class Program
     string version = typeof (Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute> ()?.InformationalVersion ?? "unknown";
     var roots = new List<string> ();
     bool allowWrites = false;
+    string? gameFolder = null;
     try
     {
       for (int i = 0; i < args.Length; i++)
@@ -56,6 +62,9 @@ public static class Program
         {
           case "--allow-root" or "--workspace" when i + 1 < args.Length && !string.IsNullOrWhiteSpace (args[i + 1]):
             roots.Add (args[++i]);
+            break;
+          case "--game" when i + 1 < args.Length && !string.IsNullOrWhiteSpace (args[i + 1]):
+            gameFolder = args[++i];
             break;
           case "--allow-writes":
             allowWrites = true;
@@ -70,7 +79,7 @@ public static class Program
             throw new ArgumentException ($"Unbekannte oder unvollständige Option: {args[i]}\n{Usage}");
         }
       }
-      var workspace = new MissionWorkspace (roots, allowWrites);
+      var workspace = new MissionWorkspace (roots, allowWrites, gameFolder);
       var builder = Host.CreateApplicationBuilder (Array.Empty<string> ());
       builder.Logging.ClearProviders ();
       builder.Logging.AddConsole (options => options.LogToStandardErrorThreshold = LogLevel.Trace);

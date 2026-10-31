@@ -38,6 +38,7 @@ public sealed class MainViewModel : ObservableObject
   private IniSection? _focusSection;
   private IReadOnlyList<FindingItem> _focusFindings = [];
   private ILookup<int, FindingItem> _findingsByLine = Array.Empty<FindingItem> ().ToLookup (finding => finding.LineNumber);
+  private GameFolderSettings _gameFolderSettings = GameFolderSettings.Load ();
 
   /// <summary>Creates the view model.</summary>
   public MainViewModel ()
@@ -113,6 +114,33 @@ public sealed class MainViewModel : ObservableObject
 
   /// <summary>Shows a message from the window (e.g. "copied") in the status bar.</summary>
   public void ReportStatus (string message) => StatusText = message;
+
+  /// <summary>Which installation provides the game data (automatic or a chosen folder).</summary>
+  public GameFolderSettings GameFolderSettings => _gameFolderSettings;
+
+  /// <summary>The game data used for the open mission (nickname checks, texts behind IDS numbers), or null.</summary>
+  public GameData? GameData
+  {
+    get; private set;
+  }
+
+  /// <summary>The game data in use, for the status bar.</summary>
+  public string GameDataText =>
+    GameData is { } gameData
+      ? $"Spieldaten: {gameData.Summary}{(_gameFolderSettings.GameFolder.Length > 0 ? " · fest eingestellt" : " · automatisch")}"
+      : _gameFolderSettings.GameFolder.Length > 0
+        ? $"Spieldaten: {_gameFolderSettings.GameFolder} ist keine Freelancer-Installation"
+        : Script is null ? "Spieldaten: automatisch" : "Spieldaten: keine Installation gefunden";
+
+  /// <summary>Uses another game folder setting and checks the open mission again.</summary>
+  public void ApplyGameFolder (GameFolderSettings settings)
+  {
+    _gameFolderSettings = settings;
+    if (Script is not null)
+      Analyze (Script.Document, keepHistory: true);
+    else
+      OnPropertyChanged (nameof (GameDataText));
+  }
 
   /// <summary>The selected trigger row.</summary>
   public TriggerItem? SelectedTrigger
@@ -506,7 +534,9 @@ public sealed class MainViewModel : ObservableObject
     string? previousName = SelectedTrigger?.Name;
     MissionScript script = MissionScript.FromDocument (document, FilePath);
     var graph = new TriggerGraph (script);
-    IReadOnlyList<Finding> findings = MissionChecker.Run (script);
+    GameData = GameData.Locate (FilePath, _gameFolderSettings.GameFolder);
+    OnPropertyChanged (nameof (GameDataText));
+    IReadOnlyList<Finding> findings = MissionChecker.Run (script, GameData);
 
     List<uint> historyIds = keepHistory ? _history.Reverse ().Select (node => node.Id).ToList () : [];
     _history.Clear ();
@@ -625,8 +655,8 @@ public sealed class MainViewModel : ObservableObject
   private List<SectionLineItem> BuildPreview (List<(string? Caption, IniSection Section)> parts)
   {
     var items = new List<SectionLineItem> ();
-    // IDS numbers get their text when the mission lies inside a game installation.
-    GameData? gameData = GameData.ForMission (FilePath);
+    // IDS numbers get their text when game data is known (configured folder or the installation of the mission).
+    GameData? gameData = GameData;
     foreach ((string? caption, IniSection section) in parts)
     {
       if (caption is not null)

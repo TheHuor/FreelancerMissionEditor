@@ -5,8 +5,8 @@ namespace MissionEditor.Core.Checks;
 
 /// <summary>
 /// Nicknames of the game (systems, bases, factions, ship and solar archetypes, loadouts, equipment, NPC
-/// ship archetypes) that the installation does not define. Runs only when the mission lies inside a
-/// Freelancer installation; a wrong nickname there fails silently or crashes the game.
+/// ship archetypes) that the installation does not define. Runs only when game data is known (the configured
+/// game folder or the installation the mission lies in); a wrong nickname there fails silently or crashes the game.
 /// </summary>
 public sealed class GameDataCheck : IMissionCheck
 {
@@ -38,13 +38,9 @@ public sealed class GameDataCheck : IMissionCheck
   // Placeholders the scripts use instead of a nickname (e.g. "Cnd_BaseEnter = ANY", "Act_SetShipAndLoadout = none, none").
   private static readonly HashSet<string> Keywords = new (StringComparer.OrdinalIgnoreCase) { "any", "none" };
 
-  private readonly GameData? _gameData;
-  private readonly bool _locate;
+  private readonly GameData _gameData;
 
-  /// <summary>Creates the check; the game data is located from the script's file.</summary>
-  public GameDataCheck () => _locate = true;
-
-  /// <summary>Creates the check with given game data (for tests and tools).</summary>
+  /// <summary>Creates the check for the game data of an installation (see <see cref="GameData.Locate"/>).</summary>
   public GameDataCheck (GameData gameData) => _gameData = gameData;
 
   /// <inheritdoc/>
@@ -58,9 +54,7 @@ public sealed class GameDataCheck : IMissionCheck
   /// <inheritdoc/>
   public IEnumerable<Finding> Run (MissionScript script)
   {
-    GameData? gameData = _locate ? GameData.ForMission (script.FilePath) : _gameData;
-    if (gameData is null)
-      yield break;
+    GameData gameData = _gameData;
 
     foreach (ScriptObject item in script.Objects)
     {

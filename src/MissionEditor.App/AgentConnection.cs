@@ -21,54 +21,59 @@ public static class AgentConnection
   private static readonly string SettingsPath = Path.Combine (
       Environment.GetFolderPath (Environment.SpecialFolder.LocalApplicationData), "FreelancerMissionEditor", "agent-connection.json");
 
-  /// <summary>The server arguments; an empty workspace means no folder limit (missions are named by absolute path).</summary>
-  public static IReadOnlyList<string> Arguments (string workspace, bool allowWrites)
+  /// <summary>
+  /// The server arguments; an empty workspace means no folder limit (missions are named by absolute path), an
+  /// empty game folder means the installation each mission lies in.
+  /// </summary>
+  public static IReadOnlyList<string> Arguments (string workspace, bool allowWrites, string gameFolder = "")
   {
     var arguments = new List<string> ();
     if (workspace.Length > 0)
       arguments.AddRange (["--allow-root", workspace]);
+    if (gameFolder.Length > 0)
+      arguments.AddRange (["--game", gameFolder]);
     if (allowWrites)
       arguments.Add ("--allow-writes");
     return arguments;
   }
 
   /// <summary>The command line for <c>claude mcp add</c> (Claude Code), registered for all projects of the user.</summary>
-  public static string ClaudeCodeCommand (string executable, string workspace, bool allowWrites) =>
+  public static string ClaudeCodeCommand (string executable, string workspace, bool allowWrites, string gameFolder = "") =>
       $"claude mcp add --scope user {ServerName} -- {Quote (executable)} "
-      + string.Join (' ', Arguments (workspace, allowWrites).Select (argument => argument.StartsWith ("--", StringComparison.Ordinal) ? argument : Quote (argument)));
+      + string.Join (' ', Arguments (workspace, allowWrites, gameFolder).Select (argument => argument.StartsWith ("--", StringComparison.Ordinal) ? argument : Quote (argument)));
 
   /// <summary>The <c>mcpServers</c> JSON block (Claude Desktop and other clients with that format).</summary>
-  public static string JsonConfiguration (string executable, string workspace, bool allowWrites) =>
-      McpServersJson (executable, workspace, allowWrites, includeType: false);
+  public static string JsonConfiguration (string executable, string workspace, bool allowWrites, string gameFolder = "") =>
+      McpServersJson (executable, workspace, allowWrites, gameFolder, includeType: false);
 
   /// <summary>
   /// The <c>mcpServers</c> block as Claude Code stores it in <c>%USERPROFILE%\.claude.json</c>, for adding
   /// the server by hand when the <c>claude</c> command line is not installed (e.g. only the desktop app).
   /// </summary>
-  public static string ClaudeCodeJson (string executable, string workspace, bool allowWrites) =>
-      McpServersJson (executable, workspace, allowWrites, includeType: true);
+  public static string ClaudeCodeJson (string executable, string workspace, bool allowWrites, string gameFolder = "") =>
+      McpServersJson (executable, workspace, allowWrites, gameFolder, includeType: true);
 
   /// <summary>True when a <c>claude</c> command is on the PATH, so the <c>claude mcp add</c> command works.</summary>
   public static bool IsClaudeCommandAvailable () => ProgramLocator.Find ("claude") is not null;
 
-  private static string McpServersJson (string executable, string workspace, bool allowWrites, bool includeType)
+  private static string McpServersJson (string executable, string workspace, bool allowWrites, string gameFolder, bool includeType)
   {
     var server = new JsonObject ();
     if (includeType)
       server["type"] = "stdio";
     server["command"] = executable;
-    server["args"] = new JsonArray (Arguments (workspace, allowWrites).Select (argument => (JsonNode?)JsonValue.Create (argument)).ToArray ());
+    server["args"] = new JsonArray (Arguments (workspace, allowWrites, gameFolder).Select (argument => (JsonNode?)JsonValue.Create (argument)).ToArray ());
     var root = new JsonObject { ["mcpServers"] = new JsonObject { [ServerName] = server } };
     return root.ToJsonString (new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
   }
 
   /// <summary>The <c>[mcp_servers]</c> TOML block for Codex (<c>~/.codex/config.toml</c>).</summary>
-  public static string CodexConfiguration (string executable, string workspace, bool allowWrites)
+  public static string CodexConfiguration (string executable, string workspace, bool allowWrites, string gameFolder = "")
   {
     var builder = new StringBuilder ();
     builder.Append ("[mcp_servers.").Append (ServerName).Append (']').AppendLine ();
     builder.Append ("command = ").Append (TomlString (executable)).AppendLine ();
-    builder.Append ("args = [").Append (string.Join (", ", Arguments (workspace, allowWrites).Select (TomlString))).Append (']').AppendLine ();
+    builder.Append ("args = [").Append (string.Join (", ", Arguments (workspace, allowWrites, gameFolder).Select (TomlString))).Append (']').AppendLine ();
     return builder.ToString ();
   }
 

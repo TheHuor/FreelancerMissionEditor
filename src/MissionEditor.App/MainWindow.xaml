@@ -125,6 +125,20 @@
       </DockPanel>
     </Border>
     <StatusBar DockPanel.Dock="Bottom">
+      <StatusBar.ItemsPanel>
+        <ItemsPanelTemplate>
+          <DockPanel LastChildFill="True" />
+        </ItemsPanelTemplate>
+      </StatusBar.ItemsPanel>
+      <!-- Which installation provides nicknames and texts; several game versions can be switched here. -->
+      <StatusBarItem DockPanel.Dock="Right">
+        <StackPanel Orientation="Horizontal">
+          <TextBlock Text="{Binding GameDataText}" VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" TextTrimming="CharacterEllipsis" MaxWidth="620"
+                     ToolTip="{Binding GameDataText}" />
+          <Button Content="Spielordner…" Click="OnGameFolder" Margin="8,0,0,0" Padding="8,1" FontSize="12"
+                  ToolTip="Festlegen, aus welcher Freelancer-Installation Nicknames und Texte kommen" />
+        </StackPanel>
+      </StatusBarItem>
       <StatusBarItem Content="{Binding StatusText}" />
     </StatusBar>
     <Grid>

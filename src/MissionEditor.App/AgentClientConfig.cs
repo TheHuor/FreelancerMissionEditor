@@ -132,11 +132,11 @@ public static partial class AgentClientConfig
   /// What to paste by hand and where, depending on the current state of the client's file: a whole
   /// file, a <c>"mcpServers"</c> member for an object without one, or just the server entry.
   /// </summary>
-  public static (string Instruction, string Snippet) ManualSnippet (AgentClient client, string configPath, string executable, string workspace, bool allowWrites)
+  public static (string Instruction, string Snippet) ManualSnippet (AgentClient client, string configPath, string executable, string workspace, bool allowWrites, string gameFolder = "")
   {
     if (client == AgentClient.Codex)
     {
-      string toml = AgentConnection.CodexConfiguration (executable, workspace, allowWrites);
+      string toml = AgentConnection.CodexConfiguration (executable, workspace, allowWrites, gameFolder);
       return File.Exists (configPath)
           ? (IsConfigured (client, configPath)
               ? $"{configPath} enthält schon [mcp_servers.{AgentConnection.ServerName}]: diesen Abschnitt bis zur nächsten Zeile mit [ durch den folgenden ersetzen."
@@ -145,7 +145,7 @@ public static partial class AgentClientConfig
     }
 
     bool includeType = client == AgentClient.ClaudeCode;
-    string whole = UpdateJson (null, executable, workspace, allowWrites, includeType);
+    string whole = UpdateJson (null, executable, workspace, allowWrites, gameFolder, includeType);
     if (!File.Exists (configPath))
       return ($"{configPath} gibt es noch nicht: Datei mit diesem Inhalt anlegen.", whole);
 
@@ -179,12 +179,12 @@ public static partial class AgentClientConfig
   /// <summary>Creates or replaces the server entry in the client's configuration file.</summary>
   /// <returns>The backup path, or null when the file did not exist before.</returns>
   /// <exception cref="InvalidDataException">The existing file is not valid JSON or not a JSON object.</exception>
-  public static string? AddServer (AgentClient client, string configPath, string executable, string workspace, bool allowWrites)
+  public static string? AddServer (AgentClient client, string configPath, string executable, string workspace, bool allowWrites, string gameFolder = "")
   {
     string? existing = File.Exists (configPath) ? File.ReadAllText (configPath) : null;
     string updated = client == AgentClient.Codex
-        ? UpdateCodex (existing ?? string.Empty, executable, workspace, allowWrites)
-        : UpdateJson (existing, executable, workspace, allowWrites, includeType: client == AgentClient.ClaudeCode);
+        ? UpdateCodex (existing ?? string.Empty, executable, workspace, allowWrites, gameFolder)
+        : UpdateJson (existing, executable, workspace, allowWrites, gameFolder, includeType: client == AgentClient.ClaudeCode);
 
     string directory = Path.GetDirectoryName (configPath)!;
     Directory.CreateDirectory (directory);
@@ -208,7 +208,7 @@ public static partial class AgentClientConfig
     return backup;
   }
 
-  private static string UpdateJson (string? existing, string executable, string workspace, bool allowWrites, bool includeType)
+  private static string UpdateJson (string? existing, string executable, string workspace, bool allowWrites, string gameFolder, bool includeType)
   {
     JsonObject root;
     try
@@ -232,15 +232,15 @@ public static partial class AgentClientConfig
     if (includeType)
       server["type"] = "stdio";
     server["command"] = executable;
-    server["args"] = new JsonArray (AgentConnection.Arguments (workspace, allowWrites).Select (argument => (JsonNode?)JsonValue.Create (argument)).ToArray ());
+    server["args"] = new JsonArray (AgentConnection.Arguments (workspace, allowWrites, gameFolder).Select (argument => (JsonNode?)JsonValue.Create (argument)).ToArray ());
     servers[AgentConnection.ServerName] = server;
     return root.ToJsonString (WriteOptions);
   }
 
   // Replaces the [mcp_servers.freelancer-missions] table (header up to the next table header) or appends it.
-  private static string UpdateCodex (string existing, string executable, string workspace, bool allowWrites)
+  private static string UpdateCodex (string existing, string executable, string workspace, bool allowWrites, string gameFolder = "")
   {
-    string block = AgentConnection.CodexConfiguration (executable, workspace, allowWrites).Replace ("\r\n", "\n").TrimEnd ('\n');
+    string block = AgentConnection.CodexConfiguration (executable, workspace, allowWrites, gameFolder).Replace ("\r\n", "\n").TrimEnd ('\n');
     string newline = existing.Contains ("\r\n") ? "\r\n" : "\n";
     var lines = existing.Replace ("\r\n", "\n").Split ('\n').ToList ();
     int start = lines.FindIndex (line => CodexSectionHeader ().IsMatch (line));

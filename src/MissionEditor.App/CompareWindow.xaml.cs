@@ -50,9 +50,9 @@ public partial class CompareWindow : Window
     OnApply (this, new RoutedEventArgs ());
   }
 
-  private static (int Errors, int Warnings) Count (IniDocument document)
+  private (int Errors, int Warnings) Count (IniDocument document)
   {
-    IReadOnlyList<Finding> findings = MissionChecker.Run (MissionScript.FromDocument (document));
+    IReadOnlyList<Finding> findings = MissionChecker.Run (MissionScript.FromDocument (document, _viewModel.FilePath), _viewModel.GameData);
     return (findings.Count (finding => finding.Severity == FindingSeverity.Error), findings.Count (finding => finding.Severity == FindingSeverity.Warning));
   }
 

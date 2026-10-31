@@ -34,7 +34,7 @@ public partial class MissionAdviceWindow : Window
   public void ShowAnswerForTest (string answer) => ShowAnswer (answer, "Beispielantwort.");
 
   /// <summary>The request that would be sent (for tests).</summary>
-  public AdviceRequest BuildRequest () => MissionAdvice.Build (_viewModel.Script!, _question, MissionName ());
+  public AdviceRequest BuildRequest () => MissionAdvice.Build (_viewModel.Script!, _question, MissionName (), _viewModel.GameData);
 
   private string MissionName () => _viewModel.FilePath is { } path ? Path.GetFileName (path) : "Mission";
 

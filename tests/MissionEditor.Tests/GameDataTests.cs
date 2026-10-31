@@ -70,10 +70,36 @@ public sealed class GameDataTests : IDisposable
   }
 
   [Fact]
+  public void AConfiguredGameFolderWinsOverTheMissionPath ()
+  {
+    // A mission copied out of the installation finds nothing on its own, but the configured folder applies.
+    string work = Path.Combine (Path.GetTempPath (), "mission-outside-" + Guid.NewGuid ());
+    Directory.CreateDirectory (work);
+    try
+    {
+      string outside = Path.Combine (work, "m99.ini");
+      File.Copy (Path.Combine (_root, @"DATA\missions\m99\m99.ini"), outside);
+      Assert.Null (GameData.Locate (outside, null));
+      GameData data = Assert.IsType<GameData> (GameData.Locate (outside, _root));
+      Assert.True (data.Contains (GameDataKind.Base, "Li01_01_Base"));
+      Assert.Contains ("1 Systeme", data.Summary);
+      Assert.Null (GameData.Locate (outside, work));
+
+      MissionScript script = MissionScript.Load (outside);
+      Assert.DoesNotContain (MissionChecker.Run (script), finding => finding.CheckId == "unknown-game-nickname");
+      Assert.Contains (MissionChecker.Run (script, data), finding => finding.CheckId == "unknown-game-nickname");
+    }
+    finally
+    {
+      Directory.Delete (work, true);
+    }
+  }
+
+  [Fact]
   public void UnknownGameNicknamesAreErrorsWithSuggestions ()
   {
     MissionScript script = MissionScript.Load (Path.Combine (_root, @"DATA\missions\m99\m99.ini"));
-    List<Finding> findings = new GameDataCheck ().Run (script).ToList ();
+    List<Finding> findings = new GameDataCheck (GameData.ForMission (script.FilePath)!).Run (script).ToList ();
     Assert.Single (findings, finding => finding.Message.Contains ("'li_x_grp'"));
     Assert.Single (findings, finding => finding.Message.Contains ("'lost_fighter'") && finding.Message.Contains (@"missions\m99\npcships.ini"));
     Assert.Single (findings, finding => finding.Message.Contains ("'Li01_02_Base'") && finding.Message.Contains ("'Li01_01_Base'"));

@@ -22,8 +22,13 @@ public sealed class MissionWorkspace
   /// <summary>Creates a workspace limited to one folder, which is also the base for relative paths.</summary>
   public MissionWorkspace (string root, bool allowWrites = false) : this ([root], allowWrites) { }
 
-  /// <summary>Creates a workspace; without roots every absolute path is allowed. Exporting drafts requires explicit startup opt-in.</summary>
-  public MissionWorkspace (IEnumerable<string> roots, bool allowWrites = false)
+  /// <summary>
+  /// Creates a workspace; without roots every absolute path is allowed. Exporting drafts requires explicit startup
+  /// opt-in. <paramref name="gameFolder"/> fixes the installation for game data; without it, the installation a
+  /// mission lies in is used.
+  /// </summary>
+  /// <exception cref="DirectoryNotFoundException">A root does not exist or the game folder is no installation.</exception>
+  public MissionWorkspace (IEnumerable<string> roots, bool allowWrites = false, string? gameFolder = null)
   {
     _roots = roots.Select (root => Path.TrimEndingDirectorySeparator (Path.GetFullPath (root))).Distinct (StringComparer.OrdinalIgnoreCase).ToArray ();
     foreach (string root in _roots)
@@ -32,10 +37,25 @@ public sealed class MissionWorkspace
         throw new DirectoryNotFoundException ($"Der freigegebene Ordner existiert nicht: {root}");
     }
     _allowWrites = allowWrites;
+    if (!string.IsNullOrWhiteSpace (gameFolder))
+    {
+      if (!GameData.IsInstallation (gameFolder))
+        throw new DirectoryNotFoundException ($"Der Spielordner enthält kein EXE\\freelancer.ini: {gameFolder}");
+      GameFolder = Path.TrimEndingDirectorySeparator (Path.GetFullPath (gameFolder));
+    }
   }
 
   /// <summary>The allowed root folders; empty when every absolute path is allowed.</summary>
   public IReadOnlyList<string> Roots => _roots;
+
+  /// <summary>The fixed game installation, or null when it is taken from each mission's path.</summary>
+  public string? GameFolder
+  {
+    get;
+  }
+
+  // The game data for a mission (or a new draft without a file: only with a fixed game folder).
+  private GameData? GameFor (string? missionPath) => GameData.Locate (missionPath, GameFolder);
 
   /// <summary>True when drafts may be exported as new files.</summary>
   public bool AllowWrites => _allowWrites;
@@ -44,7 +64,7 @@ public sealed class MissionWorkspace
   public MissionSummary Inspect (string path)
   {
     var loaded = Load (path);
-    var findings = MissionChecker.Run (loaded.Script);
+    var findings = MissionChecker.Run (loaded.Script, GameFor (loaded.Path));
     return new (Relative (loaded.Path), loaded.Script.Document.IsBini ? "BINI" : "Text", loaded.Hash,
         loaded.Script.Document.Lines.Count, loaded.Script.Document.Sections.Count,
         loaded.Script.Triggers.Count, loaded.Script.Objects.Count,
@@ -56,7 +76,8 @@ public sealed class MissionWorkspace
   {
     if (!Enum.TryParse<FindingSeverity> (minimumSeverity, true, out var severity) || !Enum.IsDefined (severity))
       throw new ArgumentException ("Schwere muss Info, Warning oder Error sein.");
-    return Paginate (MissionChecker.Run (Load (path).Script).Where (finding => finding.Severity >= severity).Select (FindingInfo.From).ToArray (), offset, limit);
+    var checkedMission = Load (path);
+    return Paginate (MissionChecker.Run (checkedMission.Script, GameFor (checkedMission.Path)).Where (finding => finding.Severity >= severity).Select (FindingInfo.From).ToArray (), offset, limit);
   }
 
   /// <summary>Pages named trigger definitions, including shadowed duplicates.</summary>
@@ -80,8 +101,10 @@ public sealed class MissionWorkspace
   public Page<string> GameNicknames (string path, string kind, string filter = "", int offset = 0, int limit = 100)
   {
     var loaded = Load (path);
-    GameData gameData = GameData.ForMission (loaded.Path)
-        ?? throw new InvalidOperationException ($"{loaded.Path} liegt in keiner Freelancer-Installation (kein EXE\\freelancer.ini in einem übergeordneten Ordner).");
+    GameData gameData = GameFor (loaded.Path)
+        ?? throw new InvalidOperationException (GameFolder is not null
+          ? $"Der Spielordner {GameFolder} ließ sich nicht lesen."
+          : $"{loaded.Path} liegt in keiner Freelancer-Installation (kein EXE\\freelancer.ini in einem übergeordneten Ordner). Den Spielordner beim Serverstart mit --game <Ordner> angeben.");
     IEnumerable<string> names;
     if (kind.Equals ("NpcShipArchetype", StringComparison.OrdinalIgnoreCase))
     {
@@ -229,7 +252,7 @@ public sealed class MissionWorkspace
     byte[] bytes = document.ToBytes ();
     if (bytes.Length > MaxFileBytes)
       throw new InvalidDataException ("Entwurf ist größer als 8 MiB.");
-    var findings = MissionChecker.Run (MissionScript.FromDocument (document));
+    var findings = MissionChecker.Run (MissionScript.FromDocument (document, source), GameFor (source));
     string id = Guid.NewGuid ().ToString ("N");
     lock (_draftGate)
     {
@@ -304,11 +327,11 @@ public sealed class MissionWorkspace
       throw new InvalidDataException ("Entwurfstext ist zu groß.");
   }
   // Lines carry the text behind their IDS numbers when the mission lies inside a game installation.
-  private static SourcePage Source (IniDocument document, int firstLine, int lineCount, string? missionPath)
+  private SourcePage Source (IniDocument document, int firstLine, int lineCount, string? missionPath)
   {
     if (firstLine < 1 || lineCount < 1 || lineCount > 500)
       throw new ArgumentOutOfRangeException (nameof (firstLine), "Erste Zeile mindestens 1; Zeilenanzahl zwischen 1 und 500.");
-    GameData? gameData = GameData.ForMission (missionPath);
+    GameData? gameData = GameFor (missionPath);
     var sectionOfLine = new Dictionary<int, string> ();
     if (gameData is not null)
     {
