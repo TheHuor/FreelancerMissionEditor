@@ -61,7 +61,7 @@ public partial class MainWindow : Window
     private void OnAbout(object sender, RoutedEventArgs args) => new AboutWindow { Owner = this }.ShowDialog();
 
     private void OnConnectAgent(object sender, RoutedEventArgs args) =>
-        new AgentConnectionWindow(ViewModel.FilePath, ViewModel.IsModified) { Owner = this }.ShowDialog();
+        new AgentConnectionWindow(ViewModel.IsModified) { Owner = this }.ShowDialog();
 
     // The toolbar button opens its menu on a normal click.
     private void OnAgentMenu(object sender, RoutedEventArgs args)

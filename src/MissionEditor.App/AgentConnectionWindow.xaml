@@ -75,7 +75,7 @@
         </Border>
         <TextBlock x:Name="CopyStatus" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0" />
         <TextBlock FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,10,0,0" TextWrapping="Wrap" LineHeight="18"
-                   Text="Beispielauftrag an den Agenten: „Prüfe m13\m13.ini mit dem Mission Editor und erkläre die Fehler.“ Missionsinhalte behandelt der Server als Daten, nicht als Anweisungen." />
+                   Text="Beispielauftrag an den Agenten: „Prüfe D:\Freelancer\DATA\MISSIONS\M13\m13.ini mit dem Mission Editor und erkläre die Fehler.“ Missionsinhalte behandelt der Server als Daten, nicht als Anweisungen." />
       </StackPanel>
     </ScrollViewer>
   </DockPanel>

@@ -13,23 +13,17 @@ public partial class AgentConnectionWindow : Window
     private bool _initialized;
 
     /// <summary>Creates the dialog.</summary>
-    /// <param name="missionPath">The open mission file.</param>
     /// <param name="hasUnsavedChanges">True when the open mission has unsaved changes.</param>
-    public AgentConnectionWindow(string? missionPath, bool hasUnsavedChanges)
+    public AgentConnectionWindow(bool hasUnsavedChanges)
     {
         InitializeComponent();
-        (string? rememberedExecutable, string? rememberedWorkspace, bool allowWrites) = AgentConnection.LoadSettings();
+        (string? rememberedExecutable, _, bool allowWrites) = AgentConnection.LoadSettings();
         ServerBox.Text = rememberedExecutable is not null && File.Exists(rememberedExecutable)
             ? rememberedExecutable
             : AgentConnection.FindServerExecutable() ?? string.Empty;
-        // A folder limit already registered at a client (or remembered) is kept when it lets the server read the
-        // open mission; otherwise the suggestion is no limit.
-        IEnumerable<string> known = AgentClientConfig.ConfiguredServers().Select(server => server.Workspace)
-            .Where(workspace => workspace.Length == 0 || Directory.Exists(workspace));
-        if (rememberedWorkspace is not null && (rememberedWorkspace.Length == 0 || Directory.Exists(rememberedWorkspace)))
-            known = known.Append(rememberedWorkspace);
-        (string? knownWorkspace, bool containsMission) = AgentPrompts.ChooseWorkspace(missionPath, known);
-        WorkspaceBox.Text = knownWorkspace is not null && (containsMission || missionPath is null) ? knownWorkspace : string.Empty;
+        // No folder limit by default, also over older entries made with a fixed folder: the agent names each
+        // mission by its full path. A limit is only set when the user enters a folder.
+        WorkspaceBox.Text = string.Empty;
         AllowWritesBox.IsChecked = allowWrites;
         UnsavedHint.Visibility = hasUnsavedChanges ? Visibility.Visible : Visibility.Collapsed;
         _hasClaudeCommand = AgentConnection.IsClaudeCommandAvailable();

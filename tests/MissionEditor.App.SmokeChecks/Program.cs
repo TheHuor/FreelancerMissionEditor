@@ -138,9 +138,9 @@ internal static class Program
         CheckAgentClientConfig(ServerPath, MissionsPath);
         CheckAgentPrompts(window);
         CheckAiAdvice(window);
-        var agentWindow = new AgentConnectionWindow(tmp, hasUnsavedChanges: false) { Owner = window };
+        var agentWindow = new AgentConnectionWindow(hasUnsavedChanges: false) { Owner = window };
         agentWindow.Show(); agentWindow.UpdateLayout();
-        Assert(!agentWindow.ClaudeCodeText.Contains("--allow-root") && !agentWindow.ClaudeCodeText.Contains("--workspace"), "agent dialog suggests no folder limit for a mission outside known folders");
+        Assert(!agentWindow.ClaudeCodeText.Contains("--allow-root") && !agentWindow.ClaudeCodeText.Contains("--workspace"), "agent dialog suggests no folder limit by default");
         agentWindow.Close();
 
         about.Close();
