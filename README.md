@@ -183,14 +183,37 @@ nur den Eintrag in ein vorhandenes `"mcpServers"` einfügen. Hat die geöffnete 
 ungespeicherte Änderungen, weist der Dialog darauf hin, denn der Agent sieht nur den gespeicherten
 Stand. Pfad, Workspace und Export-Wahl merkt sich der Editor.
 
+### „Frag KI“ direkt im Editor
+
+**„Frag KI“** an einem Fund (Details) bzw. per Rechtsklick in der Prüfliste fragt ein Sprachmodell und
+zeigt die Antwort im Editor: Erklärung, Annahmen und einen Korrekturvorschlag mit Vorher/Nachher. Der
+Vorschlag wird vor der Anzeige geprüft – er muss eine der mitgeschickten Sektionen ersetzen, und der
+Editor zeigt, ob der Fund verschwindet und ob neue Funde entstehen. „Übernehmen“ setzt ihn ein
+(Strg+Z macht es rückgängig, gespeichert wird erst mit Strg+S); vorher lässt er sich noch bearbeiten.
+
+Mitgeschickt werden der Fund mit der Erklärung des Editors, die betroffene Sektion, eine Bezugsstelle,
+benachbarte Trigger und bei fehlenden Triggern die ähnlich benannten – nicht die ganze Datei.
+
+Unter „KI-Agent ▾ → KI-Einstellungen…“ wählst du den Weg zum Modell:
+
+| Anbieter | Voraussetzung | Kosten |
+|---|---|---|
+| Anthropic-API (Standard, Modell `claude-opus-5-5`) | eigener API-Schlüssel aus der Anthropic Console; wird mit Windows-DPAPI verschlüsselt für deinen Benutzer gespeichert (alternativ `ANTHROPIC_API_KEY`) | pro Anfrage, meist wenige Cent |
+| Claude Code (lokal) | installierte Kommandozeile `claude` | über dein Abo |
+| Codex (lokal) | installierte Kommandozeile `codex` | über dein Abo |
+
+Die API-Anfrage nutzt strukturierte Ausgabe (die Antwort ist garantiert JSON nach festem Schema) und
+den serverseitigen Fallback bei abgelehnten Anfragen. Die Kommandozeilen laufen ohne Schreibrechte und
+bekommen den Auftrag über die Standardeingabe.
+
 ### Aufträge aus dem Editor
 
-Gearbeitet wird im Chat von Claude oder Codex; der Editor liefert fertige Aufträge dafür.
+Alternativ arbeitest du im Chat von Claude oder Codex; der Editor liefert fertige Aufträge dafür.
 „Kopieren“ legt sie in die Zwischenablage, im Agenten mit Strg+V einfügen:
 
 | Wo | Auftrag |
 |---|---|
-| „An KI ›“ an einem Fund (Details) bzw. Rechtsklick in der Prüfliste | Fund erklären und eine Korrektur als Entwurf vorschlagen; bei unbekannten Trigger-Zielen: prüfen, ob es ein Tippfehler ist oder ein Trigger fehlt, und ihn im Stil der Nachbarn entwerfen |
+| Rechtsklick in der Prüfliste → „An KI-Agent übergeben“ | Fund erklären und eine Korrektur als Entwurf vorschlagen; bei unbekannten Trigger-Zielen: prüfen, ob es ein Tippfehler ist oder ein Trigger fehlt, und ihn im Stil der Nachbarn entwerfen |
 | „KI-Agent ▾ → Alle Funde erklären lassen“ | Funde zusammenfassen, je Art erklären, Reihenfolge zum Beheben vorschlagen |
 | „KI-Agent ▾ → Neue Mission mit KI…“ | aus einer Beschreibung eine Mission schreiben, mit dem Server prüfen und erst nach Zustimmung exportieren |
 

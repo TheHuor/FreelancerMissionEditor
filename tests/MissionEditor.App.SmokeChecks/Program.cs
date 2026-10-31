@@ -136,6 +136,7 @@ internal static class Program
         }
         CheckAgentClientConfig(ServerPath, MissionsPath);
         CheckAgentPrompts(window);
+        CheckAiAdvice(window);
         var agentWindow = new AgentConnectionWindow(tmp, hasUnsavedChanges: false) { Owner = window };
         agentWindow.Show(); agentWindow.UpdateLayout();
         Assert(agentWindow.ClaudeCodeText.Contains($"--workspace \"{Path.GetDirectoryName(tmp)}\""), "agent dialog suggests the folder of the open mission");
@@ -178,6 +179,69 @@ internal static class Program
         Check(newMission.Contains("Drei Piraten") && newMission.Contains(@"M13\m13.ini als Vorlage") && newMission.Contains("prepare_new_mission")
             && newMission.Contains("nicht freigeschaltet"), "new-mission prompt has description, template and export state");
         dialog.Close();
+    }
+
+    // "Frag KI" without network: request context, answer parsing, fix check, the window and the key storage.
+    private static void CheckAiAdvice(Window owner)
+    {
+        static void Check(bool value, string message) { if (!value) throw new Exception(message); Console.WriteLine("PASS " + message); }
+        string folder = Path.Combine(Path.GetTempPath(), "mission-ai-" + Guid.NewGuid());
+        Directory.CreateDirectory(folder);
+        try
+        {
+            string missionPath = Path.Combine(folder, "ai.ini");
+            File.WriteAllText(missionPath, "[Trigger]\nnickname = start\nInitState = ACTIVE\nCnd_True = no_params\nAct_ActTrig = secnod\n\n[Trigger]\nnickname = second\nCnd_Timer = 5\n");
+            var viewModel = new MainViewModel();
+            viewModel.Load(missionPath);
+            var finding = viewModel.Findings.Single(item => item.CheckId == "unknown-trigger").Finding;
+            var script = viewModel.Script!;
+
+            var request = MissionEditor.App.Ai.AiAdvice.BuildRequest(script, new MissionEditor.Core.Graph.TriggerGraph(script), finding, "ai.ini");
+            Check(request.User.Contains("Act_ActTrig = secnod") && request.User.Contains("Ähnliche vorhandene Trigger: second")
+                && request.User.Contains("nickname = second") && request.EditableSections.SetEquals([1]), "AI request carries the section, similar triggers and the editable section");
+
+            const string Answer = """
+                Hier ist die Antwort: {"explanation":"Tippfehler im Triggernamen.","hasFix":true,"sectionStartLine":1,
+                "replacementText":"[Trigger]\nnickname = start\nInitState = ACTIVE\nCnd_True = no_params\nAct_ActTrig = second",
+                "fixSummary":"secnod in second korrigiert.","assumptions":[]}
+                """;
+            var advice = MissionEditor.App.Ai.AiAdvice.Parse(Answer);
+            var fix = MissionEditor.App.Ai.AiAdvice.CheckFix(script, request, finding, advice);
+            Check(advice.HasFix && fix.FindingResolved && fix.NewFindings.Count == 0 && fix.FindingsAfter < fix.FindingsBefore, "AI fix is checked: the finding disappears, nothing new appears");
+
+            bool rejected = false;
+            try { MissionEditor.App.Ai.AiAdvice.CheckFix(script, request, finding, advice with { SectionStartLine = 7 }); }
+            catch (InvalidDataException) { rejected = true; }
+            Check(rejected, "AI fix for a section that was not offered is rejected");
+
+            var adviceWindow = new AiAdviceWindow(viewModel, finding, askOnOpen: false) { Owner = owner };
+            adviceWindow.ShowAnswerForTest(Answer.Substring(Answer.IndexOf('{')));
+            Check(adviceWindow.OfferedFix is { FindingResolved: true }, "AI window offers the checked fix");
+            if (Environment.GetEnvironmentVariable("MISSION_EDITOR_AI_PREVIEW") is { Length: > 0 } previewPath)
+            {
+                adviceWindow.Show();
+                adviceWindow.UpdateLayout();
+                var dpi = VisualTreeHelper.GetDpi(adviceWindow);
+                var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(adviceWindow.ActualWidth * dpi.DpiScaleX), (int)(adviceWindow.ActualHeight * dpi.DpiScaleY),
+                    dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+                bitmap.Render(adviceWindow);
+                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+                using var previewStream = File.Create(previewPath);
+                encoder.Save(previewStream);
+            }
+            adviceWindow.Close();
+
+            string settingsPath = Path.Combine(folder, "ai-settings.json");
+            new MissionEditor.App.Ai.AiSettings { Provider = MissionEditor.App.Ai.AiProvider.CodexCli, ApiKey = "sk-test-not-a-real-key", Model = "claude-opus-5-5" }.Save(settingsPath);
+            var loaded = MissionEditor.App.Ai.AiSettings.Load(settingsPath);
+            Check(!File.ReadAllText(settingsPath).Contains("sk-test") && loaded.ApiKey == "sk-test-not-a-real-key" && loaded.Provider == MissionEditor.App.Ai.AiProvider.CodexCli,
+                "AI settings keep the API key encrypted and restore it");
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
     }
 
     // Adding the server keeps everything else in the client files; the manual instructions yield valid files.

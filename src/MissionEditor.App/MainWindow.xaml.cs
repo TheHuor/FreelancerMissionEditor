@@ -72,10 +72,34 @@ public partial class MainWindow : Window
         menu.IsOpen = true;
     }
 
-    private void OnAskAgentForDetailFinding(object sender, RoutedEventArgs args)
+    private void OnAskAiForDetailFinding(object sender, RoutedEventArgs args)
     {
         if (sender is FrameworkElement { DataContext: FindingRow row })
-            CopyAgentPrompt(reference => AgentPrompts.ForFinding(reference, row.Item.Finding));
+            AskAi(row.Item.Finding);
+    }
+
+    private void OnAskAiForGridFinding(object sender, RoutedEventArgs args)
+    {
+        if (FindingsGrid.SelectedItem is FindingItem finding)
+            AskAi(finding.Finding);
+        else
+            ViewModel.ReportStatus("Erst einen Fund in der Prüfliste auswählen.");
+    }
+
+    private void OnAiSettings(object sender, RoutedEventArgs args) => new AiSettingsWindow { Owner = this }.ShowDialog();
+
+    // Shows the model's explanation and fix for a finding in the editor itself.
+    private void AskAi(MissionEditor.Core.Checks.Finding finding)
+    {
+        if (ViewModel.Script is null)
+            return;
+        Ai.AiSettings settings = Ai.AiSettings.Load();
+        if (settings.Provider == Ai.AiProvider.AnthropicApi && settings.EffectiveApiKey is null)
+        {
+            if (new AiSettingsWindow { Owner = this }.ShowDialog() != true)
+                return;
+        }
+        new AiAdviceWindow(ViewModel, finding) { Owner = this }.ShowDialog();
     }
 
     private void OnAskAgentForGridFinding(object sender, RoutedEventArgs args)

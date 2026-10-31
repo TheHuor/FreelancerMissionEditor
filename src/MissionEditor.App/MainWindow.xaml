@@ -100,6 +100,7 @@
               <MenuItem Header="Neue Mission mit KI…" Click="OnAskAgentForNewMission" />
               <Separator />
               <MenuItem Header="KI-Agent verbinden…" Click="OnConnectAgent" />
+              <MenuItem Header="KI-Einstellungen…" Click="OnAiSettings" />
             </ContextMenu>
           </Button.ContextMenu>
         </Button>
@@ -258,7 +259,7 @@
                     <Border x:Name="Box" Background="{StaticResource WarningSurfaceBrush}" BorderBrush="{StaticResource WarningBrush}" BorderThickness="3,0,0,0" Padding="6,3" Margin="0,0,0,3" Cursor="Hand" MouseLeftButtonUp="OnDetailFindingClicked" ToolTip="{Binding FullText}">
                       <StackPanel>
                         <DockPanel>
-                          <Button DockPanel.Dock="Right" Content="An KI ›" Click="OnAskAgentForDetailFinding" Padding="6,0" Margin="6,0,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Auftrag für Claude oder Codex kopieren: Fund erklären und Korrektur als Entwurf vorschlagen" />
+                          <Button DockPanel.Dock="Right" Content="Frag KI" Click="OnAskAiForDetailFinding" Padding="6,0" Margin="6,0,0,0" VerticalAlignment="Top" FontSize="12" ToolTip="Erklärung und Korrekturvorschlag direkt hier im Editor anzeigen" />
                           <ContentControl DockPanel.Dock="Left" Template="{StaticResource SeverityBadge}" Margin="0,1,6,0" VerticalAlignment="Top" />
                           <TextBlock TextWrapping="Wrap">
                             <Run Text="{Binding LineNumber, Mode=OneWay, StringFormat={}Zeile {0}:}" Foreground="{StaticResource MutedTextBrush}" />
@@ -377,6 +378,7 @@
           <DataGrid x:Name="FindingsGrid" ItemsSource="{Binding FindingsView}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="None" MouseDoubleClick="OnFindingDoubleClick" EnableRowVirtualization="True">
             <DataGrid.ContextMenu>
               <ContextMenu>
+                <MenuItem Header="Frag KI …" Click="OnAskAiForGridFinding" FontWeight="SemiBold" />
                 <MenuItem Header="An KI-Agent übergeben (Auftrag kopieren)" Click="OnAskAgentForGridFinding" />
               </ContextMenu>
             </DataGrid.ContextMenu>
