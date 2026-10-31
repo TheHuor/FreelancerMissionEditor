@@ -58,6 +58,13 @@ Der optionale zweite Parameter wählt beim Start einen Trigger aus. Dateien lass
 
 Symbole: roter Kreis mit ✕ = Fehler, gelbes Dreieck mit ! = Warnung, grauer Kreis mit i = Hinweis.
 
+Liegt die Mission in einer Spielinstallation, zeigt die Vorschau hinter Zeilen mit Text-IDs grau den
+Text dazu – Namen (`individual_name`, `string_id`), Ziele (`[NNObjective] type = ids, …` bzw.
+`rep_inst`), `Act_SetTitle`, `Act_SetOffer`, `Act_NNIds`, den Sprecher von `Act_EtherComm` und Popups.
+Die Texte kommen aus `resources.dll` und den DLLs unter `[Resources]` in `freelancer.ini`
+(Index = IDS >> 16), in der Sprache der Installation. Der MCP-Server liefert sie in
+`read_mission_source` als `note` mit.
+
 ### Kommandozeile
 
 ```
