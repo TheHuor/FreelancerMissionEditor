@@ -100,6 +100,21 @@ internal static class Program
                 Assert(contrast>=4.5,$"contrast {fg}/{bg}: {contrast:F2}");
             }
         }
+        Assert(vm.WindowTitle.Contains(AboutWindow.DisplayVersion), "main caption contains build version");
+        var about = new AboutWindow { Owner = window };
+        about.Show(); about.UpdateLayout();
+        Assert(about.Modules.Count == 3 && about.Modules.All(module => module.Version == AboutWindow.DisplayVersion), "About lists consistent GUI, Core and CLI repository versions");
+        if (Environment.GetEnvironmentVariable("MISSION_EDITOR_ABOUT_PREVIEW") is { Length: > 0 } previewPath)
+        {
+            var dpi = VisualTreeHelper.GetDpi(about);
+            var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(about.ActualWidth*dpi.DpiScaleX), (int)(about.ActualHeight*dpi.DpiScaleY), dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+            bitmap.Render(about);
+            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+            using var previewStream = File.Create(previewPath);
+            encoder.Save(previewStream);
+        }
+        about.Close();
         Console.WriteLine("ALL CHECKS PASSED");
         File.Delete(tmp);
         File.Delete(tmp + ".bak");

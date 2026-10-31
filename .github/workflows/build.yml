@@ -2,14 +2,20 @@ name: build
 
 on:
   push:
-    branches: [master]
+    branches: ['**']
+    tags-ignore: ['**']
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
@@ -17,3 +23,19 @@ jobs:
         run: dotnet build MissionEditor.slnx --configuration Release
       - name: Test
         run: dotnet test MissionEditor.slnx --configuration Release --no-build
+      - name: Build version
+        id: version
+        shell: pwsh
+        run: |
+          $file = Resolve-Path src/MissionEditor.App/bin/Release/net10.0-windows/MissionEditor.App.dll
+          $version = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($file).ProductVersion.Split('+')[0]
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "Version: $version" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mission-editor-${{ steps.version.outputs.version }}-${{ github.sha }}
+          path: |
+            src/MissionEditor.App/bin/Release/net10.0-windows/
+            src/MissionEditor.Cli/bin/Release/net10.0/
+          if-no-files-found: error
+          retention-days: 14

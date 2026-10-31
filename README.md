@@ -174,3 +174,44 @@ Fensterfunktionen (Verschieben, Größenänderung und Maximieren) bleiben über 
 verfügbar; Schließen verwendet weiterhin die bestehende Rückfrage für ungespeicherte Änderungen.
 Der Graph zeigt ein dezentes Sternenfeld mit Nebel. Assets und ihre Erzeugung sind unter
 `src/MissionEditor.App/Assets/README.md` dokumentiert.
+
+## Versionierung und Releases
+
+Alle Projekte (GUI, Core, CLI und Tests) erhalten ihre Version zentral über MinVer 8.0.0 in
+`Directory.Build.props`. Die gemeinsame Repository-Version berücksichtigt jeden neuen Commit,
+auch wenn nur Core oder CLI verändert wurden. Ohne Release-Tag entsteht beispielsweise
+`0.1.0-preview.0.15`; der nächste Commit erhöht den Entwicklungsstand. Die vollständige
+Assembly-Produktversion enthält zusätzlich die Git-Revision. Die numerische Assembly-/Dateiversion
+folgt MinVers Standard; Entwicklungsversionen unterscheiden sich über die Produktversion.
+
+Versionen werden beim Build berechnet, ohne zusätzliche Versionscommits oder Git-Hooks.
+Erneutes Pushen oder Bauen desselben Commits ändert seine Version nicht. Die GUI zeigt die
+semantische Version im Titel. Unter „Über…“ stehen GUI-, Core- und gemeinsame CLI-Build-Version,
+Laufzeit und Referenzen; „Build-Infos kopieren“ übernimmt die vollständigen Versionsangaben.
+
+`build.yml` läuft bei Branch-Pushes und Pull Requests, lädt die vollständige Git-Historie und
+stellt versionierte Build-Artefakte bereit. Diese CI-Artefakte benötigen die passende .NET-Laufzeit.
+
+Ein Release wird durch einen SemVer-Tag mit Präfix `v` ausgelöst:
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+`release.yml` baut und testet den getaggten Commit, veröffentlicht GUI und CLI für Windows x64
+mit enthaltener .NET-Laufzeit und erstellt zwei ZIPs sowie SHA-256-Prüfsummen. Es prüft, dass
+Tag und berechnete MinVer-Version übereinstimmen und alle ausgelieferten Module dieselbe
+Produktversion haben. Bei Tags wie `v0.2.0-rc.1` wird das GitHub-Release als Vorabversion markiert.
+Die benötigten Rechte kommen vom eingebauten `GITHUB_TOKEN`; ein eigener PAT ist nicht nötig.
+Manuell auf einem Branch gestartet erzeugt der Workflow nur Artefakte, kein GitHub-Release.
+
+Der Verpackungsschritt lässt sich lokal ausführen:
+
+```powershell
+./.github/scripts/Publish-Release.ps1
+```
+
+Die Ausgaben liegen im ignorierten Verzeichnis `artifacts/`. Für eine andere Ausgabestelle kann
+`-OutputDirectory` angegeben werden. Die ZIPs enthalten jeweils den Inhalt des entsprechenden
+GUI-/CLI-Verzeichnisses und können ohne vorherige .NET-Installation entpackt gestartet werden.

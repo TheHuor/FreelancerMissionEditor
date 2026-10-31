@@ -58,6 +58,8 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnAbout(object sender, RoutedEventArgs args) => new AboutWindow { Owner = this }.ShowDialog();
+
     private void OnOpen(object sender, ExecutedRoutedEventArgs args)
     {
         var dialog = new OpenFileDialog { Filter = FileFilter };

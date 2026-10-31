@@ -1,0 +1,56 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Build
+        run: dotnet build MissionEditor.slnx --configuration Release
+      - name: Test
+        run: dotnet test MissionEditor.slnx --configuration Release --no-build
+      - name: Publish and package
+        id: package
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: ./.github/scripts/Publish-Release.ps1 -ReleaseTag $env:RELEASE_TAG
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ steps.package.outputs.version }}-win-x64
+          path: artifacts/releases/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Create GitHub release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          $assets = @(Get-ChildItem artifacts/releases -File | ForEach-Object FullName)
+          $arguments = @('release', 'create', $env:RELEASE_TAG, '--verify-tag', '--generate-notes', '--title', "Mission Editor $env:RELEASE_VERSION")
+          if ($env:RELEASE_VERSION.Contains('-')) { $arguments += '--prerelease' }
+          & gh @arguments @assets
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub release creation failed.' }

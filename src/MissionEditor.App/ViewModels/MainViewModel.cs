@@ -63,8 +63,8 @@ public sealed class MainViewModel : ObservableObject
 
     /// <summary>Title bar text.</summary>
     public string WindowTitle => FilePath is { } path
-        ? $"{Path.GetFileName(path)}{(IsModified ? " *" : string.Empty)} – Mission Editor"
-        : "Mission Editor";
+        ? $"{Path.GetFileName(path)}{(IsModified ? " *" : string.Empty)} – Mission Editor {AboutWindow.DisplayVersion}"
+        : $"Mission Editor {AboutWindow.DisplayVersion}";
 
     /// <summary>All trigger rows.</summary>
     public ObservableCollection<TriggerItem> Triggers { get; } = [];
