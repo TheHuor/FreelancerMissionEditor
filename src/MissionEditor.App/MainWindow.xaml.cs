@@ -219,10 +219,21 @@ public partial class MainWindow : Window
     private void ShowInPreview(FindingItem finding)
     {
         SectionLineItem? line = ViewModel.ShowFinding(finding);
+        if (finding.Node is not null)
+            Dispatcher.BeginInvoke(() => BringDetailFindingIntoView(finding), System.Windows.Threading.DispatcherPriority.Loaded);
         if (line is null)
             return;
         SectionPreview.SelectedItem = line;
         SectionPreview.ScrollIntoView(line);
+    }
+
+    // Scrolls the findings area in the details to the highlighted finding.
+    private void BringDetailFindingIntoView(FindingItem finding)
+    {
+        // SelectedFindings builds new rows on every call, so look the row up among the shown items.
+        object? row = DetailFindings.Items.OfType<FindingRow>().FirstOrDefault(candidate => candidate.Item == finding);
+        if (row is not null && DetailFindings.ItemContainerGenerator.ContainerFromItem(row) is FrameworkElement container)
+            container.BringIntoView();
     }
 
     private void ShowInFindingsGrid(FindingItem finding)

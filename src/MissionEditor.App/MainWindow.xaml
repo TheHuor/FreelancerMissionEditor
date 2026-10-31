@@ -236,10 +236,10 @@
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Text="{Binding SelectedTrigger.Name}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
         <TextBlock Grid.Row="1" Text="{Binding SelectedSummary}" Foreground="Gray" Margin="0,2,0,6" TextWrapping="Wrap" />
-        <Expander Grid.Row="2" Header="{Binding SelectedFindingsHeader}" IsExpanded="True" Margin="0,0,0,6" FontWeight="SemiBold"
+        <Expander Grid.Row="2" Header="{Binding SelectedFindingsHeader}" IsExpanded="{Binding FindingsExpanded}" Margin="0,0,0,6" FontWeight="SemiBold"
                   Visibility="{Binding HasSelectedFindings, Converter={StaticResource BoolToVisibility}}">
           <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontWeight="Normal" Margin="0,4,0,0">
-            <ItemsControl ItemsSource="{Binding SelectedFindings}">
+            <ItemsControl x:Name="DetailFindings" ItemsSource="{Binding SelectedFindings}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="viewModels:FindingRow">
                   <Border x:Name="Box" Background="#FFF8E1" BorderBrush="#F9A825" BorderThickness="3,0,0,0"
@@ -265,6 +265,10 @@
                     <DataTrigger Binding="{Binding SeverityText}" Value="Hinweis">
                       <Setter TargetName="Box" Property="Background" Value="#F5F5F5" />
                       <Setter TargetName="Box" Property="BorderBrush" Value="Gray" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                      <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource SelectionAccentBrush}" />
+                      <Setter TargetName="Box" Property="BorderThickness" Value="5,2,2,2" />
                     </DataTrigger>
                   </DataTemplate.Triggers>
                 </DataTemplate>

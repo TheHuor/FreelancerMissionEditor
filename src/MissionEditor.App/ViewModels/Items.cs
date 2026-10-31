@@ -97,8 +97,11 @@ public sealed class FindingItem(Finding finding, TriggerNode? node)
 }
 
 /// <summary>A finding in the details pane; the hint is shown only when it differs from the row above.</summary>
-public sealed class FindingRow(FindingItem item, bool showHint)
+public sealed class FindingRow(FindingItem item, bool showHint, bool isCurrent)
 {
+    /// <summary>True for the finding the user navigated to (shown with a blue frame).</summary>
+    public bool IsCurrent { get; } = isCurrent;
+
     /// <summary>The finding.</summary>
     public FindingItem Item { get; } = item;
 

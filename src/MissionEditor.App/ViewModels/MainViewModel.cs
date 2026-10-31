@@ -33,6 +33,8 @@ public sealed class MainViewModel : ObservableObject
     private IniDocument? _savedDocument;
     private string? _filePath;
     private bool _backupWritten;
+    private FindingItem? _currentFinding;
+    private bool _findingsExpanded = true;
     private ILookup<int, FindingItem> _findingsByLine = Array.Empty<FindingItem>().ToLookup(finding => finding.LineNumber);
 
     /// <summary>Creates the view model.</summary>
@@ -133,9 +135,12 @@ public sealed class MainViewModel : ObservableObject
         {
             if (finding.Node != SelectedTrigger?.Node)
                 SelectNode(finding.Node);
+            FindingsExpanded = true;
+            CurrentFinding = finding;
         }
         else if (Script is not null)
         {
+            CurrentFinding = null;
             var parts = new List<(string? Caption, IniSection Section)>();
             IniSection? section = Script.Document.FindSectionAt(finding.LineNumber);
             if (section is not null)
@@ -283,11 +288,29 @@ public sealed class MainViewModel : ObservableObject
             string? previousHint = null;
             foreach (FindingItem finding in SelectedTrigger?.Findings ?? [])
             {
-                rows.Add(new FindingRow(finding, finding.Hint != previousHint));
+                rows.Add(new FindingRow(finding, finding.Hint != previousHint, finding == CurrentFinding));
                 previousHint = finding.Hint;
             }
             return rows;
         }
+    }
+
+    /// <summary>The finding the user navigated to; highlighted in the details.</summary>
+    public FindingItem? CurrentFinding
+    {
+        get => _currentFinding;
+        set
+        {
+            if (SetProperty(ref _currentFinding, value))
+                OnPropertyChanged(nameof(SelectedFindings));
+        }
+    }
+
+    /// <summary>Whether the findings area in the details is open.</summary>
+    public bool FindingsExpanded
+    {
+        get => _findingsExpanded;
+        set => SetProperty(ref _findingsExpanded, value);
     }
 
     /// <summary>Header of the findings area, e.g. "Funde (6)".</summary>
@@ -520,6 +543,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void OnSelectionChanged()
     {
+        _currentFinding = null;
         References.Clear();
         if (SelectedTrigger is not null)
         {
