@@ -122,6 +122,30 @@ public partial class MainWindow : Window
             ViewModel.SelectNode(reference.Other);
     }
 
+    // The warning sign in the trigger list: select the trigger and show its first finding in the list below.
+    private void OnFindingSignClicked(object sender, RoutedEventArgs args)
+    {
+        if (sender is not FrameworkElement { DataContext: TriggerItem item } || item.Findings.Count == 0)
+            return;
+        ViewModel.SelectNode(item.Node);
+        ShowInFindingsGrid(item.Findings.OrderByDescending(finding => finding.Severity).First());
+    }
+
+    private void OnDetailFindingClicked(object sender, MouseButtonEventArgs args)
+    {
+        if (sender is FrameworkElement { DataContext: FindingItem finding })
+            ShowInFindingsGrid(finding);
+    }
+
+    private void ShowInFindingsGrid(FindingItem finding)
+    {
+        if (finding.Severity < ViewModel.MinimumSeverity)
+            ViewModel.MinimumSeverity = finding.Severity;
+        FindingsGrid.SelectedItem = finding;
+        FindingsGrid.ScrollIntoView(finding);
+        FindingsGrid.Focus();
+    }
+
     private void OnFindingDoubleClick(object sender, MouseButtonEventArgs args)
     {
         if (sender is DataGrid { SelectedItem: FindingItem { Node: { } node } })

@@ -68,6 +68,8 @@
         <TextBox x:Name="FilterBox" DockPanel.Dock="Top" Margin="0,0,0,4"
                  Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged, Delay=150}"
                  ToolTip="Trigger filtern (Strg+F)" />
+        <CheckBox DockPanel.Dock="Top" Margin="0,0,0,4" IsChecked="{Binding OnlyWithFindings}"
+                  Content="Nur Trigger mit Funden" ToolTip="Zeigt nur Trigger mit Funden ab der unten gewählten Schwere" />
         <ListBox x:Name="TriggerList" ItemsSource="{Binding TriggersView}" SelectedItem="{Binding SelectedTrigger}"
                  VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                  SelectionChanged="OnTriggerListSelectionChanged" HorizontalContentAlignment="Stretch"
@@ -75,9 +77,20 @@
           <ListBox.ItemTemplate>
             <DataTemplate DataType="viewModels:TriggerItem">
               <DockPanel>
-                <TextBlock DockPanel.Dock="Right" Text="⚠" Foreground="#E65100" Margin="4,0,0,0"
-                           Visibility="{Binding HasFindings, Converter={StaticResource BoolToVisibility}}"
-                           ToolTip="{Binding FindingCount, StringFormat={}{0} Funde}" />
+                <Button DockPanel.Dock="Right" Margin="4,0,0,0" Cursor="Hand" Click="OnFindingSignClicked"
+                        Visibility="{Binding HasFindings, Converter={StaticResource BoolToVisibility}}"
+                        ToolTip="{Binding FindingsToolTip}">
+                  <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                      <TextBlock x:Name="Sign" Text="⚠" Foreground="#E65100" FontSize="14" Background="Transparent" />
+                      <ControlTemplate.Triggers>
+                        <DataTrigger Binding="{Binding HasError}" Value="True">
+                          <Setter TargetName="Sign" Property="Foreground" Value="Firebrick" />
+                        </DataTrigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Button.Template>
+                </Button>
                 <StackPanel>
                   <TextBlock x:Name="NameText" Text="{Binding Name}" FontWeight="SemiBold" />
                   <TextBlock Text="{Binding Detail}" FontFamily="Consolas" FontSize="10.5" Foreground="Gray" TextTrimming="CharacterEllipsis" />
@@ -144,13 +157,39 @@
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
           <RowDefinition Height="*" MinHeight="80" />
           <RowDefinition Height="5" />
           <RowDefinition Height="2*" />
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Text="{Binding SelectedTrigger.Name}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
         <TextBlock Grid.Row="1" Text="{Binding SelectedSummary}" Foreground="Gray" Margin="0,2,0,6" TextWrapping="Wrap" />
-        <ListView Grid.Row="2" ItemsSource="{Binding References}">
+        <ItemsControl Grid.Row="2" ItemsSource="{Binding SelectedFindings}" Margin="0,0,0,6">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="viewModels:FindingItem">
+              <Border x:Name="Box" Background="#FFF3E0" BorderBrush="#E65100" BorderThickness="3,0,0,0"
+                      Padding="6,3" Margin="0,0,0,3" Cursor="Hand" MouseLeftButtonUp="OnDetailFindingClicked"
+                      ToolTip="Klicken: in der Prüfliste zeigen">
+                <TextBlock TextWrapping="Wrap">
+                  <Run Text="{Binding SeverityText, Mode=OneWay}" FontWeight="SemiBold" />
+                  <Run Text="{Binding LineNumber, Mode=OneWay, StringFormat={}Zeile {0}:}" Foreground="Gray" />
+                  <Run Text="{Binding Message, Mode=OneWay}" />
+                </TextBlock>
+              </Border>
+              <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding SeverityText}" Value="Fehler">
+                  <Setter TargetName="Box" Property="Background" Value="#FFEBEE" />
+                  <Setter TargetName="Box" Property="BorderBrush" Value="Firebrick" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding SeverityText}" Value="Hinweis">
+                  <Setter TargetName="Box" Property="Background" Value="#F5F5F5" />
+                  <Setter TargetName="Box" Property="BorderBrush" Value="Gray" />
+                </DataTrigger>
+              </DataTemplate.Triggers>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <ListView Grid.Row="3" ItemsSource="{Binding References}">
           <ListView.View>
             <GridView>
               <GridViewColumn Header="Beziehung" Width="150" DisplayMemberBinding="{Binding Relation}" />
@@ -166,8 +205,8 @@
             </GridView>
           </ListView.View>
         </ListView>
-        <GridSplitter Grid.Row="3" HorizontalAlignment="Stretch" />
-        <TextBox Grid.Row="4" Text="{Binding SelectedSectionText, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas"
+        <GridSplitter Grid.Row="4" HorizontalAlignment="Stretch" />
+        <TextBox Grid.Row="5" Text="{Binding SelectedSectionText, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas"
                  HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" />
       </Grid>
 
@@ -181,7 +220,7 @@
                     DisplayMemberPath="Value" SelectedValuePath="Key" SelectedValue="{Binding MinimumSeverity}" />
           <TextBlock Text="(Doppelklick springt zum Trigger)" Foreground="Gray" VerticalAlignment="Center" />
         </StackPanel>
-        <DataGrid ItemsSource="{Binding FindingsView}" AutoGenerateColumns="False" IsReadOnly="True"
+        <DataGrid x:Name="FindingsGrid" ItemsSource="{Binding FindingsView}" AutoGenerateColumns="False" IsReadOnly="True"
                   HeadersVisibility="Column" GridLinesVisibility="None" MouseDoubleClick="OnFindingDoubleClick"
                   EnableRowVirtualization="True">
           <DataGrid.RowStyle>

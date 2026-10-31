@@ -27,6 +27,7 @@ public sealed class MainViewModel : ObservableObject
     private bool _showSave = true;
     private FindingSeverity _minimumSeverity = FindingSeverity.Warning;
     private bool _navigating;
+    private bool _onlyWithFindings;
 
     /// <summary>Creates the view model.</summary>
     public MainViewModel()
@@ -215,9 +216,27 @@ public sealed class MainViewModel : ObservableObject
         set
         {
             if (SetProperty(ref _minimumSeverity, value))
+            {
                 FindingsView.Refresh();
+                if (OnlyWithFindings)
+                    TriggersView.Refresh();
+            }
         }
     }
+
+    /// <summary>Shows only triggers with findings at or above <see cref="MinimumSeverity"/>.</summary>
+    public bool OnlyWithFindings
+    {
+        get => _onlyWithFindings;
+        set
+        {
+            if (SetProperty(ref _onlyWithFindings, value))
+                TriggersView.Refresh();
+        }
+    }
+
+    /// <summary>The findings of the selected trigger.</summary>
+    public IReadOnlyList<FindingItem> SelectedFindings => SelectedTrigger?.Findings ?? [];
 
     /// <summary>The severities to choose from, with German names.</summary>
     public IReadOnlyList<KeyValuePair<FindingSeverity, string>> Severities { get; } =
@@ -249,11 +268,12 @@ public sealed class MainViewModel : ObservableObject
         Findings.Clear();
         foreach (Finding finding in findings)
             Findings.Add(new FindingItem(finding, FindNodeForFinding(finding)));
-        var findingsPerNode = Findings.Where(item => item.Node is not null).GroupBy(item => item.Node!).ToDictionary(group => group.Key, group => group.Count());
+        var findingsPerNode = Findings.Where(item => item.Node is not null).GroupBy(item => item.Node!)
+            .ToDictionary(group => group.Key, group => (IReadOnlyList<FindingItem>)group.ToList());
 
         Triggers.Clear();
         foreach (TriggerNode node in graph.Nodes.OrderBy(node => node.Trigger?.LineNumber ?? int.MaxValue).ThenBy(node => node.Name))
-            Triggers.Add(new TriggerItem(node, findingsPerNode.GetValueOrDefault(node)));
+            Triggers.Add(new TriggerItem(node, findingsPerNode.GetValueOrDefault(node) ?? []));
 
         int errors = findings.Count(finding => finding.Severity == FindingSeverity.Error);
         int warnings = findings.Count(finding => finding.Severity == FindingSeverity.Warning);
@@ -273,7 +293,10 @@ public sealed class MainViewModel : ObservableObject
     {
         TriggerItem? item = node is null ? null : Triggers.FirstOrDefault(row => row.Node == node);
         if (item is not null && !TriggersView.Filter(item))
+        {
             FilterText = string.Empty;
+            OnlyWithFindings = false;
+        }
         _navigating = !remember;
         try
         {
@@ -294,7 +317,8 @@ public sealed class MainViewModel : ObservableObject
     }
 
     private bool FilterTrigger(TriggerItem item) =>
-        FilterText.Length == 0 || item.Name.Contains(FilterText, StringComparison.OrdinalIgnoreCase);
+        (FilterText.Length == 0 || item.Name.Contains(FilterText, StringComparison.OrdinalIgnoreCase))
+        && (!OnlyWithFindings || item.Findings.Any(finding => finding.Severity >= MinimumSeverity));
 
     private TriggerNode? FindNodeForFinding(Finding finding)
     {
@@ -314,6 +338,7 @@ public sealed class MainViewModel : ObservableObject
                 References.Add(reference);
         }
         OnPropertyChanged(nameof(SelectedSectionText));
+        OnPropertyChanged(nameof(SelectedFindings));
         OnPropertyChanged(nameof(SelectedSummary));
         UpdateLayout();
     }

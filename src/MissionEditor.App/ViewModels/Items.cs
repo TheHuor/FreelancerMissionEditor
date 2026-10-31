@@ -5,8 +5,21 @@ using MissionEditor.Core.Model;
 namespace MissionEditor.App.ViewModels;
 
 /// <summary>A row of the trigger list.</summary>
-public sealed class TriggerItem(TriggerNode node, int findingCount)
+public sealed class TriggerItem(TriggerNode node, IReadOnlyList<FindingItem> findings)
 {
+    /// <summary>The findings that belong to this trigger.</summary>
+    public IReadOnlyList<FindingItem> Findings { get; } = findings;
+
+    /// <summary>The most serious finding's severity, or null without findings.</summary>
+    public FindingSeverity? MaxSeverity => Findings.Count > 0 ? Findings.Max(finding => finding.Severity) : null;
+
+    /// <summary>True when the most serious finding is an error.</summary>
+    public bool HasError => MaxSeverity == FindingSeverity.Error;
+
+    /// <summary>Tooltip of the warning sign: the messages.</summary>
+    public string FindingsToolTip => string.Join("\n", Findings.Select(finding => $"{finding.SeverityText}, Zeile {finding.LineNumber}: {finding.Message}"))
+        + "\n\nKlicken: zum Fund in der Prüfliste springen";
+
     /// <summary>The graph node.</summary>
     public TriggerNode Node { get; } = node;
 
@@ -28,7 +41,7 @@ public sealed class TriggerItem(TriggerNode node, int findingCount)
     public bool IsMissing => Node.IsMissing;
 
     /// <summary>Number of findings for this trigger.</summary>
-    public int FindingCount { get; } = findingCount;
+    public int FindingCount => Findings.Count;
 
     /// <summary>True when there are findings.</summary>
     public bool HasFindings => FindingCount > 0;
