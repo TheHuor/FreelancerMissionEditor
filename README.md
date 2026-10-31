@@ -26,6 +26,7 @@ Entstanden beim Aufteilen der Crossfire-Kampagne (ein 36 000-Zeilen-Skript) in e
   ändert), danach wird sofort neu geprüft; Rückgängig (Strg+Z), Speichern (Strg+S) mit `.bak`-Sicherung
   beim ersten Speichern.
 - **Kommandozeile** für Skripte und Stapelprüfungen.
+- **MCP-Server**, über den KI-Agenten Missionen untersuchen und Änderungen als Entwurf vorschlagen.
 
 ## Voraussetzungen
 
@@ -112,9 +113,94 @@ Ziel, `Cnd_WatchTrigger` vom beobachteten Trigger zum Beobachter.
 | `src/MissionEditor.Core` | INI-Leser ohne Verlust (`IniDocument`), Modell (`MissionScript`, `Trigger`, Verweise), Trigger-Graph und Schichten-Anordnung, `FlHash.CreateId`, Prüfungen |
 | `src/MissionEditor.Cli` | Kommandozeile |
 | `src/MissionEditor.App` | WPF-Oberfläche |
-| `tests/MissionEditor.Tests` | xUnit-Tests |
+| `src/MissionEditor.Mcp` | MCP-Server für externe KI-Agenten (stdio) |
+| `tests/MissionEditor.Tests` | xUnit-Tests für den Kern |
+| `tests/MissionEditor.Mcp.Tests` | xUnit-Tests für den MCP-Server, inklusive echtem Stdio-Client |
 
 Neue Prüfungen implementieren `IMissionCheck` und werden in `MissionChecker.AllChecks` eingetragen.
+
+## MCP-Server für KI-Agenten
+
+`MissionEditor.Mcp` macht den Kern des Editors für KI-Agenten nutzbar, die das
+[Model Context Protocol](https://modelcontextprotocol.io) sprechen (z. B. Claude Code, Claude Desktop,
+Codex). Ein Agent kann damit Missionen untersuchen, prüfen, Triggerabläufe nachverfolgen und
+Änderungen als Entwurf vorschlagen. Der Server läuft lokal über stdio; er hat keinen
+Netzwerkzugang, braucht keine API-Schlüssel und enthält kein eigenes Sprachmodell.
+
+### Sicherheit
+
+- Der Server sieht nur das mit `--workspace` freigegebene Verzeichnis. Pfade außerhalb davon,
+  symbolische Links und andere Dateitypen als `.ini` werden abgewiesen; Dateien über 8 MiB auch.
+- Standardmäßig wird nur gelesen. Änderungen entstehen als Entwürfe im Arbeitsspeicher
+  (höchstens acht pro Sitzung) mit Vorher/Nachher und den Befunden des Entwurfs.
+- Erst mit `--allow-writes` darf ein Entwurf exportiert werden – und zwar nur in eine **neue**
+  Datei. Bestehende Dateien und Originalmissionen werden nie überschrieben.
+- Sektionsänderungen verlangen den SHA256 der gelesenen Fassung. Hat sich die Datei seitdem
+  geändert, werden Entwurf und Export abgelehnt.
+- BINI bleibt BINI; Zeichen, die die Kodierung der Datei nicht kennt, werden abgewiesen.
+
+### Tools
+
+| Tool | Zweck |
+|---|---|
+| `inspect_mission` | Format, SHA256, Anzahl Zeilen/Sektionen/Trigger/Objekte, Fehler und Warnungen |
+| `check_mission` | Befunde mit Zeile, Erklärung und Abhilfe (paginiert) |
+| `list_triggers` | Trigger mit Sektionsindex, Zeile, Anfangszustand, Bedingung; Duplikate markiert |
+| `list_sections` | alle Sektionen mit Index, Name, nickname und Zeilenbereich |
+| `read_mission_source` | bis zu 500 Quelltextzeilen |
+| `get_trigger_context` | Umgebung eines Triggers mit Bedingungen, Aktionen und Verweisen |
+| `suggest_missing_trigger` | ähnliche Namen und aufrufende Stellen für einen fehlenden Trigger |
+| `get_mission_vocabulary` | die `Cnd_`/`Act_`-Namen, die das Spiel kennt |
+| `prepare_section_edit` | Sektionsänderung als Entwurf |
+| `prepare_new_mission` | vom Agenten geschriebene neue Mission als Entwurf |
+| `read_mission_draft` / `discard_mission_draft` | Entwurf lesen oder verwerfen |
+| `export_mission_draft` | Entwurf als neue Datei schreiben (nur mit `--allow-writes`) |
+
+### Einrichten
+
+Bauen bzw. starten:
+
+```
+dotnet build src/MissionEditor.Mcp -c Release
+dotnet run --project src/MissionEditor.Mcp -- --workspace <Missionsverzeichnis> [--allow-writes]
+```
+
+Ein Release enthält zusätzlich `MissionEditorMcp-<version>-win-x64.zip` mit
+`MissionEditor.Mcp.exe`, das ohne installiertes .NET läuft.
+
+Claude Code:
+
+```
+claude mcp add freelancer-missions -- <Pfad>\MissionEditor.Mcp.exe --workspace "D:\freelancer crossfire\DATA\MISSIONS"
+```
+
+Claude Desktop (`claude_desktop_config.json`) bzw. andere Clients mit derselben Struktur:
+
+```json
+{
+  "mcpServers": {
+    "freelancer-missions": {
+      "command": "C:\\Tools\\MissionEditorMcp\\MissionEditor.Mcp.exe",
+      "args": ["--workspace", "D:\\freelancer crossfire\\DATA\\MISSIONS"]
+    }
+  }
+}
+```
+
+Codex (`~/.codex/config.toml`):
+
+```toml
+[mcp_servers.freelancer-missions]
+command = "C:\\Tools\\MissionEditorMcp\\MissionEditor.Mcp.exe"
+args = ["--workspace", "D:\\freelancer crossfire\\DATA\\MISSIONS"]
+```
+
+Für Exporte `"--allow-writes"` an die Argumente anhängen. Ohne installierte exe geht statt
+`command` auch `dotnet` mit dem Pfad zur `MissionEditor.Mcp.dll` als erstem Argument.
+
+Der Server arbeitet mit gespeicherten Dateien; ungespeicherte Änderungen im Editor sieht er nicht.
+Namensvorschläge für fehlende Trigger beruhen nur auf Ähnlichkeit und sind kein Beleg für die
+beabsichtigte Funktion.
 
 ## Mitarbeit
 
@@ -177,7 +263,7 @@ Der Graph zeigt ein dezentes Sternenfeld mit Nebel. Assets und ihre Erzeugung si
 
 ## Versionierung und Releases
 
-Alle Projekte (GUI, Core, CLI und Tests) erhalten ihre Version zentral über MinVer 8.0.0 in
+Alle Projekte (GUI, Core, CLI, MCP und Tests) erhalten ihre Version zentral über MinVer 8.0.0 in
 `Directory.Build.props`. Die gemeinsame Repository-Version berücksichtigt jeden neuen Commit,
 auch wenn nur Core oder CLI verändert wurden. Ohne Release-Tag entsteht beispielsweise
 `0.1.0-preview.0.15`; der nächste Commit erhöht den Entwicklungsstand. Die vollständige
@@ -199,8 +285,8 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-`release.yml` baut und testet den getaggten Commit, veröffentlicht GUI und CLI für Windows x64
-mit enthaltener .NET-Laufzeit und erstellt zwei ZIPs sowie SHA-256-Prüfsummen. Es prüft, dass
+`release.yml` baut und testet den getaggten Commit, veröffentlicht GUI, CLI und MCP-Server für
+Windows x64 mit enthaltener .NET-Laufzeit und erstellt drei ZIPs sowie SHA-256-Prüfsummen. Es prüft, dass
 Tag und berechnete MinVer-Version übereinstimmen und alle ausgelieferten Module dieselbe
 Produktversion haben. Bei Tags wie `v0.2.0-rc.1` wird das GitHub-Release als Vorabversion markiert.
 Die benötigten Rechte kommen vom eingebauten `GITHUB_TOKEN`; ein eigener PAT ist nicht nötig.
@@ -214,4 +300,4 @@ Der Verpackungsschritt lässt sich lokal ausführen:
 
 Die Ausgaben liegen im ignorierten Verzeichnis `artifacts/`. Für eine andere Ausgabestelle kann
 `-OutputDirectory` angegeben werden. Die ZIPs enthalten jeweils den Inhalt des entsprechenden
-GUI-/CLI-Verzeichnisses und können ohne vorherige .NET-Installation entpackt gestartet werden.
+GUI-, CLI- bzw. MCP-Verzeichnisses und können ohne vorherige .NET-Installation entpackt gestartet werden.
