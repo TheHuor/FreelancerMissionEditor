@@ -8,11 +8,12 @@ using MissionEditor.Core.Model;
 
 namespace MissionEditor.App.Ai;
 
-/// <summary>What the editor asks the model about one finding: the instructions and the mission excerpt.</summary>
+/// <summary>What the editor asks the model: the instructions and the mission excerpt.</summary>
 /// <param name="System">Role, engine rules and answer format.</param>
 /// <param name="User">The finding and the relevant sections with line numbers.</param>
 /// <param name="EditableSections">Header line numbers of the sections the answer may replace.</param>
-public sealed record AdviceRequest(string System, string User, IReadOnlySet<int> EditableSections);
+/// <param name="AnswerSchema">JSON schema the answer must follow, or null for a free text answer.</param>
+public sealed record AdviceRequest(string System, string User, IReadOnlySet<int> EditableSections, string? AnswerSchema = AiAdvice.AnswerSchemaJson);
 
 /// <summary>The model's answer, as returned (before it is checked against the mission).</summary>
 /// <param name="Explanation">What goes wrong in the game and why.</param>

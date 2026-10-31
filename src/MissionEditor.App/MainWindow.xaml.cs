@@ -115,6 +115,20 @@ public partial class MainWindow : Window
 
     private void OnAskAgentToExplainMission(object sender, RoutedEventArgs args) => CopyAgentPrompt(AgentPrompts.ForExplainMission);
 
+    private void OnAskAiToExplainMission(object sender, RoutedEventArgs args) => AskAiAboutMission(Ai.MissionQuestion.Explain);
+
+    private void OnAskAiForGapsAndBreaks(object sender, RoutedEventArgs args) => AskAiAboutMission(Ai.MissionQuestion.GapsAndBreaks);
+
+    private void AskAiAboutMission(Ai.MissionQuestion question)
+    {
+        if (ViewModel.Script is null)
+        {
+            ViewModel.ReportStatus("Erst eine Mission öffnen.");
+            return;
+        }
+        new MissionAdviceWindow(ViewModel, question) { Owner = this }.Show();
+    }
+
     private void OnAskAgentForGapsAndBreaks(object sender, RoutedEventArgs args) => CopyAgentPrompt(AgentPrompts.ForGapsAndBreaks);
 
     private void OnAskAgentForNewMission(object sender, RoutedEventArgs args)

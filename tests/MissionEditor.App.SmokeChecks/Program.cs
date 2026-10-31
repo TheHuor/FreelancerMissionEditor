@@ -184,6 +184,18 @@ internal static class Program
         Assert(!vm.Script!.Document.Lines.Any(line => line.Text == "Act_DebugMsg = from_the_draft"), "undo reverts the taken-over sections");
         File.Delete(draftPath);
 
+        // "Frag KI" about the whole mission: free text, a digest instead of the file.
+        var missionAdvice = new MissionAdviceWindow(vm, MissionEditor.App.Ai.MissionQuestion.GapsAndBreaks, askOnOpen: false) { Owner = window };
+        var missionRequest = missionAdvice.BuildRequest();
+        Assert(missionRequest.AnswerSchema is null && missionRequest.User.Contains("Trigger (Dateireihenfolge):")
+            && missionRequest.User.Contains(startTrigger.Nickname) && missionRequest.User.Contains("Funde des Editors"), "mission request carries the trigger digest and the findings as free text");
+        Assert(missionRequest.User.Length <= MissionEditor.App.Ai.MissionAdvice.MaxDigestLength + 4000, "mission digest stays within its limit for the large fixture");
+        missionAdvice.Show();
+        missionAdvice.ShowAnswerForTest("1. Blockiert: …");
+        missionAdvice.UpdateLayout();
+        Assert(((TextBox)missionAdvice.FindName("AnswerBox")).Text == "1. Blockiert: …", "mission answer is shown in the editor");
+        missionAdvice.Close();
+
         about.Close();
         Console.WriteLine("ALL CHECKS PASSED");
         File.Delete(tmp);

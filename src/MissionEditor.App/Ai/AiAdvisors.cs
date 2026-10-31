@@ -44,7 +44,8 @@ public sealed class AnthropicApiAdvisor(AiSettings settings) : IAiAdvisor
             throw new InvalidOperationException("Kein API-Schlüssel hinterlegt. Unter „KI-Einstellungen“ eintragen.");
 
         AnthropicClient client = new() { ApiKey = apiKey };
-        using JsonDocument schema = JsonDocument.Parse(AiAdvice.AnswerSchemaJson);
+        // With a schema the answer is guaranteed JSON; without one it is free text.
+        using JsonDocument? schema = request.AnswerSchema is null ? null : JsonDocument.Parse(request.AnswerSchema);
         var parameters = new MessageCreateParams
         {
             Model = settings.Model,
@@ -54,14 +55,16 @@ public sealed class AnthropicApiAdvisor(AiSettings settings) : IAiAdvisor
             Fallbacks = new Default(),
             System = request.System,
             Messages = [new BetaUserMessageParam { Content = request.User }],
-            OutputConfig = new BetaOutputConfig
-            {
-                Effort = Effort.Medium,
-                Format = new BetaJsonOutputFormat
+            OutputConfig = schema is null
+                ? new BetaOutputConfig { Effort = Effort.Medium }
+                : new BetaOutputConfig
                 {
-                    Schema = schema.RootElement.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.Clone()),
+                    Effort = Effort.Medium,
+                    Format = new BetaJsonOutputFormat
+                    {
+                        Schema = schema.RootElement.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.Clone()),
+                    },
                 },
-            },
         };
 
         BetaMessage response;
@@ -116,8 +119,9 @@ public sealed class CliAdvisor(AiSettings settings, AiProvider provider) : IAiAd
         string program = FindProgram()
             ?? throw new InvalidOperationException($"{DisplayName} wurde nicht gefunden. Installieren oder den Pfad unter „KI-Einstellungen“ angeben.");
         string prompt = request.System + "\n\n" + request.User
-            + "\n\nGib ausschließlich ein JSON-Objekt nach diesem Schema aus, ohne Text davor oder danach und ohne Dateien zu ändern:\n"
-            + AiAdvice.AnswerSchemaJson;
+            + (request.AnswerSchema is null
+                ? "\n\nAntworte als Text. Ändere keine Dateien."
+                : "\n\nGib ausschließlich ein JSON-Objekt nach diesem Schema aus, ohne Text davor oder danach und ohne Dateien zu ändern:\n" + request.AnswerSchema);
         string? answerFile = provider == AiProvider.CodexCli ? Path.Combine(Path.GetTempPath(), $"mission-editor-{Guid.NewGuid():N}.txt") : null;
         string arguments = provider == AiProvider.ClaudeCli
             ? "-p --output-format json"

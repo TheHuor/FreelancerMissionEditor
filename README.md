@@ -241,6 +241,20 @@ Die API-Anfrage nutzt strukturierte Ausgabe (die Antwort ist garantiert JSON nac
 den serverseitigen Fallback bei abgelehnten Anfragen. Die Kommandozeilen laufen ohne Schreibrechte und
 bekommen den Auftrag über die Standardeingabe.
 
+**„KI-Agent ▾ → Frag KI: Mission erklären“** bzw. **„… Lücken und Brüche“** fragt dasselbe Modell nach der
+ganzen Mission und zeigt die Antwort als Text im Editor. Statt der Datei geht ein Auszug hinaus: alle Trigger
+mit Zeile, Startzustand, Bedingung und Aktionen, Ziele und NPCs mit ihren Texten und die Funde des Editors
+(höchstens 150 000 Zeichen; größere Missionen werden gekürzt). Gefragt wird der aktuelle Stand im Editor.
+
+### Entwürfe des Agenten übernehmen
+
+- Ändert ein anderes Programm – etwa der Agent – die geöffnete Datei, erscheint oben ein Hinweis mit
+  „Neu laden“. Eigene Speichervorgänge lösen ihn nicht aus.
+- **„KI-Agent ▾ → Mit Datei vergleichen…“** vergleicht die Mission abschnittsweise mit einer anderen Datei,
+  z. B. einem mit `export_mission_draft` geschriebenen Entwurf. Abschnitte werden über Name, `nickname` und
+  Vorkommen zugeordnet; das Fenster zeigt Vorher/Nachher und wie viele Fehler und Warnungen danach bleiben.
+  „Ausgewählte übernehmen“ setzt die angehakten Abschnitte in einem Schritt ein (Strg+Z macht es rückgängig).
+
 ### Aufträge aus dem Editor
 
 Alternativ arbeitest du im Chat von Claude oder Codex; der Editor liefert fertige Aufträge dafür.
