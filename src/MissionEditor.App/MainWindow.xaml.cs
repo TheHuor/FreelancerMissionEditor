@@ -146,8 +146,19 @@ public partial class MainWindow : Window
         args.Handled = true;
     }
 
+    // Brings the finding's line into the source preview and marks it.
+    private void ShowInPreview(FindingItem finding)
+    {
+        SectionLineItem? line = ViewModel.ShowFinding(finding);
+        if (line is null)
+            return;
+        SectionPreview.SelectedItem = line;
+        SectionPreview.ScrollIntoView(line);
+    }
+
     private void ShowInFindingsGrid(FindingItem finding)
     {
+        ShowInPreview(finding);
         if (finding.Severity < ViewModel.MinimumSeverity)
             ViewModel.MinimumSeverity = finding.Severity;
         FindingsGrid.SelectedItem = finding;
@@ -157,8 +168,8 @@ public partial class MainWindow : Window
 
     private void OnFindingDoubleClick(object sender, MouseButtonEventArgs args)
     {
-        if (sender is DataGrid { SelectedItem: FindingItem { Node: { } node } })
-            ViewModel.SelectNode(node);
+        if (sender is DataGrid { SelectedItem: FindingItem finding })
+            ShowInPreview(finding);
     }
 
     // Wheel zooms around the mouse position; Shift+wheel scrolls sideways.

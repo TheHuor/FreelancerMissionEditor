@@ -228,10 +228,17 @@
                              TextAlignment="Right" Margin="0,0,6,0" />
                   <TextBlock x:Name="Sign" DockPanel.Dock="Left" Width="16" Text="⚠" Foreground="#E65100"
                              FontFamily="Segoe UI Symbol" Visibility="Hidden" />
-                  <TextBlock Text="{Binding Text}" />
+                  <TextBlock x:Name="LineText" Text="{Binding Text}" />
                 </DockPanel>
               </Border>
               <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsCaption}" Value="True">
+                  <Setter TargetName="Row" Property="Background" Value="#ECEFF1" />
+                  <Setter TargetName="Row" Property="Margin" Value="0,6,0,2" />
+                  <Setter TargetName="LineText" Property="FontFamily" Value="Segoe UI" />
+                  <Setter TargetName="LineText" Property="FontWeight" Value="SemiBold" />
+                  <Setter TargetName="LineText" Property="Foreground" Value="#37474F" />
+                </DataTrigger>
                 <DataTrigger Binding="{Binding HasFindings}" Value="True">
                   <Setter TargetName="Row" Property="Background" Value="#FFF3E0" />
                   <Setter TargetName="Row" Property="BorderBrush" Value="#E65100" />
@@ -256,7 +263,7 @@
           <TextBlock Text="Prüfungen – ab" VerticalAlignment="Center" FontWeight="SemiBold" />
           <ComboBox Width="100" Margin="6,0" ItemsSource="{Binding Severities}"
                     DisplayMemberPath="Value" SelectedValuePath="Key" SelectedValue="{Binding MinimumSeverity}" />
-          <TextBlock Text="(Doppelklick springt zum Trigger)" Foreground="Gray" VerticalAlignment="Center" />
+          <TextBlock Text="(Doppelklick zeigt die Stelle im Quelltext rechts, bei Duplikaten mit der ersten Definition)" Foreground="Gray" VerticalAlignment="Center" />
         </StackPanel>
         <DataGrid x:Name="FindingsGrid" ItemsSource="{Binding FindingsView}" AutoGenerateColumns="False" IsReadOnly="True"
                   HeadersVisibility="Column" GridLinesVisibility="None" MouseDoubleClick="OnFindingDoubleClick"

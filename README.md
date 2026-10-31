@@ -24,7 +24,8 @@ dotnet run --project Tools/MissionEditor/src/MissionEditor.Cli -- check <datei.i
 Im Editor: Datei öffnen (Strg+O oder hineinziehen), Trigger filtern (Strg+F), Knoten oder Verweise
 anklicken, Zurück mit Alt+←. Graph: auf freier Fläche ziehen verschiebt, Mausrad zoomt an der
 Mausposition, Umschalt+Mausrad scrollt waagerecht, „Einpassen“ zeigt alles; ein Knoten unter der Maus
-hebt seine Kanten hervor. Doppelklick auf einen Fund springt zum Trigger; das ⚠ in der Liste (rot bei
+hebt seine Kanten hervor. Doppelklick auf einen Fund zeigt die Stelle im Quelltext (bei Duplikaten mit
+der ersten Definition, auch für [NNObjective], [ObjList] usw.); das ⚠ in der Liste (rot bei
 Fehlern) zeigt den Fund in der Prüfliste, „Nur Trigger mit Funden“ filtert die Liste, die Funde des
 gewählten Triggers stehen oben in den Details.
 

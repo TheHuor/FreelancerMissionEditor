@@ -90,8 +90,11 @@ public sealed class FindingItem(Finding finding, TriggerNode? node)
 }
 
 /// <summary>One line of the section preview, marked when a finding points at it.</summary>
-public sealed class SectionLineItem(int number, string text, IReadOnlyList<FindingItem> findings)
+public sealed class SectionLineItem(int number, string text, IReadOnlyList<FindingItem> findings, bool isCaption = false)
 {
+    /// <summary>True for a caption between two sections (not a file line).</summary>
+    public bool IsCaption { get; } = isCaption;
+
     /// <summary>Line number in the file (0 for a synthetic note).</summary>
     public int Number { get; } = number;
 

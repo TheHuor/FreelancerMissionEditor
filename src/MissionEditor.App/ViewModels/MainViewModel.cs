@@ -28,6 +28,8 @@ public sealed class MainViewModel : ObservableObject
     private FindingSeverity _minimumSeverity = FindingSeverity.Warning;
     private bool _navigating;
     private bool _onlyWithFindings;
+    private IReadOnlyList<SectionLineItem> _sectionLines = [];
+    private ILookup<int, FindingItem> _findingsByLine = Array.Empty<FindingItem>().ToLookup(finding => finding.LineNumber);
 
     /// <summary>Creates the view model.</summary>
     public MainViewModel()
@@ -104,23 +106,38 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    /// <summary>The section lines of the selected trigger, with findings marked.</summary>
+    /// <summary>
+    /// The source preview with findings marked: the selected trigger's section plus any duplicate
+    /// definitions, or the sections of a finding that has no trigger (see <see cref="ShowFinding"/>).
+    /// </summary>
     public IReadOnlyList<SectionLineItem> SelectedSectionLines
     {
-        get
+        get => _sectionLines;
+        private set => SetProperty(ref _sectionLines, value);
+    }
+
+    /// <summary>
+    /// Shows a finding: selects its trigger, or puts its section (and the related one, e.g. the first
+    /// definition of a duplicate) into the preview. Returns the preview line to scroll to.
+    /// </summary>
+    public SectionLineItem? ShowFinding(FindingItem finding)
+    {
+        if (finding.Node is not null)
         {
-            if (SelectedTrigger is null)
-                return [];
-            if (SelectedTrigger.Node.Trigger is not { } trigger)
-                return [new SectionLineItem(0, $"; '{SelectedTrigger.Name}' wird referenziert, aber kein [Trigger] definiert ihn.", [])];
-            var findingsByLine = SelectedTrigger.Findings.ToLookup(finding => finding.LineNumber);
-            IniSection section = trigger.Section;
-            List<IniLine> lines = [section.Header, .. section.Lines];
-            // Trailing blank lines belong to the section in the file but not in the preview.
-            while (lines.Count > 1 && lines[^1].Kind == IniLineKind.Blank)
-                lines.RemoveAt(lines.Count - 1);
-            return lines.Select(line => new SectionLineItem(line.Number, line.Text, findingsByLine[line.Number].ToList())).ToList();
+            if (finding.Node != SelectedTrigger?.Node)
+                SelectNode(finding.Node);
         }
+        else if (Script is not null)
+        {
+            var parts = new List<(string? Caption, IniSection Section)>();
+            IniSection? section = Script.Document.FindSectionAt(finding.LineNumber);
+            if (section is not null)
+                parts.Add(($"Fundstelle [{section.Name}], Zeile {finding.LineNumber}", section));
+            if (finding.Finding.RelatedLineNumber is int related && Script.Document.FindSectionAt(related) is { } relatedSection && relatedSection != section)
+                parts.Add(($"Bezug: Zeile {related}", relatedSection));
+            SelectedSectionLines = BuildPreview(parts);
+        }
+        return SelectedSectionLines.FirstOrDefault(line => line.Number == finding.LineNumber);
     }
 
     /// <summary>Header text of the details pane.</summary>
@@ -283,6 +300,7 @@ public sealed class MainViewModel : ObservableObject
         Findings.Clear();
         foreach (Finding finding in findings)
             Findings.Add(new FindingItem(finding, FindNodeForFinding(finding)));
+        _findingsByLine = Findings.ToLookup(finding => finding.LineNumber);
         var findingsPerNode = Findings.Where(item => item.Node is not null).GroupBy(item => item.Node!)
             .ToDictionary(group => group.Key, group => (IReadOnlyList<FindingItem>)group.ToList());
 
@@ -352,10 +370,40 @@ public sealed class MainViewModel : ObservableObject
             foreach (ReferenceItem reference in ReferenceItem.ForNode(SelectedTrigger.Node).OrderBy(item => item.LineNumber))
                 References.Add(reference);
         }
-        OnPropertyChanged(nameof(SelectedSectionLines));
+        SelectedSectionLines = BuildTriggerPreview();
         OnPropertyChanged(nameof(SelectedFindings));
         OnPropertyChanged(nameof(SelectedSummary));
         UpdateLayout();
+    }
+
+    private IReadOnlyList<SectionLineItem> BuildTriggerPreview()
+    {
+        if (SelectedTrigger is null || Script is null)
+            return [];
+        if (SelectedTrigger.Node.Trigger is not { } trigger)
+            return [new SectionLineItem(0, $"; '{SelectedTrigger.Name}' wird referenziert, aber kein [Trigger] definiert ihn.", [])];
+        var parts = new List<(string? Caption, IniSection Section)> { (null, trigger.Section) };
+        foreach (Trigger duplicate in Script.Triggers.Where(other => other.Id == trigger.Id && other != trigger))
+            parts.Add(($"Zweite Definition, Zeile {duplicate.LineNumber} – von der Engine ignoriert", duplicate.Section));
+        if (parts.Count > 1)
+            parts[0] = ($"Definition, Zeile {trigger.LineNumber} – gilt", trigger.Section);
+        return BuildPreview(parts);
+    }
+
+    private List<SectionLineItem> BuildPreview(List<(string? Caption, IniSection Section)> parts)
+    {
+        var items = new List<SectionLineItem>();
+        foreach ((string? caption, IniSection section) in parts)
+        {
+            if (caption is not null)
+                items.Add(new SectionLineItem(0, caption, [], isCaption: true));
+            List<IniLine> lines = [section.Header, .. section.Lines];
+            // Trailing blank lines belong to the section in the file but not in the preview.
+            while (lines.Count > 1 && lines[^1].Kind == IniLineKind.Blank)
+                lines.RemoveAt(lines.Count - 1);
+            items.AddRange(lines.Select(line => new SectionLineItem(line.Number, line.Text, _findingsByLine[line.Number].ToList())));
+        }
+        return items;
     }
 
     private void UpdateLayout()

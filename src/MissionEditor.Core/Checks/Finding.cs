@@ -20,7 +20,8 @@ public enum FindingSeverity
 /// <param name="Subject">The trigger or object nickname it concerns, if any.</param>
 /// <param name="Message">The message for the user (German).</param>
 /// <param name="Hint">Why it matters and how to fix it (German), if there is advice to give.</param>
-public sealed record Finding(FindingSeverity Severity, string CheckId, int LineNumber, string? Subject, string Message, string? Hint = null);
+/// <param name="RelatedLineNumber">Another line the finding refers to (e.g. the first definition of a duplicate), if any.</param>
+public sealed record Finding(FindingSeverity Severity, string CheckId, int LineNumber, string? Subject, string Message, string? Hint = null, int? RelatedLineNumber = null);
 
 /// <summary>A check over a mission script.</summary>
 public interface IMissionCheck

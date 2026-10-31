@@ -31,12 +31,12 @@ public sealed class DuplicateNicknameCheck : IMissionCheck
             {
                 yield return new Finding(FindingSeverity.Error, Id, trigger.NicknameLine.Number, trigger.Nickname,
                     $"Hash-Kollision: '{trigger.Nickname}' hat dieselbe ID ({trigger.Id}) wie '{first.Nickname}' (Zeile {first.NicknameLine.Number}); die Engine ignoriert diesen Trigger.",
-                    "CreateID bildet beide Namen auf dieselbe Zahl ab; die Engine sieht nur den ersten. Abhilfe: einen der beiden Trigger umbenennen und seine Verweise anpassen.");
+                    "CreateID bildet beide Namen auf dieselbe Zahl ab; die Engine sieht nur den ersten. Abhilfe: einen der beiden Trigger umbenennen und seine Verweise anpassen.", first.NicknameLine.Number);
                 continue;
             }
             yield return new Finding(FindingSeverity.Warning, Id, trigger.NicknameLine.Number, trigger.Nickname,
                 $"Trigger '{trigger.Nickname}' ist doppelt (erste Definition Zeile {first.NicknameLine.Number}); die Engine ignoriert diese zweite Definition.",
-                "Trigger-Namen sind für die Engine ohne Groß-/Kleinschreibung gleich; Bedingung und Aktionen dieser zweiten Sektion wirken nie. Abhilfe: zusammenführen, umbenennen (und die Verweise anpassen) oder die Sektion löschen.");
+                "Trigger-Namen sind für die Engine ohne Groß-/Kleinschreibung gleich; Bedingung und Aktionen dieser zweiten Sektion wirken nie. Abhilfe: zusammenführen, umbenennen (und die Verweise anpassen) oder die Sektion löschen.", first.NicknameLine.Number);
         }
 
         var shipsAndFormations = script.Objects.Where(item => item.Kind is ScriptObjectKind.Ship or ScriptObjectKind.Formation && item.Nickname.Length > 0);
@@ -51,7 +51,7 @@ public sealed class DuplicateNicknameCheck : IMissionCheck
             {
                 yield return new Finding(FindingSeverity.Info, Id, other.LineNumber, other.Nickname,
                     $"'{other.Nickname}' unterscheidet sich von '{first.Nickname}' (Zeile {first.LineNumber}) nur in Groß-/Kleinschreibung; Spawn-Aktionen unterscheiden die Schreibweise.",
-                    "Act_SpawnShip/Act_SpawnFormation suchen den Namen exakt (strcmp). Zwei Schreibweisen sind zwei verschiedene Einträge – leicht verwechselbar. Abhilfe: eine Schreibweise verwenden.");
+                    "Act_SpawnShip/Act_SpawnFormation suchen den Namen exakt (strcmp). Zwei Schreibweisen sind zwei verschiedene Einträge – leicht verwechselbar. Abhilfe: eine Schreibweise verwenden.", first.LineNumber);
             }
         }
 
@@ -74,7 +74,7 @@ public sealed class DuplicateNicknameCheck : IMissionCheck
                 string sectionName = ScriptObject.SectionNameOf(other.Kind);
                 yield return new Finding(FindingSeverity.Warning, Id, other.LineNumber, other.Nickname,
                     $"[{sectionName}] '{other.Nickname}' ist in {listName} doppelt (erste Definition Zeile {first.LineNumber}, [{ScriptObject.SectionNameOf(first.Kind)}]).",
-                    "Verweise auf diesen Namen finden nur einen der beiden Einträge; welcher, hängt von der Engine-Liste ab. Abhilfe: einen Eintrag umbenennen oder entfernen.");
+                    "Verweise auf diesen Namen finden nur einen der beiden Einträge; welcher, hängt von der Engine-Liste ab. Abhilfe: einen Eintrag umbenennen oder entfernen.", first.LineNumber);
             }
         }
     }
