@@ -37,6 +37,7 @@ public partial class AboutWindow : Window
         new("GUI", "WPF-Oberfläche", BuildVersion),
         new("Core", "INI, BINI und Prüfungen", VersionOf(typeof(IniDocument).Assembly)),
         new("CLI", "Kommandozeile · separat", BuildVersion),
+        new("MCP", "Agent-Schnittstelle · separat", BuildVersion),
     ];
 
     /// <summary>Creates the themed information dialog.</summary>

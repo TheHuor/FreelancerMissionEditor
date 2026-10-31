@@ -170,6 +170,16 @@ public sealed class IniDocument
 
         if (IsBini)
             return ReplaceBinaryRange(firstLine, lastLine, newLines);
+        // Characters the file's encoding cannot hold would silently turn into '?' on save.
+        try
+        {
+            Encoding.GetEncoding(Encoding.CodePage, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback).GetBytes(newText);
+        }
+        catch (EncoderFallbackException exception)
+        {
+            throw new InvalidDataException(
+                $"Das Zeichen '{exception.CharUnknown}' lässt sich in der Kodierung der Datei ({Encoding.WebName}) nicht speichern.", exception);
+        }
         var builder = new StringBuilder();
         foreach (IniLine line in Lines.Where(line => line.Number < firstLine))
             builder.Append(line.Text).Append(line.LineEnding);

@@ -103,7 +103,7 @@ internal static class Program
         Assert(vm.WindowTitle.Contains(AboutWindow.DisplayVersion), "main caption contains build version");
         var about = new AboutWindow { Owner = window };
         about.Show(); about.UpdateLayout();
-        Assert(about.Modules.Count == 3 && about.Modules.All(module => module.Version == AboutWindow.DisplayVersion), "About lists consistent GUI, Core and CLI repository versions");
+        Assert(about.Modules.Count == 4 && about.Modules.All(module => module.Version == AboutWindow.DisplayVersion), "About lists consistent GUI, Core, CLI and MCP repository versions");
         if (Environment.GetEnvironmentVariable("MISSION_EDITOR_ABOUT_PREVIEW") is { Length: > 0 } previewPath)
         {
             var dpi = VisualTreeHelper.GetDpi(about);

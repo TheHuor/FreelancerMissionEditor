@@ -38,8 +38,15 @@ internal sealed record BiniParameter(byte Type, uint Raw, string? StringValue = 
 /// <summary>Freelancer BINI v1: little-endian records followed by zero-terminated ANSI strings.</summary>
 internal static class BiniCodec
 {
+    // Every value may point at the same long string, so a small file can decode to a huge text.
+    // Real BINI files stay far below this ratio; the floor keeps small files unaffected.
+    private const int MaxExpansionFactor = 16;
+    private const long MinimumDecodedBudget = 1 << 20;
+
     internal static IniDocument Read(byte[] data)
     {
+        long decodedBudget = Math.Max(MinimumDecodedBudget, (long)data.Length * MaxExpansionFactor);
+        long decodedLength = 0;
         if (data.Length < 12 || BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(4)) != 1)
             throw Invalid("Header oder Version ungültig (unterstützt: BINI 1).");
         uint tableValue = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(8));
@@ -67,6 +74,9 @@ internal static class BiniCodec
             int end = Array.IndexOf(data, (byte)0, start);
             if (end < 0)
                 throw Invalid("String ohne Nullterminierung.");
+            decodedLength += end - start;
+            if (decodedLength > decodedBudget)
+                throw Invalid($"Entpackter Inhalt ist mehr als {MaxExpansionFactor}-mal so groß wie die Datei (beschädigte oder manipulierte Datei).");
             byte[] bytes = data[start..end];
             string text = IniDocument.Windows1252.GetString(bytes);
             return IniDocument.Windows1252.GetBytes(text).AsSpan().SequenceEqual(bytes)
