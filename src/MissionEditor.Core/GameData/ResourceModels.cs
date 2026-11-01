@@ -54,6 +54,8 @@ public sealed record ResourceEntry (int Ids, ResourceIdentity? Identity, Resourc
 public sealed record IdsReference (int Ids, string Role, string Category, string? FilePath, int SectionIndex,
     string SectionName, string SectionNickname, int LineNumber, int ParameterIndex, string SourceText, string? Provenance = null)
 {
+  /// <summary>Verified or explicitly unknown rendering behavior of this use.</summary>
+  public MissionTextRendering Rendering => MissionTextUsage.Classify(this);
   /// <summary>The separate source INI defining an indirectly resolved nickname.</summary>
   public string? DefinitionPath { get; init; }
   /// <summary>The definition section's header line.</summary>

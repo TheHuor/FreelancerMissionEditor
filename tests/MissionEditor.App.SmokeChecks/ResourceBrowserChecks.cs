@@ -88,7 +88,7 @@ internal static partial class Program
     Guard ("Verwerfen");
     browser.NavigateToId (2);
     browser.NavigateToId (50);
-    ((TabControl)browser.FindName ("ContentTabs")).SelectedIndex = 1;
+    ((TabControl)browser.FindName ("ContentTabs")).SelectedItem = browser.FindName("VisualTab");
     SavePreview (browser, "resource-browser-infocard");
     browser.Width = 840; browser.Height = 560;
     browser.UpdateLayout ();
@@ -116,15 +116,15 @@ internal static partial class Program
     browser.RefreshContext (null, game, null); browser.Show (); browser.NavigateToId (51);
     var xml = (TextBox)browser.FindName ("XmlEditor");
     var tabs = (TabControl)browser.FindName ("ContentTabs");
-    if (tabs.SelectedItem != browser.FindName ("XmlTab") || !xml.Text.Contains ('\uFFFD')
-        || !((TextBox)browser.FindName ("RawBytesText")).Text.Contains (malformed.Length + " Bytes")
+    if (tabs.SelectedItem != browser.FindName ("VisualTab") || xml.Visibility != Visibility.Visible || !xml.Text.Contains ('\uFFFD')
+        || !((MissionEditor.App.Controls.HexEditor)browser.FindName ("RawBytesEditor")).Bytes.SequenceEqual (malformed)
         || !((TextBlock)browser.FindName ("MetadataText")).Text.Contains ("1033")
         || !((Button)browser.FindName ("SaveButton")).IsEnabled)
       throw new Exception ("Malformed infocard must expose original bytes, actual language and editable repair XML");
     SavePreview (browser, "resource-infocard-repair-xml");
     tabs.SelectedItem = browser.FindName ("RawTab");
     SavePreview (browser, "resource-infocard-repair-bytes");
-    tabs.SelectedItem = browser.FindName ("XmlTab");
+    tabs.SelectedItem = browser.FindName ("VisualTab");
     xml.Text += " ";
     ((Button)browser.FindName ("ApplyButton")).RaiseEvent (new RoutedEventArgs (ButtonBase.ClickEvent));
     if (!((TextBlock)browser.FindName ("StatusText")).Text.Contains ("Ersetzungszeichen"))
@@ -134,6 +134,29 @@ internal static partial class Program
     if (game.Texts!.Resolve (51, 1033).Status != ResourceStatus.Resolved
         || game.Texts.Resolve (1, 1033).Text != ResourceDllFixture.LongText)
       throw new Exception ("Validated infocard repair must reload successfully and preserve other entries");
+    var hex = (MissionEditor.App.Controls.HexEditor)browser.FindName ("RawBytesEditor");
+    tabs.SelectedItem = browser.FindName ("RawTab");
+    byte[] before = hex.Bytes;
+    hex.SelectByte (0); hex.ReplaceByte (0);
+    ((Button)browser.FindName ("SaveButton")).RaiseEvent (new RoutedEventArgs (ButtonBase.ClickEvent));
+    if (!game.Texts.Resolve (51, 1033).RawBytes!.SequenceEqual (before)
+        || !((TextBlock)browser.FindName ("StatusText")).Text.Contains ("nicht übernommen"))
+      throw new Exception ("Invalid raw bytes must block saving rather than save the previous valid XML");
+    hex.ReplaceByte (before[0]);
+    // A text-node character can be changed without altering XML markup.
+    string currentXml = xml.Text;
+    int character = currentXml.IndexOf ("<TEXT>", StringComparison.Ordinal) + 6;
+    byte[] needle = System.Text.Encoding.Unicode.GetBytes (currentXml.Substring (character, 1));
+    int offset = -1;
+    for (int i = 0; i < before.Length - 1; i++)
+      if (before[i] == needle[0] && before[i + 1] == needle[1]) { offset = i; break; }
+    if (offset < 0) throw new Exception ("Text byte not found");
+    hex.SelectByte (offset, true); hex.ReplaceByte ((byte)'X');
+    byte[] changed = hex.Bytes;
+    if (!xml.Text.Contains ("<TEXT>X")) throw new Exception ("Byte edits must update XML");
+    SavePreview (browser, "resource-hex-edited");
+    ((Button)browser.FindName ("SaveButton")).RaiseEvent (new RoutedEventArgs (ButtonBase.ClickEvent));
+    if (!game.Texts.Resolve (51, 1033).RawBytes!.SequenceEqual (changed)) throw new Exception ("Byte edits must save exactly");
     browser.Close ();
     Console.WriteLine ("PASS malformed infocard exposes original bytes and editable XML; repair validates and saves without losing neighbors");
   }
@@ -193,5 +216,79 @@ internal static partial class Program
     ((Button)browser.FindName ("DiscardButton")).RaiseEvent (new RoutedEventArgs (ButtonBase.ClickEvent));
     browser.Close ();
     Console.WriteLine ("PASS catalog searches every language and background reload completion preserves new edits");
+  }
+
+  private static void CheckStringRdlPresentation (Window owner)
+  {
+    using var fixture = new ResourceDllFixture ();
+    var game = GameData.Load (fixture.Root);
+    const string raw = "<?xml version=\"1.0\" encoding=\"UTF-16\"?><RDL><TEXT>Sol Sector</TEXT><PARA/><TEXT>Bases</TEXT></RDL>";
+    ResourceWriter.Save ([ResourceDraft.Create (game.Texts!.Resolve (3, 1033), raw)]);
+    game.Texts.Reload ();
+    var script = MissionScript.FromDocument (IniDocument.ParseText ("[Trigger]\nnickname = rdl_string\nAct_SetOffer = 3\n"));
+    var browser = new ResourceBrowserWindow { Owner = owner };
+    browser.RefreshContext (script, game, "rdl-string.ini"); browser.Show (); browser.NavigateToId (3);
+    var editor = (TextBox)browser.FindName ("StringEditor");
+    var preview = (TextBox)browser.FindName ("PreviewText");
+    var list = (ListBox)browser.FindName ("ResourceList");
+    var row = list.Items.Cast<object> ().Single ();
+    string label = (string)row.GetType ().GetProperty ("Detail")!.GetValue (row)!;
+    string rowPreview = (string)row.GetType ().GetProperty ("Preview")!.GetValue (row)!;
+    if (!label.Contains ("Speicher: String") || !label.Contains ("Inhalt: RDL/XML") || !label.Contains ("Verwendung:")
+        || rowPreview.Contains ("<") || !rowPreview.Contains ("Sol Sector")
+        || preview.Text != "Sol Sector\nBases" || editor.Text != raw
+        || !((TextBlock)browser.FindName ("EditingHintText")).Text.Contains ("weiterhin ein String")
+        || ((TabItem)browser.FindName ("EditTab")).Visibility != Visibility.Collapsed
+        || !Equals (((TabItem)browser.FindName ("VisualTab")).Header, "Editor"))
+      throw new Exception ($"RDL string presentation: {label}; preview={preview.Text}; editor={editor.Text}; header={((TabItem)browser.FindName ("EditTab")).Header}; hint={((TextBlock)browser.FindName ("EditingHintText")).Text}");
+    ((TabControl)browser.FindName ("ContentTabs")).SelectedItem = browser.FindName("VisualTab");
+    ((Button)browser.FindName("XmlModeButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+    SavePreview (browser, "resource-string-rdl-description");
+    editor.Text = "<RDL><TEXT>Broken";
+    ((Button)browser.FindName ("SaveButton")).RaiseEvent (new RoutedEventArgs (ButtonBase.ClickEvent));
+    if (game.Texts.Resolve (3, 1033).Text != raw) throw new Exception ("Malformed XML must not overwrite an RDL string");
+    editor.Text = raw.Replace ("Sol Sector", "Changed Sector");
+    if (preview.Text != "Changed Sector\nBases") throw new Exception ("RDL string edits must update the readable preview");
+    ((Button)browser.FindName ("SaveButton")).RaiseEvent (new RoutedEventArgs (ButtonBase.ClickEvent));
+    var saved = game.Texts.Resolve (3, 1033);
+    if (saved.Identity!.Kind != ResourceKind.String || saved.Text != editor.Text
+        || game.Texts.Resolve (1, 1033).Text != ResourceDllFixture.LongText)
+      throw new Exception ("RDL string editing must preserve storage type and neighboring strings");
+    browser.NavigateToId (1);
+    if (!((TextBlock)browser.FindName ("ContentFormatText")).Text.Contains ("Klartext")
+        || !Equals (((TabItem)browser.FindName ("EditTab")).Header, "Bearbeiten"))
+      throw new Exception ("Plain strings must retain their plain text editing explanation");
+    browser.Close ();
+    Console.WriteLine ("PASS RDL inside a string has readable previews, explicit storage/content/usage guidance and validated saving without type conversion");
+  }
+
+  private static void CheckStringRawScope(Window owner)
+  {
+    using var fixture = new ResourceDllFixture();
+    var game = GameData.Load(fixture.Root);
+    var script = MissionScript.FromDocument(IniDocument.ParseText("[Trigger]\nnickname = raw_string\nAct_PopUpDialog = 1, 3\n"));
+    var browser = new ResourceBrowserWindow { Owner = owner };
+    browser.RefreshContext(script, game, "raw-string.ini"); browser.Show(); browser.NavigateToId(3);
+    var hex = (MissionEditor.App.Controls.HexEditor)browser.FindName("RawBytesEditor");
+    var editor = (TextBox)browser.FindName("StringEditor");
+    byte[] original = System.Text.Encoding.Unicode.GetBytes("Third");
+    if (!hex.Bytes.SequenceEqual(original) || !hex.IsReadOnly
+        || !((TextBlock)browser.FindName("RawScopeText")).Text.Contains("Nur IDS 3"))
+      throw new Exception("HEX must display the selected string, not the first or neighboring entries in its block");
+    editor.Text = "Changed Ω\nLine two";
+    if (!hex.Bytes.SequenceEqual(System.Text.Encoding.Unicode.GetBytes(editor.Text)))
+      throw new Exception("HEX must immediately reflect text changes to the selected string");
+    ((TabControl)browser.FindName("ContentTabs")).SelectedItem = browser.FindName("RawTab");
+    SavePreview(browser, "resource-selected-string-bytes");
+    ((Button)browser.FindName("ApplyButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+    if (!hex.Bytes.SequenceEqual(System.Text.Encoding.Unicode.GetBytes(editor.Text)))
+      throw new Exception("HEX must retain the selected string draft after applying changes");
+    ((Button)browser.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+    if (game.Texts!.Resolve(3, 1033).Text != "Changed Ω\nLine two"
+        || game.Texts.Resolve(1, 1033).Text != ResourceDllFixture.LongText
+        || game.Texts.Resolve(2, 1033).Text != "Neighbor")
+      throw new Exception("Selected string HEX view must preserve the neighboring entries on save");
+    browser.Close();
+    Console.WriteLine("PASS HEX displays only selected string bytes, follows text edits and applied drafts, and preserves neighbors on save");
   }
 }

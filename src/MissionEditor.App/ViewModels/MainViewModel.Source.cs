@@ -1,3 +1,4 @@
+using MissionEditor.Core.Model;
 using System.Globalization;
 using System.IO;
 using MissionEditor.Core.Ini;
@@ -61,9 +62,15 @@ public sealed partial class MainViewModel
       : "Zeile oder Wert auswählen";
   /// <summary>Wrapped selectable source text or a precise resolution status.</summary>
   public string SourceContextText => SelectedResourceLink is { } link
-      ? link.Resource?.HasRawResource == true ? link.Resource.Text : link.Resource?.StatusText ?? "Spielressourcen nicht geladen"
+      ? link.Resource?.HasRawResource == true ? ResourcePresentation.Preview(ResourcePresentation.Source(link.Resource)) : link.Resource?.StatusText ?? "Spielressourcen nicht geladen"
       : SelectedSourceLine is null ? "Eine IDS oder einen Nickname im Quelltext auswählen, um Zusatzinfos zu lesen."
       : "Für diese Zeile sind keine Ressourcentexte bekannt.";
+  /// <summary>Original content for the read-only formatted/XML viewer.</summary>
+  public string SourceContextContent => SelectedResourceLink?.Resource is { HasRawResource: true } resource
+      ? ResourcePresentation.Source(resource) : SourceContextText;
+  /// <summary>Verified rendering conflicts for the selected source use.</summary>
+  public string SourceContextCompatibility => SelectedResourceLink is { Resource: { HasRawResource: true } resource } link
+      ? MissionTextUsage.Warning(link.Reference, ResourcePresentation.Source(resource)) ?? string.Empty : string.Empty;
   /// <summary>Actual DLL, actual language and definition provenance.</summary>
   public string SourceContextOrigin
   {
@@ -78,12 +85,15 @@ public sealed partial class MainViewModel
         catch (CultureNotFoundException) { language = "Sprache"; }
         origin += $" · {language} ({actual.Language})";
       }
+      origin += "\nAnzeige im Spiel: " + MissionTextUsage.Label(link.Reference.Rendering);
       return origin + (link.Reference.Provenance is { } provenance ? "\n" + provenance : "");
     }
   }
   private void NotifySourceContext ()
   {
     OnPropertyChanged (nameof (SelectedResourceLink));
+    OnPropertyChanged (nameof (SourceContextCompatibility));
+    OnPropertyChanged (nameof (SourceContextContent));
     OnPropertyChanged (nameof (SourceContextHeading)); OnPropertyChanged (nameof (SourceContextText)); OnPropertyChanged (nameof (SourceContextOrigin));
   }
   private void RefreshSourceRows ()

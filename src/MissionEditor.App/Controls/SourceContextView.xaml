@@ -1,14 +1,14 @@
 <UserControl x:Class="MissionEditor.App.Controls.SourceContextView"
- xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:MissionEditor.App.Controls">
  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid Margin="8">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <TextBlock Text="{Binding SourceContextHeading}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,10"/>
   <ListBox Grid.Row="1" x:Name="ContextChoices" ItemsSource="{Binding SourceContextLinks}" SelectedItem="{Binding SelectedResourceLink, Mode=TwoWay}"
    DisplayMemberPath="ContextLabel" MaxHeight="170" ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" Margin="0,0,0,8"/>
-  <TextBox Grid.Row="2" Text="{Binding SourceContextText, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
-   VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" BorderThickness="0" Padding="8" MinHeight="120" MaxHeight="360"/>
+  <controls:RdlTextViewer Grid.Row="2" Text="{Binding SourceContextContent, Mode=OneWay}" MinHeight="120" MaxHeight="360"/>
   <StackPanel Grid.Row="3" Margin="0,10,0,0">
    <TextBlock Text="{Binding SourceContextErrors}" Foreground="{StaticResource ErrorBrush}" TextWrapping="Wrap"/>
+   <TextBlock Text="{Binding SourceContextCompatibility}" Foreground="{StaticResource WarningBrush}" TextWrapping="Wrap"/>
    <TextBlock Text="{Binding SourceContextOrigin}" Foreground="{StaticResource MutedTextBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,4" MaxHeight="100" ToolTip="{Binding SourceContextOrigin}"/>
    <Button Content="Ressource bearbeiten…" Click="OnEditResource" HorizontalAlignment="Left" Margin="0,4,0,8">
     <Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Style.Triggers><DataTrigger Binding="{Binding SelectedResourceLink}" Value="{x:Null}"><Setter Property="IsEnabled" Value="False"/></DataTrigger></Style.Triggers></Style></Button.Style>

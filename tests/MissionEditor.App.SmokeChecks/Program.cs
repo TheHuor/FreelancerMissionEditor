@@ -47,6 +47,7 @@ internal static partial class Program
     alignmentWindow.UpdateLayout ();
     alignmentWindow.Close ();
     CheckListSelection ();
+    CheckHexEditor ();
     vm.Load (fixture);
     window.Show ();
     window.UpdateLayout ();
@@ -264,7 +265,12 @@ internal static partial class Program
     about.Close ();
     CheckResourceNavigation (window);
     CheckSourceWorkspace (window);
+    CheckRdlSourceViewer(window);
     CheckResourceEditing (window);
+    CheckStringRdlPresentation (window);
+    CheckStringRawScope(window);
+    CheckVisualRdl(window);
+    CheckResourceCompatibility(window);
 
     // Agent connection: paths with spaces and backslashes survive all three configuration formats.
     const string ServerPath = @"C:\Program Files\Mission Editor\MissionEditor.Mcp.exe";
