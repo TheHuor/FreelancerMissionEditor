@@ -74,8 +74,8 @@ public sealed class DestroyedCounterCheck : IMissionCheck
             + (cloaked
                 ? " Die Ziele sind bis dahin getarnt (Act_Cloak … false erst später) – vermutlich gewollt."
                 : " Was vorher abgeschossen wird, zählt nie – der Trigger kann hängen bleiben."),
-            "Beim Aktivieren setzt die Engine den Zähler von Cnd_Destroyed auf 0 und zählt nur, solange der Trigger aktiv ist (fl_decomp "
-            + "CndDestroyed::OnActivate). Abhilfe: den Zähltrigger schon im spawnenden Trigger per Act_ActTrig aktivieren, die Ziele erst im "
+            "Beim Aktivieren setzt die Engine den Zähler von Cnd_Destroyed auf 0 und zählt nur, solange der Trigger aktiv ist. "
+            + "Abhilfe: den Zähltrigger schon im spawnenden Trigger per Act_ActTrig aktivieren, die Ziele erst im "
             + "aktivierenden Trigger spawnen oder sie bis dahin tarnen (Act_Cloak = <Ziel>, true / false).",
             spawn.Line.Number);
         break;

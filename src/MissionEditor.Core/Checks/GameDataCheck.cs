@@ -115,7 +115,7 @@ public sealed class GameDataCheck : IMissionCheck
     {
       return new Finding (FindingSeverity.Error, CheckId, line.Number, subject,
           $"{line.Key} = {line.RawValue}: die Argumente sind vertauscht – '{line.GetValue (0)}' ist eine Fraktion, an erster Stelle steht aber das Objekt bzw. Label.",
-          "Die Engine liest Act_SetRep als <Objekt oder Label>, <Fraktion>, <Wert> (fl_decomp ActSetRep::Parse). In dieser Reihenfolge findet sie kein "
+          "Die Engine liest Act_SetRep als <Objekt oder Label>, <Fraktion>, <Wert>. In dieser Reihenfolge findet sie kein "
           + "Objekt namens Fraktion und tut nichts. Abhilfe: die ersten beiden Werte tauschen, z. B. 'Act_SetRep = "
           + $"{line.GetValue (1)}, {line.GetValue (0)}, {line.GetValue (2)}'.");
     }

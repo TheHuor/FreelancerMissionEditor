@@ -56,8 +56,8 @@ public sealed class SavePointCheck : IMissionCheck
         yield return new Finding (FindingSeverity.Warning, Id, lost.Number, target.Nickname,
             $"{lost.Key} im Speicherziel '{target.Nickname}' (Cnd_True) läuft beim Laden des Speicherpunkts von '{saver.Nickname}' sofort, noch während "
             + "der Spielstand gelesen wird – der Wegpunkt bzw. das Popup geht verloren.",
-            "Beim Laden schickt die Engine MissionStart, noch während sie den Spielstand liest, und prüft das Speicherziel dabei sofort "
-            + "(fl_decomp Story.cpp und ActivateMissionTrigger; im StoryChain-Spieltest 2026-10-30 bestätigt). Abhilfe: Wegpunkt und Popup in "
+            "Beim Laden schickt die Engine MissionStart, noch während sie den Spielstand liest, und prüft das Speicherziel dabei sofort. "
+            + "Abhilfe: Wegpunkt und Popup in "
             + "einen Trigger verschieben, den das Speicherziel per Act_ActTrig aktiviert (der läuft erst im Spiel), oder statt Cnd_True "
             + "'Cnd_Timer = 1, 1, RUN_ON_BASE' verwenden.",
             save.Line.Number);
