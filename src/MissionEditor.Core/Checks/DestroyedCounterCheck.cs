@@ -80,12 +80,24 @@ public sealed class DestroyedCounterCheck : IMissionCheck
                   ? $" Was vorher abgeschossen wird, zählt nie – dann fehlen nur die Aktionen von '{trigger.Nickname}' ({Effects (trigger)}); am Ablauf hängt der Trigger nicht."
                   : " Was vorher abgeschossen wird, zählt nie – der Trigger kann hängen bleiben."),
             "Beim Aktivieren setzt die Engine den Zähler von Cnd_Destroyed auf 0 und zählt nur, solange der Trigger aktiv ist. "
-            + "Abhilfe: den Zähltrigger schon im spawnenden Trigger per Act_ActTrig aktivieren, die Ziele erst im "
-            + "aktivierenden Trigger spawnen oder sie bis dahin tarnen (Act_Cloak = <Ziel>, true / false).",
+            + Remedy (spawner, path[^2], trigger, target, spawns.Where (item => item.Spawn.Source == spawner).Select (item => item.Spawn.Line.Number)),
             spawn.Line.Number);
         break;
       }
     }
+  }
+
+  // The three ways out, named with the triggers and lines of this finding: start counting with the spawn, spawn only
+  // where counting starts, or keep the targets cloaked until then.
+  private static string Remedy (Trigger spawner, Trigger activator, Trigger counter, string target, IEnumerable<int> spawnLines)
+  {
+    int? activation = activator.References.FirstOrDefault (reference => reference.Kind == TriggerReferenceKind.Activate && reference.Target == counter)?.Line.Number;
+    string lines = string.Join (", ", spawnLines.Distinct ().Order ());
+    return $"Abhilfe – eine der Möglichkeiten: 'Act_ActTrig = {counter.Nickname}' von '{activator.Nickname}'"
+        + (activation is { } number ? $" (Zeile {number})" : "")
+        + $" nach '{spawner.Nickname}' verschieben, dann zählt er ab dem Spawn; oder die Spawn-Aktionen (Zeile {lines}) von '{spawner.Nickname}' "
+        + $"nach '{activator.Nickname}' verschieben, dann gibt es die Ziele erst, wenn gezählt wird; oder die Ziele bis dahin tarnen "
+        + $"('Act_Cloak = {target}, true' in '{spawner.Nickname}', 'Act_Cloak = {target}, false' in '{activator.Nickname}').";
   }
 
   // The trigger's action keys, e.g. "Act_SendComm, Act_AdjHealth".

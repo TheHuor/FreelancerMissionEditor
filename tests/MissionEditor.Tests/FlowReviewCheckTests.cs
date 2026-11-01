@@ -84,6 +84,10 @@ public class FlowReviewCheckTests
     Finding race = Assert.Single (findings, finding => finding.Subject == "count_relays");
     Assert.Equal (FindingSeverity.Warning, race.Severity);
     Assert.Contains ("spawn_relays → approach → count_relays", race.Message);
+    // The remedy names this finding's triggers and lines, not placeholders.
+    Assert.Matches (@"'Act_ActTrig = count_relays' von 'approach' \(Zeile \d+\) nach 'spawn_relays'", race.Hint);
+    Assert.Matches (@"Spawn-Aktionen \(Zeile \d+, \d+, \d+\) von 'spawn_relays' nach 'approach'", race.Hint);
+    Assert.Contains ("'Act_Cloak = relay, true' in 'spawn_relays'", race.Hint);
     Finding count = Assert.Single (findings, finding => finding.Subject == "too_many");
     Assert.Contains ("höchstens 3", count.Message);
   }
