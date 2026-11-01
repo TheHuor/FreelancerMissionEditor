@@ -41,13 +41,15 @@ internal sealed class ResourceDllFixture : IDisposable
   public void Dispose () => Directory.Delete (Root, true);
 
   public void AddInfocard (int localId, string rdl)
+      => AddInfocardBytes (localId, Encoding.Unicode.GetBytes (rdl + "\0"));
+
+  public void AddInfocardBytes (int localId, byte[] bytes, ushort language = 1033)
   {
     IntPtr update = BeginUpdateResourceW (DllPath, false);
     if (update == IntPtr.Zero) throw new Win32Exception ();
     try
     {
-      byte[] bytes = Encoding.Unicode.GetBytes (rdl + "\0");
-      if (!UpdateResourceW (update, (IntPtr)23, (IntPtr)localId, 1033, bytes, (uint)bytes.Length)) throw new Win32Exception ();
+      if (!UpdateResourceW (update, (IntPtr)23, (IntPtr)localId, language, bytes, (uint)bytes.Length)) throw new Win32Exception ();
       if (!EndUpdateResourceW (update, false)) throw new Win32Exception ();
       update = IntPtr.Zero;
     }

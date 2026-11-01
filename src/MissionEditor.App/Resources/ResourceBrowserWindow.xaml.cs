@@ -155,6 +155,7 @@ public partial class ResourceBrowserWindow : Window
     TechnicalText.Text = string.Empty; DraftText.Text = string.Empty;
     ResolutionText.Text = "ID auswählen, um Text und Fundstellen zu lesen";
     StringEditor.Clear(); XmlEditor.Clear(); PreviewText.Clear();
+    RawBytesText.Clear(); RawTab.Visibility = Visibility.Collapsed;
     ResetUndo(StringEditor); ResetUndo(XmlEditor);
     LanguageBox.ItemsSource = null; UsageList.ItemsSource = null;
     UsageExpander.Header = "Wird verwendet von · Aktuelle Mission";
@@ -187,7 +188,7 @@ public partial class ResourceBrowserWindow : Window
   {
     var usages = _referencesByIds[ids].ToArray();
     ResourceEntry entry = _catalogByIds.TryGetValue(ids, out var variants) ? variants[0] : _gameData?.Texts?.Resolve(ids) ?? ResourceEntry.Missing(ids);
-    ResourceEntry[] available = variants ?? (entry.IsResolved ? _gameData?.Texts?.Variants(ids).ToArray() : null) ?? [entry];
+    ResourceEntry[] available = variants ?? (entry.HasRawResource ? _gameData?.Texts?.Variants(ids).ToArray() : null) ?? [entry];
     bool hasDraft = _drafts.Keys.Any(key => key.DllPath == entry.Identity?.DllPath && key.LocalId == entry.Identity?.LocalId);
     if (entry.Identity is { } identity && _drafts.TryGetValue(identity, out var draft))
     {
@@ -268,8 +269,8 @@ public partial class ResourceBrowserWindow : Window
     ResourceList.ScrollIntoView(row);
     _updating = false;
     _selected = row;
-    var variants = _catalogByIds.TryGetValue(row.Ids, out var found) ? found.Where(item => item.IsResolved).ToArray()
-        : row.Entry.IsResolved ? _gameData?.Texts?.Variants(row.Ids).ToArray() ?? Array.Empty<ResourceEntry>() : Array.Empty<ResourceEntry>();
+    var variants = _catalogByIds.TryGetValue(row.Ids, out var found) ? found.Where(item => item.HasRawResource).ToArray()
+        : row.Entry.HasRawResource ? _gameData?.Texts?.Variants(row.Ids).ToArray() ?? Array.Empty<ResourceEntry>() : Array.Empty<ResourceEntry>();
     _updating = true;
     // Labels explicitly identify the actual language and resource kind, never a guessed default.
     LanguageBox.ItemsSource = (variants.Length == 0 ? new[] { row.Entry } : variants).Select(item => new LanguageChoice(item)).ToArray();
@@ -291,10 +292,10 @@ public partial class ResourceBrowserWindow : Window
     _updating = true;
     _editorDirty = false;
     IdText.Text = $"IDS {entry.Ids}";
-    MetadataText.Text = entry.IsResolved && entry.Identity is { } key ? $"{key.Kind} · {Path.GetFileName(key.DllPath)} · {LanguageName(key.Language)}" : "Keine aufgelöste Ressource";
+    MetadataText.Text = entry.HasRawResource && entry.Identity is { } key ? $"{key.Kind} · {Path.GetFileName(key.DllPath)} · {LanguageName(key.Language)}" : "Keine aufgelöste Ressource";
     MetadataText.ToolTip = entry.Identity?.DllPath;
     TechnicalText.Text = entry.Identity is { } identity ? $"DLL: {identity.DllPath}\nSlot: {identity.Slot} · lokale ID: {identity.LocalId} · "
-        + (entry.IsResolved ? $"Sprache: {identity.Language} (0x{identity.Language:X4})" : "Keine Sprachvariante ermittelt") : entry.StatusText;
+        + (entry.HasRawResource ? $"Sprache: {identity.Language} (0x{identity.Language:X4})" : "Keine Sprachvariante ermittelt") : entry.StatusText;
     if (entry.Identity is { } saved && _backups.TryGetValue(saved.DllPath, out string? backup)) TechnicalText.Text += "\nLetzte Sicherung: " + backup;
     ResolutionText.Text = entry.StatusText + (entry.Identity?.Kind == ResourceKind.Infocard && !entry.StatusText.Contains("Klartext aus Infocard") ? " · Klartext aus Infocard" : "");
     string content = entry.Identity is { } id && _drafts.TryGetValue(id, out var draft) ? draft.EditedText : entry.RawText ?? entry.Text;
@@ -305,6 +306,8 @@ public partial class ResourceBrowserWindow : Window
     StringEditor.Visibility = entry.Identity?.Kind == ResourceKind.Infocard ? Visibility.Collapsed : Visibility.Visible;
     SegmentScroll.Visibility = entry.Identity?.Kind == ResourceKind.Infocard ? Visibility.Visible : Visibility.Collapsed;
     XmlTab.Visibility = entry.Identity?.Kind == ResourceKind.Infocard ? Visibility.Visible : Visibility.Collapsed;
+    RawTab.Visibility = entry.HasRawResource ? Visibility.Visible : Visibility.Collapsed;
+    RawBytesText.Text = entry.RawBytes is { } rawBytes ? FormatRawBytes(rawBytes) : string.Empty;
     if (!entry.IsResolved || (ContentTabs.SelectedItem == XmlTab && XmlTab.Visibility == Visibility.Collapsed)) ContentTabs.SelectedIndex = 0;
     StringEditor.Text = content;
     XmlEditor.Text = content;
@@ -340,6 +343,11 @@ public partial class ResourceBrowserWindow : Window
     }
     else PreviewText.Text = content;
     if (!entry.IsResolved) PreviewText.Text = entry.StatusText;
+    if (entry.Status == ResourceStatus.DecodeError)
+    {
+      PreviewText.Text = _infocard?.PlainText ?? content;
+      ContentTabs.SelectedItem = XmlTab;
+    }
     _updating = false;
     UpdateDraftStatus();
     UpdateEnabled();
@@ -413,7 +421,7 @@ public partial class ResourceBrowserWindow : Window
   {
     if (dirty && _entry?.Identity is { } identity && !_fileHashes.ContainsKey(identity.DllPath))
     {
-      try { _fileHashes[identity.DllPath] = ResourceDraft.Create(_entry, _baseline).OriginalFileHash; }
+      try { _fileHashes[identity.DllPath] = ResourceDraft.CaptureSourceHash(_entry); }
       catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
       {
         // A conflict sentinel can never authorize an original write. It retains the stale
@@ -430,7 +438,7 @@ public partial class ResourceBrowserWindow : Window
   private bool ApplyEditor()
   {
     if (!_editorDirty) return true;
-    if (_entry?.Identity is not { } identity || !_entry.IsResolved) return false;
+    if (_entry?.Identity is not { } identity || !_entry.CanEdit) return false;
     string text = identity.Kind == ResourceKind.Infocard ? XmlEditor.Text : StringEditor.Text;
     try
     {
@@ -567,7 +575,7 @@ public partial class ResourceBrowserWindow : Window
     {
       var catalog = await Task.Run(() => texts.Enumerate(cancellation.Token, progress), cancellation.Token);
       if (generation != _generation || cancellation.IsCancellationRequested) return;
-      _catalog = catalog.ToList(); _catalogByIds = _catalog.Where(item => item.IsResolved).GroupBy(item => item.Ids).ToDictionary(group => group.Key, group => group.ToArray()); _catalogReady = true;
+      _catalog = catalog.ToList(); _catalogByIds = _catalog.Where(item => item.HasRawResource).GroupBy(item => item.Ids).ToDictionary(group => group.Key, group => group.ToArray()); _catalogReady = true;
       BuildRows();
       if (_selected is { } row && !_editorDirty) SelectRow(row);
       SetStatus($"Installationskatalog: {_catalog.Select(entry => entry.Ids).Distinct().Count()} IDs. Verwendungen beziehen sich ausschließlich auf die aktuelle Mission.");
@@ -616,8 +624,8 @@ public partial class ResourceBrowserWindow : Window
   }
   private void UpdateEnabled()
   {
-    bool enabled = _entry?.IsResolved == true;
-    EditTab.IsEnabled = enabled; XmlTab.IsEnabled = enabled;
+    bool enabled = _entry?.CanEdit == true;
+    EditTab.IsEnabled = enabled && _entry?.Status != ResourceStatus.DecodeError; XmlTab.IsEnabled = enabled;
     ApplyButton.IsEnabled = enabled; DiscardButton.IsEnabled = enabled; SaveButton.IsEnabled = enabled; SaveAsButton.IsEnabled = enabled;
   }
   private void ConstrainDetailLayout()
@@ -630,6 +638,25 @@ public partial class ResourceBrowserWindow : Window
     if (UsageRow.MaxHeight < 85) UsageExpander.IsExpanded = false;
   }
   private void SetStatus(string text) { if (StatusText is not null) StatusText.Text = text; }
+  private static string FormatRawBytes(byte[] bytes)
+  {
+    var text = new System.Text.StringBuilder($"Unveränderte Originalbytes · {bytes.Length} Bytes\nKorrektur erfolgt im Reiter RDL/XML. Diese Hex-Ansicht ist schreibgeschützt.\n\n");
+    int shown = Math.Min(bytes.Length, 65536);
+    for (int offset = 0; offset < shown; offset += 16)
+      text.Append(offset.ToString("X8")).Append("  ").AppendLine(string.Join(" ", bytes.Skip(offset).Take(Math.Min(16, shown - offset)).Select(value => value.ToString("X2"))));
+    if (shown < bytes.Length) text.AppendLine("Anzeige auf 65536 Bytes begrenzt. Originalbytes speichern… exportiert die vollständigen Daten.");
+    return text.ToString();
+  }
+  private void OnExportRaw(object sender, RoutedEventArgs e)
+  {
+    if (_entry?.RawBytes is not { } bytes) return;
+    var picker = new SaveFileDialog { FileName = $"IDS-{_entry.Ids}-original.bin", Filter = "Originalbytes (*.bin)|*.bin", OverwritePrompt = true };
+    if (picker.ShowDialog(this) != true) return;
+    if ((_gameData?.Texts?.DllPaths ?? []).Any(path => string.Equals(Path.GetFullPath(path), Path.GetFullPath(picker.FileName), StringComparison.OrdinalIgnoreCase)))
+    { SetStatus("Rohdatenexport darf keine registrierte Ressourcen-DLL überschreiben. Bitte eine separate .bin-Datei wählen."); return; }
+    try { File.WriteAllBytes(picker.FileName, bytes); SetStatus("Originalbytes gespeichert: " + picker.FileName); }
+    catch (Exception error) when (error is IOException or UnauthorizedAccessException) { SetStatus("Rohdaten konnten nicht exportiert werden: " + error.Message); }
+  }
   private static void ResetUndo(TextBox editor) { editor.IsUndoEnabled = false; editor.IsUndoEnabled = true; }
   private void ReleaseUnusedHash(string file) { if (!_drafts.Keys.Any(key => string.Equals(key.DllPath, file, StringComparison.OrdinalIgnoreCase))) _fileHashes.Remove(file); }
   private static bool MatchesVariant(ResourceEntry entry, string query, int kind, int ids) =>
@@ -657,7 +684,7 @@ public partial class ResourceBrowserWindow : Window
   }
   private sealed record LanguageChoice(ResourceEntry Entry)
   {
-    public string Label => Entry.IsResolved && Entry.Identity is { } id ? $"{LanguageName(id.Language)} · {id.Kind}" : "Keine Sprachvariante";
+    public string Label => Entry.HasRawResource && Entry.Identity is { } id ? $"{LanguageName(id.Language)} · {id.Kind}" : "Keine Sprachvariante";
     public override string ToString() => Label;
   }
   private sealed record DllChoice(string? Path, int Slot)
@@ -673,7 +700,7 @@ public partial class ResourceBrowserWindow : Window
   private sealed record ResourceRow(int Ids, ResourceEntry Entry, IReadOnlyList<IdsReference> References, bool HasDraft, string? DllPath, IReadOnlyList<ResourceEntry> Variants)
   {
     public string IdLabel => Ids + (HasDraft ? " *" : "");
-    public string Preview => Entry.IsResolved ? Entry.Text.Replace('\r', ' ').Replace('\n', ' ') : Entry.StatusText;
+    public string Preview => Entry.HasRawResource ? Entry.Text.Replace('\r', ' ').Replace('\n', ' ') : Entry.StatusText;
     public string Categories => string.Join(", ", References.Select(item => item.Category).Distinct());
     public string Detail => $"{Path.GetFileName(DllPath) ?? "DLL nicht aufgelöst"} · {(References.Count == 0 ? "Keine Verwendung in aktueller Mission" : Categories)}";
   }

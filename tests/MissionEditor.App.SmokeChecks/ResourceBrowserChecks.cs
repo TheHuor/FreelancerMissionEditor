@@ -102,7 +102,40 @@ internal static partial class Program
         "installation switch clears previous texts and edit buffers");
     browser.Close ();
     CheckResourceIndexCompletion (owner);
+    CheckResourceRepair (owner);
     owner.Activate ();
+  }
+
+  private static void CheckResourceRepair (Window owner)
+  {
+    using var fixture = new ResourceDllFixture ();
+    byte[] malformed = System.Text.Encoding.Unicode.GetBytes ("\uFEFF" + ResourceDllFixture.Card + "  ").Concat (new byte[] { 0 }).ToArray ();
+    fixture.AddInfocardBytes (51, malformed);
+    var game = GameData.Load (fixture.Root);
+    var browser = new ResourceBrowserWindow { Owner = owner, Width = 1120, Height = 760 };
+    browser.RefreshContext (null, game, null); browser.Show (); browser.NavigateToId (51);
+    var xml = (TextBox)browser.FindName ("XmlEditor");
+    var tabs = (TabControl)browser.FindName ("ContentTabs");
+    if (tabs.SelectedItem != browser.FindName ("XmlTab") || !xml.Text.Contains ('\uFFFD')
+        || !((TextBox)browser.FindName ("RawBytesText")).Text.Contains (malformed.Length + " Bytes")
+        || !((TextBlock)browser.FindName ("MetadataText")).Text.Contains ("1033")
+        || !((Button)browser.FindName ("SaveButton")).IsEnabled)
+      throw new Exception ("Malformed infocard must expose original bytes, actual language and editable repair XML");
+    SavePreview (browser, "resource-infocard-repair-xml");
+    tabs.SelectedItem = browser.FindName ("RawTab");
+    SavePreview (browser, "resource-infocard-repair-bytes");
+    tabs.SelectedItem = browser.FindName ("XmlTab");
+    xml.Text += " ";
+    ((Button)browser.FindName ("ApplyButton")).RaiseEvent (new RoutedEventArgs (ButtonBase.ClickEvent));
+    if (!((TextBlock)browser.FindName ("StatusText")).Text.Contains ("Ersetzungszeichen"))
+      throw new Exception ("Repair cannot silently save replacement characters");
+    xml.Text = xml.Text.Replace ("\uFFFD", "");
+    ((Button)browser.FindName ("SaveButton")).RaiseEvent (new RoutedEventArgs (ButtonBase.ClickEvent));
+    if (game.Texts!.Resolve (51, 1033).Status != ResourceStatus.Resolved
+        || game.Texts.Resolve (1, 1033).Text != ResourceDllFixture.LongText)
+      throw new Exception ("Validated infocard repair must reload successfully and preserve other entries");
+    browser.Close ();
+    Console.WriteLine ("PASS malformed infocard exposes original bytes and editable XML; repair validates and saves without losing neighbors");
   }
 
   private static void CheckResourceIndexCompletion (Window owner)

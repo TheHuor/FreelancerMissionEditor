@@ -129,12 +129,22 @@ public sealed class GameText
       }
       else if (blob.Key.Type == "#23" && resourceId is >= 0 and <= 65535)
       {
-        string raw = ResourceEncoding.ReadInfocard (blob.Bytes);
+        string raw;
+        ResourceStatus status = ResourceStatus.Resolved;
+        string statusText = "Klartext aus Infocard";
+        try { raw = ResourceEncoding.ReadInfocard (blob.Bytes); }
+        catch (System.Text.DecoderFallbackException error)
+        {
+          raw = ResourceEncoding.InfocardRepairText (blob.Bytes);
+          status = ResourceStatus.DecodeError;
+          statusText = "Infocard vorhanden, Textkodierung fehlerhaft: " + error.Message
+              + " Rohdaten sind erhalten. Im RDL/XML-Reiter korrigieren; ungültige Bytes erscheinen als �.";
+        }
         string text;
         try { text = InfocardDocument.Parse (raw).PlainText; }
         catch (Exception exception) when (exception is System.Xml.XmlException or InvalidDataException) { text = raw; }
         entries.Add (new ((slot << 16) | resourceId, new (_dllPaths[slot], slot, resourceId, ResourceKind.Infocard, blob.Key.Language),
-            ResourceStatus.Resolved, "Klartext aus Infocard", text, raw, (byte[])blob.Bytes.Clone ()));
+            status, statusText, text, raw, (byte[])blob.Bytes.Clone ()));
       }
     }
     return entries;

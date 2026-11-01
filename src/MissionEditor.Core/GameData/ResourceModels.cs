@@ -26,6 +26,8 @@ public enum ResourceStatus
   DllUnreadable,
   /// <summary>The readable DLL has no entry for this ID/type/language.</summary>
   EntryMissing,
+  /// <summary>The actual resource exists, but its encoded text is malformed. Original bytes remain available.</summary>
+  DecodeError,
 }
 
 /// <summary>Identity of an actual language variant in its registered source DLL.</summary>
@@ -37,6 +39,11 @@ public sealed record ResourceEntry (int Ids, ResourceIdentity? Identity, Resourc
 {
   /// <summary>Whether the entry exists and was read successfully.</summary>
   public bool IsResolved => Status == ResourceStatus.Resolved;
+  /// <summary>An actual resource was read, including one needing text repair.</summary>
+  public bool HasRawResource => Identity is not null && RawBytes is not null;
+  /// <summary>Existing valid resources and malformed infocards with repair text can be edited.</summary>
+  public bool CanEdit => IsResolved || (Status == ResourceStatus.DecodeError && HasRawResource
+      && Identity!.Kind == ResourceKind.Infocard && RawText is not null);
 
   /// <summary>A reference remains navigable even without loaded resources.</summary>
   public static ResourceEntry Missing (int ids, ResourceStatus status = ResourceStatus.NoInstallation,

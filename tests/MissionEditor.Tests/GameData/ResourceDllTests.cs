@@ -14,6 +14,51 @@ public sealed class ResourceDllTests : IDisposable
   private GameText Texts () => GameData.Load (_root).Texts!;
 
   [Fact]
+  public void MalformedInfocardRetainsIdentityBytesAndRepairTextWithoutHidingOtherEntries ()
+  {
+    byte[] malformed = System.Text.Encoding.Unicode.GetBytes ("\uFEFF" + Card + "  ").Concat (new byte[] { 0 }).ToArray ();
+    _fixture.AddInfocardBytes (51, malformed);
+    _fixture.AddInfocardBytes (51, System.Text.Encoding.Unicode.GetBytes ("<RDL><TEXT>Deutsch erhalten</TEXT></RDL>\0"), 1031);
+    var texts = Texts ();
+    var broken = texts.Resolve (51, 1033);
+    Assert.Equal (ResourceStatus.DecodeError, broken.Status);
+    Assert.Equal ((ushort)1033, broken.Identity!.Language);
+    Assert.Equal (malformed, broken.RawBytes);
+    Assert.Contains ('\uFFFD', broken.RawText!);
+    Assert.Contains (texts.Enumerate (), item => item.Ids == 51 && item.Status == ResourceStatus.DecodeError);
+    Assert.Equal (LongText, texts.Resolve (1, 1033).Text);
+    Assert.Throws<InvalidDataException> (() => ResourceDraft.Create (broken, broken.RawText!));
+    string repaired = broken.RawText!.Replace ("\uFFFD", "");
+    string copy = Path.Combine (_root, "repaired.dll");
+    byte[] original = File.ReadAllBytes (DllPath);
+    ResourceWriter.Save ([ResourceDraft.Create (broken, repaired)], copy);
+    Assert.Equal (original, File.ReadAllBytes (DllPath));
+    File.Copy (copy, DllPath, true);
+    texts.Reload ();
+    Assert.Equal (ResourceStatus.Resolved, texts.Resolve (51, 1033).Status);
+    Assert.Equal (repaired, texts.Resolve (51, 1033).RawText);
+    Assert.Equal ("Deutsch", texts.Resolve (1, 1031).Text);
+    Assert.Equal ("Deutsch erhalten", texts.Resolve (51, 1031).Text);
+  }
+
+  [Fact]
+  public void InvalidUtf8BytesAreMarkedAndRequireExplicitCorrection ()
+  {
+    byte[] malformed = System.Text.Encoding.UTF8.GetBytes ("<RDL><TEXT>Bad ").Concat (new byte[] { 0xFF })
+        .Concat (System.Text.Encoding.UTF8.GetBytes ("</TEXT></RDL>")).ToArray ();
+    _fixture.AddInfocardBytes (51, malformed);
+    var texts = Texts ();
+    var broken = texts.Resolve (51, 1033);
+    Assert.Equal (ResourceStatus.DecodeError, broken.Status);
+    Assert.Contains ('\uFFFD', broken.RawText!);
+    Assert.Throws<InvalidDataException> (() => ResourceDraft.Create (broken, broken.RawText!));
+    ResourceWriter.Save ([ResourceDraft.Create (broken, broken.RawText!.Replace ("\uFFFD", "fixed"))]);
+    texts.Reload ();
+    Assert.Equal ("Bad fixed", texts.Resolve (51, 1033).Text);
+    Assert.Equal (ResourceStatus.Resolved, texts.Resolve (51, 1033).Status);
+  }
+
+  [Fact]
   public void FullStringAndActualLanguageAreReadWithoutWhitespaceCleanupOrTruncation ()
   {
     GameText texts = Texts ();

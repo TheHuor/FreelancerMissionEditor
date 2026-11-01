@@ -51,6 +51,10 @@
       <TabItem Header="Vorschau"><TextBox x:Name="PreviewText" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" BorderThickness="0" Padding="9"/></TabItem>
       <TabItem x:Name="EditTab" Header="Bearbeiten"><Grid><TextBox x:Name="StringEditor" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" TextChanged="OnEditorChanged"/><ScrollViewer x:Name="SegmentScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed"><StackPanel x:Name="SegmentPanel"/></ScrollViewer></Grid></TabItem>
       <TabItem x:Name="XmlTab" Header="RDL/XML" Visibility="Collapsed"><TextBox x:Name="XmlEditor" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontFamily="Consolas" TextChanged="OnXmlChanged"/></TabItem>
+      <TabItem x:Name="RawTab" Header="Rohdaten (Hex)" Visibility="Collapsed"><DockPanel>
+       <Button DockPanel.Dock="Top" Content="Originalbytes speichern…" Click="OnExportRaw" HorizontalAlignment="Left" Margin="4"/>
+       <TextBox x:Name="RawBytesText" IsReadOnly="True" FontFamily="Consolas" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+      </DockPanel></TabItem>
      </TabControl>
      <WrapPanel Grid.Row="1" Margin="0,7,0,6"><Button x:Name="ApplyButton" Content="Änderungen übernehmen" Click="OnApply"/><Button x:Name="DiscardButton" Content="Diese ID verwerfen" Click="OnDiscard" Margin="6,0,0,0"/><Button x:Name="SaveButton" Content="Speichern" Click="OnSave" Margin="6,0,0,0"/><Button x:Name="SaveAsButton" Content="Speichern unter…" Click="OnSaveAs" Margin="6,0,0,0"/></WrapPanel>
     </Grid>

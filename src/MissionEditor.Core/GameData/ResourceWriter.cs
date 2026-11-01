@@ -9,8 +9,13 @@ public sealed record ResourceDraft (ResourceEntry Original, string EditedText, s
   public static ResourceDraft Create (ResourceEntry original, string editedText)
   {
     Validate (original, editedText);
-    return new (original, editedText, ResourceWriter.Fingerprint (original.Identity!.DllPath));
+    return new (original, editedText, CaptureSourceHash (original));
   }
+
+  /// <summary>Capture the source independently of malformed editor content; original resource bytes are checked on direct save as well.</summary>
+  public static string CaptureSourceHash (ResourceEntry original) => original.HasRawResource
+      ? ResourceWriter.Fingerprint (original.Identity!.DllPath)
+      : throw new InvalidDataException ("Kein vorhandener Ressourceneintrag ausgewählt.");
 
   /// <summary>Validate content without recapturing a draft's file fingerprint; suitable for editing an existing draft.</summary>
   public static void Validate (ResourceEntry original, string editedText) => ResourceWriter.Validate (original, editedText);
@@ -107,7 +112,7 @@ public static class ResourceWriter
 
   internal static void Validate (ResourceEntry original, string text)
   {
-    if (!original.IsResolved || original.Identity is null || original.RawBytes is null)
+    if (!original.CanEdit || original.Identity is null || original.RawBytes is null)
       throw new InvalidDataException ("Nur vorhandene, erfolgreich geladene Ressourcen können bearbeitet werden.");
     if (original.Identity.LocalId is < 0 or > 65535)
       throw new InvalidDataException ("Ungültige lokale Ressourcen-ID.");
@@ -116,7 +121,12 @@ public static class ResourceWriter
       if (text.Length == 0) throw new InvalidDataException ("Ein leerer String würde den Eintrag entfernen. Das Löschen von Ressourcen wird nicht unterstützt.");
       ResourceEncoding.ValidateString (text);
     }
-    else InfocardDocument.Validate (text);
+    else
+    {
+      if (original.Status == ResourceStatus.DecodeError && text.Contains ('\uFFFD'))
+        throw new InvalidDataException ("Ersetzungszeichen � aus fehlerhaften Bytes müssen im RDL/XML-Rohtext ausdrücklich korrigiert werden.");
+      InfocardDocument.Validate (text);
+    }
   }
 
   internal static string Fingerprint (string path)
