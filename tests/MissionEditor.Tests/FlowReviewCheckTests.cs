@@ -384,6 +384,42 @@ public class FlowReviewCheckTests
   }
 
   [Fact]
+  public void DeactivatingAnObjListWhoseShipsAreHandledAnywayIsOnlyAHint ()
+  {
+    // cfmission5-38: the cleanup trigger also gives Juni the 'die' list and destroys her.
+    MissionScript script = Load ("""
+        [ObjList]
+        nickname = juni_follows
+
+        [ObjList]
+        nickname = escort_follows
+
+        [Trigger]
+        nickname = start
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_GiveObjList = juni, juni_follows
+        Act_GiveObjList = escort, escort_follows
+        Act_ActTrig = cleanup
+
+        [Trigger]
+        nickname = cleanup
+        Cnd_Timer = 5
+        Act_DeactTrig = juni_follows
+        Act_DeactTrig = escort_follows
+        Act_GiveObjList = juni, die
+        Act_Destroy = juni, SILENT
+        """);
+    List<Finding> findings = new UnknownTriggerTargetCheck ().Run (script).ToList ();
+    Finding handled = Assert.Single (findings, finding => finding.Message.Contains ("'juni_follows'"));
+    Assert.Equal (FindingSeverity.Info, handled.Severity);
+    Assert.Contains ("nur überflüssig", handled.Message);
+    Assert.Contains ("die Zeile entfernen", handled.Hint);
+    // The escort keeps following: still a warning.
+    Assert.Equal (FindingSeverity.Warning, Assert.Single (findings, finding => finding.Message.Contains ("'escort_follows'")).Severity);
+  }
+
+  [Fact]
   public void DeactivatingARandomEncounterThatIsAlsoDisabledIsOnlyAHint ()
   {
     // The original m13 watch_endgame_object: Act_DeactTrig on the encounter, Act_DisableEnc right after does the job.

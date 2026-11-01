@@ -55,6 +55,16 @@ public sealed class UnknownTriggerTargetCheck : IMissionCheck
           severity = FindingSeverity.Info;
           message += $" Derselbe Trigger schaltet den Zufallskampf in Zeile {disabled.Number} mit Act_DisableEnc ab – die Zeile ist nur überflüssig.";
         }
+        // Likewise on an object list when the same trigger gives every ship that uses it other orders or destroys it
+        // (the cleanup trigger cfmission5-38 of the Crossfire campaign).
+        IniLine? replaced = reference.Kind == TriggerReferenceKind.Deactivate && other?.Kind == ScriptObjectKind.ObjList
+            ? OrdersEnded (script, trigger, reference.TargetName)
+            : null;
+        if (replaced is not null)
+        {
+          severity = FindingSeverity.Info;
+          message += $" Derselbe Trigger beendet die Befehle der Schiffe mit dieser Liste ohnehin ({replaced.Key} in Zeile {replaced.Number}) – die Zeile ist nur überflüssig.";
+        }
         // A misspelt Act_DeactTrig is not harmless when the trigger it meant keeps running and spawns or repeats. Which
         // of several similar names was meant is the author's call, so all running ones are named.
         string[] keepRunning = reference.Kind != TriggerReferenceKind.Deactivate || disabled is not null ? []
@@ -74,10 +84,12 @@ public sealed class UnknownTriggerTargetCheck : IMissionCheck
         string hint = reference.Kind switch
         {
           TriggerReferenceKind.Activate => "Act_ActTrig auf einen Namen ohne [Trigger] ist im Spiel ein stiller No-op – es gibt keine Fehlermeldung, der Ablauf geht dort einfach nicht weiter.",
+          TriggerReferenceKind.Deactivate when replaced is not null =>
+            "Act_DeactTrig schaltet nur Trigger ab; die Befehlsliste beendet hier schon das Act_GiveObjList bzw. Act_Destroy desselben Triggers.",
           TriggerReferenceKind.Deactivate when other?.Kind == ScriptObjectKind.ObjList =>
             "Act_DeactTrig schaltet nur Trigger ab; eine laufende Befehlsliste beendet es nicht. Dafür dem Schiff per Act_GiveObjList eine andere [ObjList] geben.",
           TriggerReferenceKind.Deactivate when disabled is not null =>
-            "Act_DeactTrig schaltet nur Trigger ab; den Zufallskampf schaltet hier schon das Act_DisableEnc desselben Triggers ab. Abhilfe: die Zeile entfernen – am Spielverhalten ändert sich nichts.",
+            "Act_DeactTrig schaltet nur Trigger ab; den Zufallskampf schaltet hier schon das Act_DisableEnc desselben Triggers ab.",
           TriggerReferenceKind.Deactivate when other?.Kind == ScriptObjectKind.RandomEncounter =>
             "Act_DeactTrig schaltet nur Trigger ab; einen Zufallskampf ([MsnRandEnc]) schaltet Act_DisableEnc ab.",
           TriggerReferenceKind.Deactivate when meantKeepsRunning =>
@@ -86,10 +98,48 @@ public sealed class UnknownTriggerTargetCheck : IMissionCheck
           TriggerReferenceKind.Watch => "Cnd_WatchTrigger wartet dann für immer; der Trigger löst nie aus.",
           _ => "Beim Laden dieses Spielstands wird kein Trigger aktiviert – die Mission steht still.",
         };
-        hint += " Trigger-Namen vergleicht die Engine ohne Groß-/Kleinschreibung. Abhilfe: Namen korrigieren oder den fehlenden [Trigger] anlegen"
-            + (reference.Kind == TriggerReferenceKind.Deactivate ? " bzw. die Zeile entfernen." : ".");
+        // The remedy follows from what the name is: a superfluous line goes, another section needs the matching action.
+        hint += disabled is not null || replaced is not null
+            ? " Abhilfe: die Zeile entfernen – am Spielverhalten ändert sich nichts."
+            : other is not null
+              ? " Abhilfe: die passende Aktion verwenden oder die Zeile entfernen."
+              : " Trigger-Namen vergleicht die Engine ohne Groß-/Kleinschreibung. Abhilfe: Namen korrigieren oder den fehlenden [Trigger] anlegen"
+                + (reference.Kind == TriggerReferenceKind.Deactivate ? " bzw. die Zeile entfernen." : ".");
         yield return new Finding (severity, Id, reference.Line.Number, trigger.Nickname, message, hint);
       }
     }
+  }
+
+  // The line in the trigger that ends the orders of every ship using the object list (another Act_GiveObjList or
+  // Act_Destroy on it), or null when a ship keeps them or no ship gets the list.
+  private static IniLine? OrdersEnded (MissionScript script, Trigger trigger, string objList)
+  {
+    var ships = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
+    foreach (Trigger giver in script.EffectiveTriggers)
+    {
+      foreach (IniLine action in giver.Actions)
+      {
+        if (action.IsKey ("Act_GiveObjList") && action.GetValue (1).Equals (objList, StringComparison.OrdinalIgnoreCase)
+            || (action.IsKey ("Act_SpawnShip") || action.IsKey ("Act_SpawnShipRel")) && action.GetValue (1).Equals (objList, StringComparison.OrdinalIgnoreCase))
+          ships.Add (action.GetValue (0));
+      }
+    }
+    foreach (ScriptObject ship in script.Objects.Where (item => item.Kind == ScriptObjectKind.Ship))
+    {
+      if (ship.Section.FindAll ("init_objectives").Any (line => line.GetValue (0).Equals (objList, StringComparison.OrdinalIgnoreCase)))
+        ships.Add (ship.Nickname);
+    }
+    if (ships.Count == 0)
+      return null;
+    IniLine? first = null;
+    foreach (string ship in ships)
+    {
+      IniLine? ending = trigger.Actions.FirstOrDefault (action => action.GetValue (0).Equals (ship, StringComparison.OrdinalIgnoreCase)
+          && (action.IsKey ("Act_Destroy") || action.IsKey ("Act_GiveObjList") && !action.GetValue (1).Equals (objList, StringComparison.OrdinalIgnoreCase)));
+      if (ending is null)
+        return null;
+      first ??= ending;
+    }
+    return first;
   }
 }
