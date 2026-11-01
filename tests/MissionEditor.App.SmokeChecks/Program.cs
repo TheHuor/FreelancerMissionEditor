@@ -11,6 +11,10 @@ internal static class Program
   [STAThread]
   private static void Main ()
   {
+    using var bindingErrors = new StringWriter ();
+    using var bindingListener = new System.Diagnostics.TextWriterTraceListener (bindingErrors);
+    System.Diagnostics.PresentationTraceSources.DataBindingSource.Listeners.Add (bindingListener);
+    System.Diagnostics.PresentationTraceSources.DataBindingSource.Switch.Level = System.Diagnostics.SourceLevels.Error;
     var repository = new DirectoryInfo (AppContext.BaseDirectory);
     while (repository is not null && !File.Exists (Path.Combine (repository.FullName, "MissionEditor.slnx")))
       repository = repository.Parent;
@@ -27,8 +31,86 @@ internal static class Program
         throw new Exception (message);
       Console.WriteLine ("PASS " + message);
     }
+    var alignmentList = new ListBox { ItemsSource = new[] { "first", "second" } };
+    var alignmentWindow = new Window { Content = alignmentList, Width = 320, Height = 200, ShowInTaskbar = false };
+    alignmentWindow.Show ();
+    alignmentWindow.UpdateLayout ();
+    var alignmentItem = (ListBoxItem)alignmentList.ItemContainerGenerator.ContainerFromIndex (0);
+    foreach (var property in new[] { Control.HorizontalContentAlignmentProperty, Control.VerticalContentAlignmentProperty })
+      Assert (System.Windows.Data.BindingOperations.GetBindingExpression (alignmentItem, property) is null,
+          "list item " + property.Name + " does not depend on an ancestor binding");
+    alignmentList.ItemsSource = Array.Empty<string> ();
+    alignmentWindow.UpdateLayout ();
+    alignmentWindow.Close ();
     vm.Load (fixture);
     window.Show ();
+    window.UpdateLayout ();
+    var triggerList = (ListBox)window.FindName ("TriggerList");
+    var triggerRow = (FrameworkElement)triggerList.ItemTemplate.LoadContent ();
+    Assert (triggerRow.FindName ("ConditionBadge") is Border && triggerRow.FindName ("ConditionValue") is TextBlock,
+        "trigger rows separate the coloured condition label from its parameters");
+    foreach (var (key, expected) in new[]
+    {
+      ("Cnd_True", "Always"), ("cnd_timer", "Timer"), ("Cnd_SystemExit", "System"),
+      ("Cnd_Destroyed", "Event"), ("", "None")
+    })
+    {
+      var source = "[Trigger]\nnickname = label_test\n" + (key.Length > 0 ? key + " = first, 2\n" : "") + "Act_ActTrig = missing\n";
+      var script = MissionEditor.Core.Model.MissionScript.FromDocument (MissionEditor.Core.Ini.IniDocument.ParseText (source));
+      var graph = new MissionEditor.Core.Graph.TriggerGraph (script);
+      var labelItem = new TriggerItem (graph.FindNode ("label_test")!, []);
+      Assert (labelItem.ConditionKind == expected, key + " uses the " + expected + " label category");
+      Assert (key.Length == 0 || labelItem.ConditionValue == "first, 2", "label parameters preserve their original text");
+      var missingItem = new TriggerItem (graph.FindNode ("missing")!, []);
+      Assert (missingItem.ConditionKey == "nicht definiert" && missingItem.ConditionValue == "" && missingItem.ConditionKind == "None",
+          "undefined triggers have a neutral readable label");
+    }
+    foreach (var listName in new[] { "TriggerList", "SectionPreview" })
+    {
+      var list = (ListBox)window.FindName (listName);
+      var item = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex (0);
+      Assert (item is not null &&
+          System.Windows.Data.BindingOperations.GetBindingExpression (item, Control.HorizontalContentAlignmentProperty) is null &&
+          System.Windows.Data.BindingOperations.GetBindingExpression (item, Control.VerticalContentAlignmentProperty) is null,
+          listName + " custom selection style uses stable alignment values");
+      if (listName == "TriggerList")
+      {
+        SavePreview (list, "trigger-list");
+        list.Width = 260;
+        window.UpdateLayout ();
+        SavePreview (list, "trigger-list-narrow");
+        list.ClearValue (FrameworkElement.WidthProperty);
+        window.UpdateLayout ();
+      }
+    }
+    foreach (var (name, menu) in new[]
+    {
+      ("agent-menu", ((Button)window.FindName ("AgentMenuButton")).ContextMenu!),
+      ("findings-menu", ((DataGrid)window.FindName ("FindingsGrid")).ContextMenu!)
+    })
+    {
+      menu.PlacementTarget = window;
+      menu.IsOpen = true;
+      menu.UpdateLayout ();
+      Assert (menu.Background == app.FindResource ("SurfaceBrush"), name + " uses the dark surface");
+      foreach (var separator in menu.Items.OfType<Separator> ().Where (entry => entry.Tag is null))
+      {
+        separator.ApplyTemplate ();
+        Assert (separator.Template.FindName ("Line", separator) is Border line && line.Background == app.FindResource ("BorderBrush"),
+            name + " uses subdued theme separators");
+      }
+      var item = menu.Items.OfType<MenuItem> ().First ();
+      item.ApplyTemplate ();
+      Assert (item.Foreground == app.FindResource ("TextBrush"), name + " uses readable theme text");
+      Assert (((ContentPresenter)item.Template.FindName ("Icon", item)).Visibility == Visibility.Collapsed,
+          name + " hides the empty icon gutter");
+      SavePreview (menu, name);
+      Assert (item.Focus (), name + " supports keyboard focus");
+      item.UpdateLayout ();
+      Assert (item.Foreground == app.FindResource ("AccentBrush"), name + " highlights keyboard focus");
+      SavePreview (menu, name + "-focused");
+      menu.IsOpen = false;
+    }
     Assert (vm.Script!.Triggers.Count == 1711, "large fixture loaded (plus placeholder nodes for missing references)");
     foreach (var size in new[] { new Size (1280, 800), new Size (1920, 1080) })
     {
@@ -265,6 +347,12 @@ internal static class Program
     simulation.Close ();
 
     about.Close ();
+    window.Dispatcher.Invoke (() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+    bindingListener.Flush ();
+    Assert (!bindingErrors.ToString ().Split (Environment.NewLine).Any (line => line.Contains ("ListBoxItem") &&
+        (line.Contains ("HorizontalContentAlignment") || line.Contains ("VerticalContentAlignment"))),
+        "list item alignment has no binding errors: " + bindingErrors);
+    System.Diagnostics.PresentationTraceSources.DataBindingSource.Listeners.Remove (bindingListener);
     Console.WriteLine ("ALL CHECKS PASSED");
     File.Delete (tmp);
     File.Delete (tmp + ".bak");
@@ -273,7 +361,7 @@ internal static class Program
   }
 
   // With MISSION_EDITOR_PREVIEW_DIR set, saves a DPI-aware picture of the window there for a visual check.
-  private static void SavePreview (Window window, string name)
+  private static void SavePreview (FrameworkElement window, string name)
   {
     if (Environment.GetEnvironmentVariable ("MISSION_EDITOR_PREVIEW_DIR") is not { Length: > 0 } folder)
       return;
@@ -281,7 +369,10 @@ internal static class Program
     var dpi = VisualTreeHelper.GetDpi (window);
     var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap ((int)(window.ActualWidth * dpi.DpiScaleX), (int)(window.ActualHeight * dpi.DpiScaleY),
         dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
-    bitmap.Render (window);
+    var visual = new DrawingVisual ();
+    using (var drawing = visual.RenderOpen ())
+      drawing.DrawRectangle (new VisualBrush (window), null, new Rect (0, 0, window.ActualWidth, window.ActualHeight));
+    bitmap.Render (visual);
     var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder ();
     encoder.Frames.Add (System.Windows.Media.Imaging.BitmapFrame.Create (bitmap));
     using var stream = File.Create (Path.Combine (folder, name + ".png"));

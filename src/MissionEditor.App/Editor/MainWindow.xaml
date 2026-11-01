@@ -21,7 +21,7 @@
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
     <!-- List item with a clearly visible selection (also when the list has no focus): light blue
          background and a blue bar on the left. Background stays bindable for severity tints. -->
-    <Style x:Key="ClearSelectionItem" TargetType="ListBoxItem">
+    <Style x:Key="ClearSelectionItem" TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Padding" Value="8,6" />
       <Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}" />
@@ -97,9 +97,11 @@
         <Button x:Name="AgentMenuButton" Content="KI-Agent ▾" Click="OnAgentMenu" Margin="12,0,0,0" ToolTip="Aufträge für Claude oder Codex kopieren und den MCP-Server einrichten">
           <Button.ContextMenu>
             <ContextMenu>
+              <Separator Style="{StaticResource MenuGroupHeading}" Tag="Direkt im Editor" />
               <MenuItem Header="Frag KI: Mission erklären" Click="OnAskAiToExplainMission" FontWeight="SemiBold" ToolTip="Die Antwort erscheint hier im Editor (Anbieter unter „KI-Einstellungen…“)" />
               <MenuItem Header="Frag KI: Lücken und Brüche" Click="OnAskAiForGapsAndBreaks" FontWeight="SemiBold" ToolTip="Die Antwort erscheint hier im Editor (Anbieter unter „KI-Einstellungen…“)" />
               <Separator />
+              <Separator Style="{StaticResource MenuGroupHeading}" Tag="Auftrag für externen Agenten kopieren" />
               <MenuItem Header="Mission erklären lassen" Click="OnAskAgentToExplainMission" ToolTip="Auftrag kopieren: Ablauf und Geschichte der Mission in Spielreihenfolge erklären, mit den tragenden Triggern" />
               <MenuItem Header="Auf Lücken und Brüche prüfen lassen" Click="OnAskAgentForGapsAndBreaks" ToolTip="Auftrag kopieren: unerreichbare Trigger, Sackgassen, unmögliche Bedingungen und fehlende Pfade suchen" />
               <MenuItem Header="Alle Funde erklären lassen" Click="OnAskAgentForAllFindings" ToolTip="Auftrag kopieren: Funde der Mission zusammenfassen, erklären und Korrekturen vorschlagen" />
@@ -175,24 +177,61 @@
           </ListBox.ItemContainerStyle>
           <ListBox.ItemTemplate>
             <DataTemplate DataType="viewModels:TriggerItem">
-              <DockPanel>
-                <Button DockPanel.Dock="Right" Margin="4,0,0,0" Cursor="Hand" Click="OnFindingSignClicked" Visibility="{Binding HasFindings, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding FindingsToolTip}">
-                  <Button.Template>
-                    <ControlTemplate TargetType="Button">
-                      <Border Background="Transparent" Padding="2">
-                        <ContentControl Template="{StaticResource SeverityBadge}" />
-                      </Border>
-                    </ControlTemplate>
-                  </Button.Template>
-                </Button>
-                <StackPanel>
-                  <TextBlock x:Name="NameText" Text="{Binding Name}" ToolTip="{Binding Name}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding Detail}" FontFamily="Consolas" FontSize="12" Foreground="{StaticResource MutedTextBrush}" TextTrimming="CharacterEllipsis" />
+              <Grid>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="NameText" Text="{Binding Name}" ToolTip="{Binding Name}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                  <TextBlock Text="Start aktiv" Margin="6,0,0,0" FontSize="11" Foreground="{StaticResource ActiveBrush}" VerticalAlignment="Center" Visibility="{Binding IsInitiallyActive, Converter={StaticResource BoolToVisibility}}" ToolTip="InitState = ACTIVE: Dieser Trigger ist ab Missionsbeginn aktiv." />
+                  <Button Margin="6,0,0,0" MinHeight="0" Cursor="Hand" Click="OnFindingSignClicked" Visibility="{Binding HasFindings, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding FindingsToolTip}" AutomationProperties.Name="{Binding FindingsToolTip}">
+                    <Button.Template>
+                      <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent" Padding="2">
+                          <ContentControl Template="{StaticResource SeverityBadge}" />
+                        </Border>
+                      </ControlTemplate>
+                    </Button.Template>
+                  </Button>
                 </StackPanel>
-              </DockPanel>
+                <TextBlock x:Name="SourceLine" Grid.Column="2" Text="{Binding LineNumber, StringFormat=Z. {0}}" Margin="12,0,0,0" FontSize="11" Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center" ToolTip="Position im Quelltext" />
+                <Grid Grid.Row="1" Grid.ColumnSpan="3" Margin="0,4,0,0" ToolTip="{Binding Detail}">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" MaxWidth="170" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <Border x:Name="ConditionBadge" Background="{StaticResource ConditionEventSurfaceBrush}" CornerRadius="3" Padding="6,1" VerticalAlignment="Center">
+                    <TextBlock x:Name="ConditionLabel" Text="{Binding ConditionKey}" Foreground="{StaticResource ConditionEventTextBrush}" FontFamily="Consolas" FontSize="11" TextTrimming="CharacterEllipsis" />
+                  </Border>
+                  <TextBlock x:Name="ConditionValue" Grid.Column="1" Text="{Binding ConditionValue}" Margin="7,0,0,0" FontFamily="Consolas" FontSize="12" Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                </Grid>
+              </Grid>
               <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding ConditionKind}" Value="Always">
+                  <Setter TargetName="ConditionBadge" Property="Background" Value="{StaticResource ConditionNeutralSurfaceBrush}" />
+                  <Setter TargetName="ConditionLabel" Property="Foreground" Value="{StaticResource ConditionNeutralTextBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding ConditionKind}" Value="None">
+                  <Setter TargetName="ConditionBadge" Property="Background" Value="{StaticResource ConditionNeutralSurfaceBrush}" />
+                  <Setter TargetName="ConditionLabel" Property="Foreground" Value="{StaticResource ConditionNeutralTextBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding ConditionKind}" Value="Timer">
+                  <Setter TargetName="ConditionBadge" Property="Background" Value="{StaticResource ConditionTimerSurfaceBrush}" />
+                  <Setter TargetName="ConditionLabel" Property="Foreground" Value="{StaticResource ConditionTimerTextBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding ConditionKind}" Value="System">
+                  <Setter TargetName="ConditionBadge" Property="Background" Value="{StaticResource ConditionSystemSurfaceBrush}" />
+                  <Setter TargetName="ConditionLabel" Property="Foreground" Value="{StaticResource ConditionSystemTextBrush}" />
+                </DataTrigger>
                 <DataTrigger Binding="{Binding IsMissing}" Value="True">
                   <Setter TargetName="NameText" Property="Foreground" Value="{StaticResource ErrorBrush}" />
+                  <Setter TargetName="SourceLine" Property="Visibility" Value="Collapsed" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsInitiallyActive}" Value="True">
                   <Setter TargetName="NameText" Property="Foreground" Value="{StaticResource ActiveBrush}" />
@@ -414,7 +453,10 @@
           <DataGrid x:Name="FindingsGrid" ItemsSource="{Binding FindingsView}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="None" MouseDoubleClick="OnFindingDoubleClick" EnableRowVirtualization="True">
             <DataGrid.ContextMenu>
               <ContextMenu>
+                <Separator Style="{StaticResource MenuGroupHeading}" Tag="Direkt im Editor" />
                 <MenuItem Header="Frag KI …" Click="OnAskAiForGridFinding" FontWeight="SemiBold" />
+                <Separator />
+                <Separator Style="{StaticResource MenuGroupHeading}" Tag="Auftrag für externen Agenten kopieren" />
                 <MenuItem Header="An KI-Agent übergeben (Auftrag kopieren)" Click="OnAskAgentForGridFinding" />
               </ContextMenu>
             </DataGrid.ContextMenu>
