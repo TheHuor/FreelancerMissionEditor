@@ -430,7 +430,7 @@ public partial class MainWindow : Window
       return;
     SectionPreview.SelectedItem = line;
     SectionPreview.ScrollIntoView (line);
-    DetailTabs.SelectedIndex = 1;
+    FindingsTab.IsSelected = true;
   }
 
   // Double-click on a marked line in the source preview: open the findings above and highlight its finding.
@@ -441,7 +441,7 @@ public partial class MainWindow : Window
     FindingItem finding = line.Findings.OrderByDescending (item => item.Severity).First ();
     if (finding.Node is null || finding.Node != ViewModel.SelectedTrigger?.Node)
       return;
-    DetailTabs.SelectedIndex = 1;
+    FindingsTab.IsSelected = true;
     ViewModel.FindingsExpanded = true;
     ViewModel.CurrentFinding = finding;
     Dispatcher.BeginInvoke (() => BringDetailFindingIntoView (finding), System.Windows.Threading.DispatcherPriority.Loaded);

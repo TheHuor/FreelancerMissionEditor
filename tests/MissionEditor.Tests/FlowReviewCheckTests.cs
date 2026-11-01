@@ -10,6 +10,35 @@ public class FlowReviewCheckTests
   private static MissionScript Load (string text) => MissionScript.FromDocument (IniDocument.ParseText (text));
 
   [Fact]
+  public void ADeadTriggerThatMovesThePlayerIsNamedAsDeveloperJumpPoint ()
+  {
+    // goto_hole_key in the original m13: never activated, puts the player at the jump hole with the whole party.
+    MissionScript script = Load ("""
+        [Trigger]
+        nickname = key_offer
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_DebugMsg = start
+
+        [Trigger]
+        nickname = goto_hole_key
+        Cnd_True = no_params
+        Act_MovePlayer = 25000, 0, -20000, 500
+        Act_SpawnShip = juni, no_ol, 25210, 0, -20090
+
+        [Trigger]
+        nickname = leftover
+        Cnd_True = no_params
+        Act_DebugMsg = old
+        """);
+    List<Finding> findings = new UnreachableTriggerCheck ().Run (script).ToList ();
+    Finding jump = Assert.Single (findings, finding => finding.Subject == "goto_hole_key");
+    Assert.Contains ("Entwickler-Sprungpunkt", jump.Message);
+    Assert.Contains ("InitState = ACTIVE", jump.Hint);
+    Assert.DoesNotContain ("Entwickler-Sprungpunkt", Assert.Single (findings, finding => finding.Subject == "leftover").Message);
+  }
+
+  [Fact]
   public void TargetsSpawnedBeforeTheCountingTriggerIsActiveAreReported ()
   {
     // Mission 26: spawn the relays, wait for the approach, only then start counting.
@@ -55,8 +84,62 @@ public class FlowReviewCheckTests
     Finding race = Assert.Single (findings, finding => finding.Subject == "count_relays");
     Assert.Equal (FindingSeverity.Warning, race.Severity);
     Assert.Contains ("spawn_relays → approach → count_relays", race.Message);
+    // The remedy names this finding's triggers and lines, not placeholders.
+    Assert.Matches (@"'Act_ActTrig = count_relays' von 'approach' \(Zeile \d+\) nach 'spawn_relays'", race.Hint);
+    Assert.Matches (@"Spawn-Aktionen \(Zeile \d+, \d+, \d+\) von 'spawn_relays' nach 'approach'", race.Hint);
+    Assert.Contains ("'Act_Cloak = relay, true' in 'spawn_relays'", race.Hint);
     Finding count = Assert.Single (findings, finding => finding.Subject == "too_many");
     Assert.Contains ("höchstens 3", count.Message);
+  }
+
+  [Fact]
+  public void ACountingTriggerThatOnlySendsACommIsAHint ()
+  {
+    // The original m13 generators: generators_destroyed counts from the spawn and carries the mission,
+    // generator2_down only sends a comm and starts counting later.
+    MissionScript script = Load ("""
+        [MsnSolar]
+        nickname = generator_1
+        label = generator
+
+        [MsnSolar]
+        nickname = generator_2
+        label = generator
+
+        [Trigger]
+        nickname = in_story
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_SpawnSolar = generator_1
+        Act_SpawnSolar = generator_2
+        Act_ActTrig = generators_destroyed
+        Act_ActTrig = near_moon
+
+        [Trigger]
+        nickname = near_moon
+        Cnd_DistVec = inside, Player, 0, 0, 0, 2000
+        Act_ActTrig = generator2_down
+
+        [Trigger]
+        nickname = generator2_down
+        Cnd_Destroyed = generator, 2
+        Act_SendComm = king, Player, DX_M13_0840_KING
+
+        [Trigger]
+        nickname = generators_destroyed
+        Cnd_Destroyed = generator, 2
+        Act_ActTrig = dock
+
+        [Trigger]
+        nickname = dock
+        Cnd_BaseEnter = st03_base
+        Act_ChangeState = SUCCEED
+        """);
+    Finding finding = Assert.Single (new DestroyedCounterCheck ().Run (script));
+    Assert.Equal ("generator2_down", finding.Subject);
+    Assert.Equal (FindingSeverity.Info, finding.Severity);
+    Assert.Contains ("fehlen nur die Aktionen", finding.Message);
+    Assert.Contains ("Act_SendComm", finding.Message);
   }
 
   [Fact]
@@ -187,11 +270,40 @@ public class FlowReviewCheckTests
         Act_DebugMsg = welcome
         """);
     List<Finding> findings = new SavePointCheck ().Run (script).ToList ();
-    Assert.Single (findings, finding => finding.Subject == "reach_point" && finding.Message.Contains ("Startposition"));
-    Assert.Single (findings, finding => finding.Subject == "mission20save" && finding.Message.Contains ("Act_Popupdialog"));
+    // The save holds the ship position, so a missing start position is only a hint.
+    Assert.Equal (FindingSeverity.Info, Assert.Single (findings, finding => finding.Subject == "reach_point" && finding.Message.Contains ("Startposition")).Severity);
+    // A lost popup is only a message: a hint.
+    Assert.Equal (FindingSeverity.Info, Assert.Single (findings, finding => finding.Subject == "mission20save" && finding.Message.Contains ("Act_Popupdialog")).Severity);
     // What the target activates is only queued and runs in the game: its waypoint is not lost.
     Assert.DoesNotContain (findings, finding => finding.Subject == "next_waypoint");
     Assert.DoesNotContain (findings, finding => finding.Subject == "docked");
+    Assert.Equal (2, findings.Count);
+  }
+
+  [Fact]
+  public void AWaypointInTheSaveTargetIsAWarningARepeatedPopupAHint ()
+  {
+    // Crossfire missionNsave: the saving trigger shows the completion popup, the target repeats it on loading.
+    MissionScript script = Load ("""
+        [Trigger]
+        nickname = mission_done
+        InitState = ACTIVE
+        Cnd_DistVec = inside, Player, 0, 0, 0, 500
+        Act_Popupdialog = 500729, 500730, CLOSE
+        Act_Save = mission10save, 500725
+
+        [Trigger]
+        nickname = mission10save
+        Cnd_True = no_params
+        Act_SetInitialPlayerPos = 0, 0, 0, 1, 0, 0, 0
+        Act_Popupdialog = 500729, 500730, CLOSE
+        Act_NNPath = 12345, 0, 0, 0, sys
+        """);
+    List<Finding> findings = new SavePointCheck ().Run (script).ToList ();
+    Finding popup = Assert.Single (findings, finding => finding.Message.Contains ("Act_Popupdialog"));
+    Assert.Equal (FindingSeverity.Info, popup.Severity);
+    Assert.Contains ("nur die Wiederholung", popup.Message);
+    Assert.Equal (FindingSeverity.Warning, Assert.Single (findings, finding => finding.Message.Contains ("Act_NNPath")).Severity);
     Assert.Equal (2, findings.Count);
   }
 
@@ -315,7 +427,14 @@ public class FlowReviewCheckTests
         InitState = ACTIVE
         Cnd_True = no_params
         Act_DeactTrig = follow_trent
+        Act_DeactTrig = respawn_wing1b
         Act_DeactTrig = respawn_wing1bc
+
+        [Trigger]
+        nickname = respawn_wing1b
+        Cnd_Timer = 30
+        Act_SpawnShip = wing
+        Act_ActTrig = respawn_wing1c
 
         [Trigger]
         nickname = respawn_wing1c
@@ -327,9 +446,89 @@ public class FlowReviewCheckTests
     Finding objList = Assert.Single (findings, finding => finding.Message.Contains ("'follow_trent'"));
     Assert.Contains ("ist eine [ObjList]", objList.Message);
     Assert.Equal (FindingSeverity.Warning, objList.Severity);
+    // The mission goes on, only leftover spawns follow: a warning, not an error. respawn_wing1b is switched off in the
+    // line above, so only respawn_wing1c can have been meant (cf60respawnsequence1a, 1b, "1bc", 1d, 1e).
     Finding typo = Assert.Single (findings, finding => finding.Message.Contains ("'respawn_wing1bc'"));
-    Assert.Equal (FindingSeverity.Error, typo.Severity);
-    Assert.Contains ("'respawn_wing1c'", typo.Message);
+    Assert.Equal (FindingSeverity.Warning, typo.Severity);
+    Assert.Contains ("Gemeint vielleicht 'respawn_wing1c'?", typo.Message);
+    Assert.DoesNotContain ("'respawn_wing1b'", typo.Message);
     Assert.Contains ("bleibt er dadurch aktiv", typo.Message);
+  }
+
+  [Fact]
+  public void DeactivatingAnObjListWhoseShipsAreHandledAnywayIsOnlyAHint ()
+  {
+    // cfmission5-38: the cleanup trigger also gives Juni the 'die' list and destroys her.
+    MissionScript script = Load ("""
+        [ObjList]
+        nickname = juni_follows
+
+        [ObjList]
+        nickname = escort_follows
+
+        [Trigger]
+        nickname = start
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_GiveObjList = juni, juni_follows
+        Act_GiveObjList = escort, escort_follows
+        Act_ActTrig = cleanup
+
+        [Trigger]
+        nickname = cleanup
+        Cnd_Timer = 5
+        Act_DeactTrig = juni_follows
+        Act_DeactTrig = escort_follows
+        Act_GiveObjList = juni, die
+        Act_Destroy = juni, SILENT
+        Act_ActTrig = next_mission
+
+        [Trigger]
+        nickname = next_mission
+        Cnd_Timer = 10
+        Act_GiveObjList = king_next, JUNI_FOLLOWS
+        """);
+    List<Finding> findings = new UnknownTriggerTargetCheck ().Run (script).ToList ();
+    // king_next gets the list only in the next mission, after the cleanup: he does not follow it yet.
+    Finding handled = Assert.Single (findings, finding => finding.Message.Contains ("'juni_follows'"));
+    Assert.Equal (FindingSeverity.Info, handled.Severity);
+    Assert.Contains ("nur überflüssig", handled.Message);
+    Assert.Contains ("die Zeile entfernen", handled.Hint);
+    // The escort keeps following: still a warning.
+    Assert.Equal (FindingSeverity.Warning, Assert.Single (findings, finding => finding.Message.Contains ("'escort_follows'")).Severity);
+  }
+
+  [Fact]
+  public void DeactivatingARandomEncounterThatIsAlsoDisabledIsOnlyAHint ()
+  {
+    // The original m13 watch_endgame_object: Act_DeactTrig on the encounter, Act_DisableEnc right after does the job.
+    MissionScript script = Load ("""
+        [MsnRandEnc]
+        nickname = se_nomads_5_more
+
+        [Trigger]
+        nickname = watch_endgame_object
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_DeactTrig = se_nomads_5_more
+        Act_DisableEnc = se_nomads_5_more
+
+        [Trigger]
+        nickname = forgets_to_disable
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_DeactTrig = se_nomads_5_more
+
+        [Trigger]
+        nickname = nomads_5_more
+        repeatable = true
+        Cnd_EncLaunched = se_nomads_5_more
+        Act_SpawnShip = extra
+        """);
+    List<Finding> findings = new UnknownTriggerTargetCheck ().Run (script).ToList ();
+    Finding superfluous = Assert.Single (findings, finding => finding.Subject == "watch_endgame_object");
+    Assert.Equal (FindingSeverity.Info, superfluous.Severity);
+    Assert.Contains ("nur überflüssig", superfluous.Message);
+    Assert.NotEqual (FindingSeverity.Info, Assert.Single (findings, finding => finding.Subject == "forgets_to_disable").Severity);
   }
 }

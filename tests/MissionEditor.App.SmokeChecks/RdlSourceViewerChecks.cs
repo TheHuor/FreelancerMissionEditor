@@ -23,7 +23,8 @@ internal static partial class Program
     var window = new MainWindow { Owner = owner, Width = 1400, Height = 900 };
     var vm = (MainViewModel)window.DataContext;
     vm.ApplyGameFolder(new GameFolderSettings { GameFolder = fixture.Root }); vm.Load(path);
-    window.Show(); vm.ShowSourceLine(3); window.UpdateLayout();
+    window.Show(); vm.ShowSourceLine(3);
+    ((TabItem)window.FindName("ContextTab")).IsSelected = true; window.UpdateLayout(); // texts show on click; the findings come first
     static IEnumerable<DependencyObject> Children(DependencyObject parent)
     {
       for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)

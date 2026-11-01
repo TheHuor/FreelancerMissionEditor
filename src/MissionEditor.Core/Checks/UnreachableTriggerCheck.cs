@@ -1,3 +1,4 @@
+using MissionEditor.Core.Ini;
 using MissionEditor.Core.Model;
 
 namespace MissionEditor.Core.Checks;
@@ -53,12 +54,23 @@ public sealed class UnreachableTriggerCheck : IMissionCheck
               && !reference.Line.GetValue (1).Equals ("INACTIVE", StringComparison.OrdinalIgnoreCase));
       if (waiting is not null)
         message += $" '{waiting.Source.Nickname}' wartet per Cnd_WatchTrigger (Zeile {waiting.Line.Number}) darauf und löst deshalb nie aus.";
-      yield return new Finding (waiting is null ? FindingSeverity.Info : FindingSeverity.Warning, Id, trigger.NicknameLine.Number, trigger.Nickname, message,
-          "Die Engine prüft die Bedingung eines Triggers erst, wenn er aktiv ist; aktiv wird er nur durch InitState = ACTIVE, "
+
+      // A dead trigger that puts the player somewhere (Act_MovePlayer) is mostly a developer jump point into the middle of
+      // the mission, like goto_hole_key in the original m13: it sets the scene for a test start.
+      IniLine? jump = activators.Length == 0 ? trigger.Actions.FirstOrDefault (action => action.IsKey ("Act_MovePlayer")) : null;
+      if (jump is not null)
+        message += $" Vermutlich ein Entwickler-Sprungpunkt: Er versetzt den Spieler (Act_MovePlayer, Zeile {jump.Number}) und baut die Szene für einen Einstieg mitten in der Mission auf.";
+      string hint = "Die Engine prüft die Bedingung eines Triggers erst, wenn er aktiv ist; aktiv wird er nur durch InitState = ACTIVE, "
           + "durch Act_ActTrig eines laufenden Triggers oder als Act_Save-Ziel beim Laden. Cnd_WatchTrigger beobachtet nur. "
-          + "Folge: Bedingung und Aktionen dieses Triggers wirken nie – oft ein Überbleibsel, manchmal ein vergessener oder falsch "
-          + "geschriebener Act_ActTrig (siehe 'unknown-trigger'). Abhilfe: den Act_ActTrig ergänzen oder den toten Trigger entfernen.",
-          waiting?.Line.Number);
+          + "Folge: Bedingung und Aktionen dieses Triggers wirken nie – ";
+      hint += jump is not null
+          ? "im Spiel hat er keine Wirkung. Zum Testen in einer Kopie der Mission: beim Sprungpunkt 'InitState = ACTIVE' direkt unter nickname "
+            + "eintragen und es beim regulären Starttrigger entfernen (sonst läuft der Missionsanfang parallel und spawnt doppelt). "
+            + "Abhilfe, wenn er nicht gebraucht wird: entfernen oder stehen lassen – beides ändert am Spiel nichts."
+          : "oft ein Überbleibsel, manchmal ein vergessener oder falsch geschriebener Act_ActTrig (siehe 'unknown-trigger'). "
+            + "Abhilfe: den Act_ActTrig ergänzen oder den toten Trigger entfernen.";
+      yield return new Finding (waiting is null ? FindingSeverity.Info : FindingSeverity.Warning, Id, trigger.NicknameLine.Number, trigger.Nickname, message,
+          hint, waiting?.Line.Number);
     }
   }
 }

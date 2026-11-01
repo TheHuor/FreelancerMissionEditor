@@ -182,6 +182,15 @@ public sealed class MissionFlow
       Script.EffectiveTriggers.Where (trigger => trigger.References.Any (reference => reference.Kind == TriggerReferenceKind.Activate && reference.Target == target));
 
   /// <summary>
+  /// True when the mission's progress depends on the trigger: it saves, changes the mission state, or is the only
+  /// reachable activator of a further trigger. A trigger that only sends a comm or gives orders blocks nothing.
+  /// </summary>
+  public bool CarriesProgress (Trigger trigger) =>
+      trigger.Actions.Any (action => action.IsKey ("Act_Save") || action.IsKey ("Act_ChangeState"))
+      || trigger.References.Any (reference => reference.Kind == TriggerReferenceKind.Activate && reference.Target is { } next
+          && ActivatorsOf (next).Where (Reachable.Contains).All (activator => activator == trigger));
+
+  /// <summary>
   /// The shortest chain of Act_ActTrig from one trigger to another (both included), or null when there is none
   /// within <paramref name="maximumSteps"/> steps.
   /// </summary>

@@ -272,7 +272,12 @@
             <ListBox.ContextMenu><ContextMenu><MenuItem Header="Sektion bearbeiten…" Click="OnEditSelectedSourceSection"/><MenuItem Header="Sektion löschen…" Click="OnDeleteSelectedSourceSection"/></ContextMenu></ListBox.ContextMenu>
             <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem" BasedOn="{StaticResource ClearSelectionItem}">
               <Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0"/>
-              <Style.Triggers><DataTrigger Binding="{Binding HasFindings}" Value="True"><Setter Property="Background" Value="{StaticResource WarningSurfaceBrush}"/></DataTrigger><DataTrigger Binding="{Binding HasError}" Value="True"><Setter Property="Background" Value="{StaticResource ErrorSurfaceBrush}"/></DataTrigger></Style.Triggers>
+              <!-- Row colour by the most serious finding on the line, like the finding boxes: error red, warning brown, hint grey. -->
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding BadgeKind}" Value="Info"><Setter Property="Background" Value="{StaticResource InfoSurfaceBrush}"/></DataTrigger>
+                <DataTrigger Binding="{Binding BadgeKind}" Value="Warning"><Setter Property="Background" Value="{StaticResource WarningSurfaceBrush}"/></DataTrigger>
+                <DataTrigger Binding="{Binding BadgeKind}" Value="Error"><Setter Property="Background" Value="{StaticResource ErrorSurfaceBrush}"/></DataTrigger>
+              </Style.Triggers>
             </Style></ListBox.ItemContainerStyle>
             <ListBox.ItemTemplate><DataTemplate DataType="viewModels:SectionLineItem"><controls:SourceLineView Line="{Binding}"/></DataTemplate></ListBox.ItemTemplate>
           </ListBox>
@@ -355,8 +360,7 @@
         <TextBlock Grid.Row="0" Text="{Binding DetailsTitle}" ToolTip="{Binding DetailsTitle}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
         <TextBlock Grid.Row="1" Text="{Binding SelectedSummary}" MaxHeight="48" ToolTip="{Binding SelectedSummary}" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,6" TextWrapping="Wrap" />
         <TabControl x:Name="DetailTabs" Grid.Row="2" Grid.RowSpan="2">
-          <TabItem Header="Kontext"><controls:SourceContextView /></TabItem>
-          <TabItem Header="{Binding SelectedFindingsHeader}">
+          <TabItem x:Name="FindingsTab" Header="{Binding SelectedFindingsHeader}">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontWeight="Normal" Margin="0,4,0,0" TextElement.Foreground="{StaticResource TextBrush}">
               <ItemsControl x:Name="DetailFindings" ItemsSource="{Binding SelectedFindings}">
                 <ItemsControl.ItemTemplate>
@@ -380,7 +384,7 @@
                         <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource ErrorBrush}" />
                       </DataTrigger>
                       <DataTrigger Binding="{Binding SeverityText}" Value="Hinweis">
-                        <Setter TargetName="Box" Property="Background" Value="{StaticResource InputBrush}" />
+                        <Setter TargetName="Box" Property="Background" Value="{StaticResource InfoSurfaceBrush}" />
                         <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource MutedTextBrush}" />
                       </DataTrigger>
                       <DataTrigger Binding="{Binding IsCurrent}" Value="True">
@@ -393,6 +397,8 @@
               </ItemsControl>
             </ScrollViewer>
           </TabItem>
+          <!-- Texts and resources come forward only when one is clicked in the source; selecting a line keeps the findings. -->
+          <TabItem x:Name="ContextTab" Header="Kontext"><controls:SourceContextView /></TabItem>
           <TabItem Header="Verweise">
             <ListView ItemsSource="{Binding References}">
               <ListView.View>

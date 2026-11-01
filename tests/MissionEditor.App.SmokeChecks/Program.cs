@@ -162,6 +162,7 @@ internal static partial class Program
     var drawer = (Expander)window.FindName ("FindingsExpander");
     var row = (RowDefinition)window.FindName ("FindingsRow");
     var tabs = (TabControl)window.FindName ("DetailTabs");
+    Assert (tabs.Items.IndexOf (window.FindName ("FindingsTab")) == 0 && tabs.Items.IndexOf (window.FindName ("ContextTab")) == 1, "findings come first, texts only on click");
     var original = row.ActualHeight;
     drawer.IsExpanded = false;
     window.UpdateLayout ();
@@ -186,7 +187,7 @@ internal static partial class Program
     var finding = vm.Findings.First (f => f.Finding.RelatedLineNumber is not null);
     typeof (MainWindow).GetMethod ("ShowInFindingsGrid", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke (window, [finding]);
     window.UpdateLayout ();
-    Assert (drawer.IsExpanded && tabs.SelectedIndex == 1, "finding navigation opens drawer and findings tab");
+    Assert (drawer.IsExpanded && tabs.SelectedItem == window.FindName ("FindingsTab"), "finding navigation opens drawer and findings tab");
     Assert (vm.SelectedSectionLines.Count (l => l.HasActions) >= 2, "duplicate preview keeps both editable definitions");
     var tmp = Path.Combine (Path.GetTempPath (), "mission-layout-check-" + Guid.NewGuid () + ".ini");
     File.Copy (fixture, tmp);
@@ -398,6 +399,13 @@ internal static partial class Program
         (line.Contains ("HorizontalContentAlignment") || line.Contains ("VerticalContentAlignment"))),
         "list item alignment has no binding errors: " + bindingErrors);
     System.Diagnostics.PresentationTraceSources.DataBindingSource.Listeners.Remove (bindingListener);
+
+    // Source lines take the colour of their most serious finding: a hint is grey, not warning brown.
+    var sourceRows = ((ListBox)window.FindName ("SectionPreview")).ItemContainerStyle;
+    Brush? RowBrush (string kind) => sourceRows.Triggers.OfType<DataTrigger> ().FirstOrDefault (trigger => Equals (trigger.Value, kind))
+        ?.Setters.OfType<Setter> ().FirstOrDefault (setter => setter.Property == Control.BackgroundProperty)?.Value as Brush;
+    Assert (RowBrush ("Info") == window.FindResource ("InfoSurfaceBrush") && RowBrush ("Warning") == window.FindResource ("WarningSurfaceBrush")
+        && RowBrush ("Error") == window.FindResource ("ErrorSurfaceBrush"), "source lines are coloured by severity, hints grey");
     Console.WriteLine ("ALL CHECKS PASSED");
     File.Delete (tmp);
     File.Delete (tmp + ".bak");
@@ -512,6 +520,9 @@ internal static partial class Program
     string missingPrompt = AgentPrompts.ForFinding (@"M13\m13.ini", missing);
     Check (missingPrompt.Contains ("suggest_missing_trigger für „turn_off_music“") && missingPrompt.Contains (@"Datei: M13\m13.ini")
         && missingPrompt.Contains (AgentConnection.ServerName), "missing-trigger prompt asks for evidence about the missing trigger");
+    var missingSwitchOff = new MissionEditor.Core.Checks.Finding (MissionEditor.Core.Checks.FindingSeverity.Warning, "unknown-trigger", 5226, "watch_endgame_object",
+        "Act_DeactTrig auf unbekannten Trigger 'se_nomads_5_more' – die Deaktivierung hat keine Wirkung.", "Hinweis");
+    Check (!AgentPrompts.ForFinding (@"M13\m13.ini", missingSwitchOff).Contains ("suggest_missing_trigger"), "an unknown switch-off target gets no 'create the trigger' request");
 
     var duplicate = new MissionEditor.Core.Checks.Finding (MissionEditor.Core.Checks.FindingSeverity.Warning, "duplicate-nickname", 4843, "follow_player",
         "[ObjList] 'follow_player' ist doppelt (erste Definition Zeile 4384).", "Die Engine verwirft die zweite Liste.", 4384);

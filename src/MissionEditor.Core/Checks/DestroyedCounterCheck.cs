@@ -67,21 +67,42 @@ public sealed class DestroyedCounterCheck : IMissionCheck
           continue;
         bool cloaked = path.Skip (1).Any (step => step.Actions.Any (action => action.IsKey ("Act_Cloak")
             && !action.GetBoolean (1) && Names (target, holders).Contains (action.GetValue (0))));
+        // When nothing further depends on the counting trigger (it only sends a comm, a dialog …), a missed count costs
+        // that effect, not the mission – e.g. the original m13 generator2_down … generator4_down beside generators_destroyed.
+        bool progress = flow.CarriesProgress (trigger);
         string chain = string.Join (" → ", path.Select (step => step.Nickname));
-        yield return new Finding (cloaked ? FindingSeverity.Info : FindingSeverity.Warning, Id, condition.Number, trigger.Nickname,
+        yield return new Finding (cloaked || !progress ? FindingSeverity.Info : FindingSeverity.Warning, Id, condition.Number, trigger.Nickname,
             $"Cnd_Destroyed = {condition.RawValue} in '{trigger.Nickname}' zählt erst ab der Aktivierung, die Ziele spawnt aber schon '{spawner.Nickname}' "
             + $"(Zeile {spawn.Line.Number}); aktiviert wird erst über {chain}."
             + (cloaked
                 ? " Die Ziele sind bis dahin getarnt (Act_Cloak … false erst später) – vermutlich gewollt."
-                : " Was vorher abgeschossen wird, zählt nie – der Trigger kann hängen bleiben."),
+                : !progress
+                  ? $" Was vorher abgeschossen wird, zählt nie – dann fehlen nur die Aktionen von '{trigger.Nickname}' ({Effects (trigger)}); am Ablauf hängt der Trigger nicht."
+                  : " Was vorher abgeschossen wird, zählt nie – der Trigger kann hängen bleiben."),
             "Beim Aktivieren setzt die Engine den Zähler von Cnd_Destroyed auf 0 und zählt nur, solange der Trigger aktiv ist. "
-            + "Abhilfe: den Zähltrigger schon im spawnenden Trigger per Act_ActTrig aktivieren, die Ziele erst im "
-            + "aktivierenden Trigger spawnen oder sie bis dahin tarnen (Act_Cloak = <Ziel>, true / false).",
+            + Remedy (spawner, path[^2], trigger, target, spawns.Where (item => item.Spawn.Source == spawner).Select (item => item.Spawn.Line.Number)),
             spawn.Line.Number);
         break;
       }
     }
   }
+
+  // The three ways out, named with the triggers and lines of this finding: start counting with the spawn, spawn only
+  // where counting starts, or keep the targets cloaked until then.
+  private static string Remedy (Trigger spawner, Trigger activator, Trigger counter, string target, IEnumerable<int> spawnLines)
+  {
+    int? activation = activator.References.FirstOrDefault (reference => reference.Kind == TriggerReferenceKind.Activate && reference.Target == counter)?.Line.Number;
+    string lines = string.Join (", ", spawnLines.Distinct ().Order ());
+    return $"Abhilfe – eine der Möglichkeiten: 'Act_ActTrig = {counter.Nickname}' von '{activator.Nickname}'"
+        + (activation is { } number ? $" (Zeile {number})" : "")
+        + $" nach '{spawner.Nickname}' verschieben, dann zählt er ab dem Spawn; oder die Spawn-Aktionen (Zeile {lines}) von '{spawner.Nickname}' "
+        + $"nach '{activator.Nickname}' verschieben, dann gibt es die Ziele erst, wenn gezählt wird; oder die Ziele bis dahin tarnen "
+        + $"('Act_Cloak = {target}, true' in '{spawner.Nickname}', 'Act_Cloak = {target}, false' in '{activator.Nickname}').";
+  }
+
+  // The trigger's action keys, e.g. "Act_SendComm, Act_AdjHealth".
+  private static string Effects (Trigger trigger) =>
+      trigger.Actions.Count == 0 ? "keine" : string.Join (", ", trigger.Actions.Select (action => action.Key).Distinct (StringComparer.OrdinalIgnoreCase));
 
   // The names Act_Cloak may use for the targets: the condition's name or label, the objects' nicknames and labels.
   private static HashSet<string> Names (string target, IReadOnlyList<ScriptObject> holders)

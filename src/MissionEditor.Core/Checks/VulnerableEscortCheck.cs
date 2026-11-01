@@ -26,7 +26,7 @@ public sealed class VulnerableEscortCheck : IMissionCheck
     {
       // Only progress counts: the waiting trigger must be the one way on – it saves, ends the mission or is the only
       // activator of a further trigger. A trigger that just gives the ship new orders blocks nothing.
-      if (trigger.Condition is not { } condition || !CarriesProgress (flow, trigger))
+      if (trigger.Condition is not { } condition || !flow.CarriesProgress (trigger))
         continue;
       foreach (string shipName in ShipArguments (condition).Where (name => name.Length > 0 && !name.Equals ("Player", StringComparison.OrdinalIgnoreCase)).Distinct (StringComparer.OrdinalIgnoreCase))
       {
@@ -40,8 +40,12 @@ public sealed class VulnerableEscortCheck : IMissionCheck
             && names.Contains (action.GetValue (0)) && action.GetBoolean (1)));
         if (invulnerable || HasDeathTrigger (flow, section, ships))
           continue;
+        // The condition resolves the name on every check; a ship that is gone gives no object and the condition stays
+        // false – there is no fallback to the player (fl_decomp CndDistShip::Matches, GetLabelObjectId). A formation name
+        // resolves to one of its live ships.
+        string destroyed = ships.Count > 1 ? $"werden alle Schiffe von '{shipName}' zerstört" : "wird das Schiff zerstört";
         yield return new Finding (FindingSeverity.Warning, Id, condition.Number, trigger.Nickname,
-            $"'{trigger.Nickname}' wartet auf '{shipName}' ({condition.Key}); wird das Schiff zerstört, geht es hier nicht weiter – "
+            $"'{trigger.Nickname}' wartet auf '{shipName}' ({condition.Key}); {destroyed}, geht es hier nicht weiter – "
             + "weder Act_Invulnerable noch ein Cnd_Destroyed-Trigger in diesem Abschnitt fängt das ab.",
             "Die Bedingung tritt nur ein, solange das Schiff existiert. Abhilfe: das Schiff mit 'Act_Invulnerable = <schiff>, true' schützen "
             + "oder im selben Abschnitt (beim Spawnen oder beim Aktivieren des wartenden Triggers) einen Trigger mit 'Cnd_Destroyed = <schiff>' "
@@ -63,11 +67,6 @@ public sealed class VulnerableEscortCheck : IMissionCheck
   };
 
   private static bool IsPlayer (string name) => name.Equals ("Player", StringComparison.OrdinalIgnoreCase);
-
-  private static bool CarriesProgress (MissionFlow flow, Trigger trigger) =>
-      trigger.Actions.Any (action => action.IsKey ("Act_Save") || action.IsKey ("Act_ChangeState"))
-      || trigger.References.Any (reference => reference.Kind == TriggerReferenceKind.Activate && reference.Target is { } next
-          && flow.ActivatorsOf (next).Where (flow.Reachable.Contains).All (activator => activator == trigger));
 
   // The section around the waiting trigger, while the ship exists: the triggers that spawn it and those they
   // activate within a few steps, plus the waiting trigger's activators.
