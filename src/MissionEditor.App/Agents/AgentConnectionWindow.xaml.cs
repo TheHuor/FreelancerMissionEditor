@@ -140,7 +140,7 @@ public partial class AgentConnectionWindow : Window
         + $"Export erlaubt: {(AllowWrites ? "ja" : "nein")}\n\n"
         + $"Nur der Eintrag „{AgentConnection.ServerName}“ wird angelegt oder ersetzt, alles andere bleibt. "
         + $"Am sichersten ist es, {clientName} vorher zu schließen, damit es die Datei nicht mit einem älteren Stand überschreibt.";
-    if (MessageBox.Show (this, question, "KI-Agent verbinden", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
+    if (ThemedMessageBox.Show (this, question, "KI-Agent verbinden", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
       return;
     try
     {
@@ -156,7 +156,7 @@ public partial class AgentConnectionWindow : Window
     }
     catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
     {
-      MessageBox.Show (this, exception.Message, "Eintragen fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Warning);
+      ThemedMessageBox.Show (this, exception.Message, "Eintragen fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
   }
 

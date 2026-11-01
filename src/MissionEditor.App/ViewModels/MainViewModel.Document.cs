@@ -66,6 +66,7 @@ public sealed partial class MainViewModel
     FilePath = path;
     _backupWritten = true;
     MarkSaved ();
+    Analyze (Script.Document, keepHistory: true);
   }
 
   /// <summary>Deletes a section (with undo).</summary>
@@ -159,6 +160,8 @@ public sealed partial class MainViewModel
     MissionScript script = MissionScript.FromDocument (document, FilePath);
     var graph = new TriggerGraph (script);
     GameData = GameData.Locate (FilePath, _gameFolderSettings.GameFolder);
+    ResourceReferences = MissionResourceIndex.Build (document, FilePath, GameData);
+    OnPropertyChanged (nameof (ResourceReferences));
     OnPropertyChanged (nameof (GameDataText));
     IReadOnlyList<Finding> findings = MissionChecker.Run (script, GameData);
 
@@ -194,5 +197,6 @@ public sealed partial class MainViewModel
         ?? Triggers.FirstOrDefault (item => item.IsInitiallyActive)
         ?? Triggers.FirstOrDefault ();
     SelectNode (initial?.Node, remember: false);
+    DocumentContextChanged?.Invoke (this, EventArgs.Empty);
   }
 }

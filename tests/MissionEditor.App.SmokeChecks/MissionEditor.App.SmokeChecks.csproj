@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="../Fixtures/ResourceDllFixture.cs" Link="Fixtures/ResourceDllFixture.cs" />
     <ProjectReference Include="../../src/MissionEditor.App/MissionEditor.App.csproj" />
   </ItemGroup>
 </Project>

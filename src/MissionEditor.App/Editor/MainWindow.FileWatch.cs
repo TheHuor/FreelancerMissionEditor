@@ -74,9 +74,11 @@ public partial class MainWindow
 
   private void OnReloadAfterDiskChange (object sender, RoutedEventArgs args)
   {
+    if (!CanLeaveResources ("Mission neu laden"))
+      return;
     if (ViewModel.FilePath is not { } path)
       return;
-    if (ViewModel.IsModified && MessageBox.Show (this, "Deine ungespeicherten Änderungen gehen verloren. Trotzdem neu laden?", "Neu laden",
+    if (ViewModel.IsModified && ThemedMessageBox.Show (this, "Deine ungespeicherten Änderungen gehen verloren. Trotzdem neu laden?", "Neu laden",
             MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
       return;
     try
@@ -87,7 +89,7 @@ public partial class MainWindow
     }
     catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
     {
-      MessageBox.Show (this, exception.Message, "Datei kann nicht geladen werden", MessageBoxButton.OK, MessageBoxImage.Error);
+      ThemedMessageBox.Show (this, exception.Message, "Datei kann nicht geladen werden", MessageBoxButton.OK, MessageBoxImage.Error);
     }
   }
 }

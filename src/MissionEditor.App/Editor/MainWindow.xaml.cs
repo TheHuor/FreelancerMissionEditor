@@ -24,6 +24,7 @@ public partial class MainWindow : Window
   public MainWindow ()
   {
     InitializeComponent ();
+    InitializeResourceWindows ();
     SizeChanged += (_, _) => ConstrainFindingsHeight ();
     string[] arguments = Environment.GetCommandLineArgs ();
     if (arguments.Length > 1)
@@ -51,7 +52,7 @@ public partial class MainWindow : Window
     }
     catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
     {
-      MessageBox.Show (this, exception.Message, "Datei kann nicht geladen werden", MessageBoxButton.OK, MessageBoxImage.Error);
+      ThemedMessageBox.Show (this, exception.Message, "Datei kann nicht geladen werden", MessageBoxButton.OK, MessageBoxImage.Error);
     }
     finally
     {
@@ -121,6 +122,8 @@ public partial class MainWindow : Window
 
   private void OnGameFolder (object sender, RoutedEventArgs args)
   {
+    if (!CanLeaveResources ("Spielinstallation wechseln"))
+      return;
     var dialog = new GameFolderWindow (GameFolderSettings.Load (), ViewModel.FilePath) { Owner = this };
     if (dialog.ShowDialog () == true)
     {
@@ -232,7 +235,7 @@ public partial class MainWindow : Window
     }
     catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
     {
-      MessageBox.Show (this, exception.Message, "Datei kann nicht geladen werden", MessageBoxButton.OK, MessageBoxImage.Error);
+      ThemedMessageBox.Show (this, exception.Message, "Datei kann nicht geladen werden", MessageBoxButton.OK, MessageBoxImage.Error);
     }
   }
 
@@ -244,6 +247,8 @@ public partial class MainWindow : Window
 
   private void OnSaveAs (object sender, ExecutedRoutedEventArgs args)
   {
+    if (!CanLeaveResources ("Missionsdatei wechseln"))
+      return;
     var dialog = new SaveFileDialog { Filter = FileFilter, FileName = Path.GetFileName (ViewModel.FilePath ?? "mission.ini") };
     if (dialog.ShowDialog (this) != true)
       return;
@@ -254,7 +259,7 @@ public partial class MainWindow : Window
     }
     catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
     {
-      MessageBox.Show (this, exception.Message, "Speichern fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error);
+      ThemedMessageBox.Show (this, exception.Message, "Speichern fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error);
     }
   }
 
@@ -274,7 +279,7 @@ public partial class MainWindow : Window
     }
     catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
     {
-      MessageBox.Show (this, exception.Message, "Speichern fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error);
+      ThemedMessageBox.Show (this, exception.Message, "Speichern fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error);
       return false;
     }
   }
@@ -282,9 +287,11 @@ public partial class MainWindow : Window
   // Asks what to do with unsaved changes; false means the caller should stop.
   private bool ConfirmDiscard ()
   {
+    if (!CanLeaveResources ("Mission schließen oder neu laden"))
+      return false;
     if (!ViewModel.IsModified)
       return true;
-    MessageBoxResult answer = MessageBox.Show (this,
+    MessageBoxResult answer = ThemedMessageBox.Show (this,
         $"Die Änderungen an {Path.GetFileName (ViewModel.FilePath)} sind noch nicht gespeichert. Jetzt speichern?",
         "Ungespeicherte Änderungen", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
     return answer switch
@@ -303,7 +310,7 @@ public partial class MainWindow : Window
 
   private void OnEditSection (object sender, RoutedEventArgs args)
   {
-    if (sender is not FrameworkElement { DataContext: SectionLineItem { Section: { } section } })
+    if (ResolveSourceSection (sender) is not { } section)
       return;
     var editor = new SectionEditorWindow (
         $"[{section.Name}] ab Zeile {section.FirstLineNumber} bearbeiten",
@@ -332,19 +339,19 @@ public partial class MainWindow : Window
       }
       catch (InvalidDataException exception)
       {
-        MessageBox.Show (this, exception.Message, "Ungültige BINI-Eingabe", MessageBoxButton.OK, MessageBoxImage.Warning);
+        ThemedMessageBox.Show (this, exception.Message, "Ungültige BINI-Eingabe", MessageBoxButton.OK, MessageBoxImage.Warning);
       }
     }
   }
 
   private void OnDeleteSection (object sender, RoutedEventArgs args)
   {
-    if (sender is not FrameworkElement { DataContext: SectionLineItem { Section: { } section } })
+    if (ResolveSourceSection (sender) is not { } section)
       return;
     (int firstLine, int lastLine) = Core.Ini.IniDocument.GetRemovalRange (section);
     string question = $"[{section.Name}] in den Zeilen {firstLine}–{lastLine} löschen?\n\n{ViewModel.DescribeDeletion (section)}\n\n"
         + "Gespeichert wird erst mit Strg+S; Strg+Z macht das Löschen rückgängig.";
-    if (MessageBox.Show (this, question, "Sektion löschen", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
+    if (ThemedMessageBox.Show (this, question, "Sektion löschen", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
       ViewModel.DeleteSection (section);
   }
 
@@ -369,8 +376,11 @@ public partial class MainWindow : Window
   // Centres the selected node in the visible part of the graph once the new size is measured.
   private void OnGraphRedrawn (object? sender, Rect centerBounds)
   {
+    if (!ViewModel.IsGraphView) { _pendingGraphCenter = centerBounds; return; }
+    _pendingGraphCenter = null;
     Dispatcher.BeginInvoke (() =>
     {
+      if (!ViewModel.IsGraphView) { _pendingGraphCenter = centerBounds; return; }
       double zoom = ZoomSlider.Value;
       GraphScroller.ScrollToHorizontalOffset (Math.Max (0, (centerBounds.X + centerBounds.Width / 2) * zoom - GraphScroller.ViewportWidth / 2));
       GraphScroller.ScrollToVerticalOffset (Math.Max (0, (centerBounds.Y + centerBounds.Height / 2) * zoom - GraphScroller.ViewportHeight / 2));
@@ -412,7 +422,7 @@ public partial class MainWindow : Window
   // Brings the finding's line into the source preview and marks it.
   private void ShowInPreview (FindingItem finding)
   {
-    DetailTabs.SelectedIndex = 0;
+    ViewModel.IsGraphView = false;
     SectionLineItem? line = ViewModel.ShowFinding (finding);
     if (finding.Node is not null)
       Dispatcher.BeginInvoke (() => BringDetailFindingIntoView (finding), System.Windows.Threading.DispatcherPriority.Loaded);
@@ -420,6 +430,7 @@ public partial class MainWindow : Window
       return;
     SectionPreview.SelectedItem = line;
     SectionPreview.ScrollIntoView (line);
+    DetailTabs.SelectedIndex = 1;
   }
 
   // Double-click on a marked line in the source preview: open the findings above and highlight its finding.
@@ -430,7 +441,7 @@ public partial class MainWindow : Window
     FindingItem finding = line.Findings.OrderByDescending (item => item.Severity).First ();
     if (finding.Node is null || finding.Node != ViewModel.SelectedTrigger?.Node)
       return;
-    DetailTabs.SelectedIndex = 0;
+    DetailTabs.SelectedIndex = 1;
     ViewModel.FindingsExpanded = true;
     ViewModel.CurrentFinding = finding;
     Dispatcher.BeginInvoke (() => BringDetailFindingIntoView (finding), System.Windows.Threading.DispatcherPriority.Loaded);

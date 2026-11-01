@@ -32,7 +32,7 @@ public enum GameDataKind
 /// The nicknames of a Freelancer installation, read from the files listed under [Data] in
 /// EXE\freelancer.ini. Located from a mission file by walking up to the folder that holds EXE\freelancer.ini.
 /// </summary>
-public sealed class GameData
+public sealed partial class GameData
 {
   private static readonly ConcurrentDictionary<string, (DateTime Stamp, GameData Data)> Cache = new (StringComparer.OrdinalIgnoreCase);
   private readonly Dictionary<GameDataKind, HashSet<string>> _nicknames = [];
@@ -70,22 +70,10 @@ public sealed class GameData
   /// </summary>
   public string? DescribeIds (IniLine line, string sectionName)
   {
-    if (Texts is null || line.Key is not { } key)
+    if (Texts is null)
       return null;
-    int[] indexes = key.ToLowerInvariant () switch
-    {
-      "string_id" or "individual_name" or "ids_name" or "ids_info" => [0],
-      "type" when sectionName.Equals ("NNObjective", StringComparison.OrdinalIgnoreCase) =>
-          line.GetValue (0).Equals ("ids", StringComparison.OrdinalIgnoreCase) ? [1]
-          : line.GetValue (0).Equals ("rep_inst", StringComparison.OrdinalIgnoreCase) ? [2]
-          : [],
-      "act_settitle" or "act_setoffer" or "act_nnids" => [0],
-      "act_ethercomm" => [1],
-      "act_popupdialog" => [0, 1],
-      _ => [],
-    };
-    string[] texts = indexes
-        .Select (index => int.TryParse (line.GetValue (index), out int ids) ? Texts.Get (ids) : null)
+    string[] texts = MissionResourceIndex.Parameters (line, sectionName)
+        .Select (parameter => int.TryParse (line.GetValue (parameter.Index), out int ids) ? Texts.Get (ids) : null)
         .OfType<string> ()
         .Select (text => $"„{text.Replace ("\n", " ¶ ")}“")
         .ToArray ();
@@ -186,23 +174,29 @@ public sealed class GameData
           data.Read (file, (section, nickname) =>
               section.Is ("System") ? GameDataKind.System : section.Is ("Base") ? GameDataKind.Base : null);
           break;
+
         case "groups":
           data.Read (file, (section, _) => section.Is ("Group") ? GameDataKind.Faction : null);
           break;
+
         case "ships":
           data.Read (file, (section, _) => section.Is ("Ship") ? GameDataKind.ShipArchetype : null);
           break;
+
         case "solar":
           data.Read (file, (section, _) => section.Is ("Solar") ? GameDataKind.SolarArchetype : null);
           break;
+
         case "loadouts":
           data.Read (file, (section, _) => section.Is ("Loadout") ? GameDataKind.Loadout : null);
           break;
+
         case "equipment":
           data.Read (file, (_, _) => GameDataKind.Equipment);
           break;
       }
     }
+    data.ReadUniverseResourceDefinitions ();
     return data;
   }
 
@@ -234,7 +228,14 @@ public sealed class GameData
       if (string.IsNullOrEmpty (nickname))
         continue;
       if (kindOf (section, nickname) is { } kind)
+      {
         _nicknames[kind].Add (nickname);
+        _definitions[(kind, nickname.ToLowerInvariant ())] = new (kind, nickname, Path.GetFullPath (file), section.FirstLineNumber,
+            Id (section, "ids_name") ?? Id (section, "strid_name"), Id (section, "ids_info"),
+            section.Find ("archetype")?.GetValue (0));
+        if (kind == GameDataKind.System && section.Find ("file") is { } systemFile)
+          _systemFiles.Add (Path.Combine (Path.GetDirectoryName (file)!, systemFile.GetValue (0)));
+      }
     }
   }
 }

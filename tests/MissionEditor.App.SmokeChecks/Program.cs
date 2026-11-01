@@ -6,11 +6,13 @@ using System.Windows.Media;
 using MissionEditor.App;
 using MissionEditor.App.ViewModels;
 
-internal static class Program
+internal static partial class Program
 {
   [STAThread]
   private static void Main ()
   {
+    string geometryFolder = Path.Combine (Path.GetTempPath (), "mission-window-checks-" + Guid.NewGuid ());
+    Environment.SetEnvironmentVariable ("MISSION_EDITOR_WINDOW_SETTINGS_DIR", geometryFolder);
     using var bindingErrors = new StringWriter ();
     using var bindingListener = new System.Diagnostics.TextWriterTraceListener (bindingErrors);
     System.Diagnostics.PresentationTraceSources.DataBindingSource.Listeners.Add (bindingListener);
@@ -21,6 +23,8 @@ internal static class Program
     var fixture = Path.Combine (repository?.FullName ?? throw new Exception ("Repository root not found"), "tests", "Fixtures", "Missions", "m13sp.ini");
     var app = new App ();
     app.InitializeComponent ();
+    SynchronizationContext.SetSynchronizationContext (new System.Windows.Threading.DispatcherSynchronizationContext (
+        System.Windows.Threading.Dispatcher.CurrentDispatcher));
     // Load the same resource as application startup, including its feature folder.
     var window = (MainWindow)Application.LoadComponent (app.StartupUri);
     window.WindowState = WindowState.Normal;
@@ -42,9 +46,31 @@ internal static class Program
     alignmentList.ItemsSource = Array.Empty<string> ();
     alignmentWindow.UpdateLayout ();
     alignmentWindow.Close ();
+    CheckListSelection ();
     vm.Load (fixture);
     window.Show ();
     window.UpdateLayout ();
+    var sourceStyleCheck = new SourceWindow (vm);
+    var browserStyleCheck = new ResourceBrowserWindow ();
+    foreach (Window dialog in new Window[] { sourceStyleCheck, browserStyleCheck })
+    {
+      Assert (ReferenceEquals (dialog.Style, app.FindResource (typeof (Window))), dialog.GetType ().Name + " uses the common window style");
+      Assert (Equals (dialog.Background, app.FindResource ("WindowBrush")), dialog.GetType ().Name + " uses the dark window background");
+      dialog.Close ();
+    }
+    foreach (var choice in new[] { MessageBoxResult.Yes, MessageBoxResult.No, MessageBoxResult.Cancel })
+    {
+      window.Dispatcher.BeginInvoke (() =>
+      {
+        Window dialog = window.OwnedWindows.Cast<Window> ().Single (item => item.Title == "Stilprüfung");
+        Assert (ReferenceEquals (dialog.Style, app.FindResource (typeof (Window))), "message dialog uses the common dark chrome");
+        var actions = (WrapPanel)((DockPanel)dialog.Content).Children[0];
+        actions.Children.OfType<Button> ().Single (button => Equals (button.Tag, choice))
+            .RaiseEvent (new RoutedEventArgs (System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+      });
+      Assert (ThemedMessageBox.Show (window, "Einheitliche Meldungsfenster", "Stilprüfung", MessageBoxButton.YesNoCancel,
+          MessageBoxImage.Question) == choice, "themed message preserves " + choice + " result");
+    }
     var triggerList = (ListBox)window.FindName ("TriggerList");
     var triggerRow = (FrameworkElement)triggerList.ItemTemplate.LoadContent ();
     Assert (triggerRow.FindName ("ConditionBadge") is Border && triggerRow.FindName ("ConditionValue") is TextBlock,
@@ -68,6 +94,8 @@ internal static class Program
     foreach (var listName in new[] { "TriggerList", "SectionPreview" })
     {
       var list = (ListBox)window.FindName (listName);
+      list.ScrollIntoView (list.Items[0]);
+      window.UpdateLayout ();
       var item = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex (0);
       Assert (item is not null &&
           System.Windows.Data.BindingOperations.GetBindingExpression (item, Control.HorizontalContentAlignmentProperty) is null &&
@@ -121,7 +149,14 @@ internal static class Program
       window.UpdateLayout ();
       var graph = (ScrollViewer)window.FindName ("GraphScroller");
       var preview = (ListBox)window.FindName ("SectionPreview");
-      Assert (graph.ActualWidth >= 350 && preview.ActualWidth >= 300, "graph/source available at " + size);
+      vm.IsGraphView = false; window.UpdateLayout ();
+      Assert (preview.ActualWidth >= 350 && !graph.IsVisible, "source is central default workspace at " + size);
+      SavePreview (window, "source-workspace-main-" + (int)size.Width);
+      ((Button)window.FindName ("GraphModeButton")).RaiseEvent (new RoutedEventArgs (System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+      window.UpdateLayout ();
+      Assert (graph.ActualWidth >= 350 && !preview.IsVisible, "optional graph shares workspace at " + size);
+      SavePreview (window, "source-workspace-graph-" + (int)size.Width);
+      vm.IsGraphView = false;
     }
     var drawer = (Expander)window.FindName ("FindingsExpander");
     var row = (RowDefinition)window.FindName ("FindingsRow");
@@ -145,12 +180,12 @@ internal static class Program
         $"drawer restoration respects remaining workspace height after resize (row {row.Height.Value}, workspace {workspace.ActualHeight}, window {window.ActualHeight})");
     window.Height = 1080;
     window.UpdateLayout ();
-    tabs.SelectedIndex = 1;
+    tabs.SelectedIndex = 2;
     drawer.IsExpanded = false;
     var finding = vm.Findings.First (f => f.Finding.RelatedLineNumber is not null);
     typeof (MainWindow).GetMethod ("ShowInFindingsGrid", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke (window, [finding]);
     window.UpdateLayout ();
-    Assert (drawer.IsExpanded && tabs.SelectedIndex == 0, "finding navigation opens drawer and findings tab");
+    Assert (drawer.IsExpanded && tabs.SelectedIndex == 1, "finding navigation opens drawer and findings tab");
     Assert (vm.SelectedSectionLines.Count (l => l.HasActions) >= 2, "duplicate preview keeps both editable definitions");
     var tmp = Path.Combine (Path.GetTempPath (), "mission-layout-check-" + Guid.NewGuid () + ".ini");
     File.Copy (fixture, tmp);
@@ -227,6 +262,9 @@ internal static class Program
       encoder.Save (previewStream);
     }
     about.Close ();
+    CheckResourceNavigation (window);
+    CheckSourceWorkspace (window);
+    CheckResourceEditing (window);
 
     // Agent connection: paths with spaces and backslashes survive all three configuration formats.
     const string ServerPath = @"C:\Program Files\Mission Editor\MissionEditor.Mcp.exe";
@@ -349,6 +387,7 @@ internal static class Program
     about.Close ();
     window.Dispatcher.Invoke (() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     bindingListener.Flush ();
+    CheckDefinitionEditing (window);
     Assert (!bindingErrors.ToString ().Split (Environment.NewLine).Any (line => line.Contains ("ListBoxItem") &&
         (line.Contains ("HorizontalContentAlignment") || line.Contains ("VerticalContentAlignment"))),
         "list item alignment has no binding errors: " + bindingErrors);
@@ -358,17 +397,82 @@ internal static class Program
     File.Delete (tmp + ".bak");
     window.Close ();
     app.Shutdown ();
+    if (Directory.Exists (geometryFolder)) Directory.Delete (geometryFolder, true);
+  }
+
+  private static void CheckResourceNavigation (MainWindow owner)
+  {
+    string path = Path.Combine (Path.GetTempPath (), "resource-navigation-" + Guid.NewGuid () + ".ini");
+    File.WriteAllText (path, "[Trigger]\nnickname = resource_links\nCnd_True = no_params\nAct_PopUpDialog = +065537, 00065538\n\n[NNObjective]\nnickname = objective\ntype = ids, 65539\n");
+    try
+    {
+      var vm = new MainViewModel ();
+      vm.ApplyGameFolder (new GameFolderSettings { GameFolder = path + ".no-installation" });
+      vm.Load (path);
+      var line = vm.SelectedSectionLines.Single (item => item.Text.StartsWith ("Act_PopUpDialog"));
+      if (line.ResourceLinks.Count != 2 || line.ResourceLinks[0].Ids == line.ResourceLinks[1].Ids)
+        throw new Exception ("Popup IDs must remain individually navigable without an installation");
+      var source = new SourceWindow (vm) { Owner = owner };
+      var requested = new List<int> ();
+      source.AddHandler (MissionEditor.App.Controls.SourceLineView.ResourceSelectedEvent,
+          new RoutedEventHandler ((_, args) => requested.Add (((ResourceLinkItem)args.OriginalSource).Ids)));
+      source.Show ();
+      source.UpdateLayout ();
+      static IEnumerable<DependencyObject> Descendants (DependencyObject parent)
+      {
+        for (int index = 0; index < VisualTreeHelper.GetChildrenCount (parent); index++)
+        {
+          DependencyObject child = VisualTreeHelper.GetChild (parent, index);
+          yield return child;
+          foreach (DependencyObject descendant in Descendants (child)) yield return descendant;
+        }
+      }
+      var renderedLine = Descendants (source).OfType<MissionEditor.App.Controls.SourceLineView> ().Single (item => item.Line == line);
+      var code = ((Grid)renderedLine.Content).Children.OfType<TextBlock> ().Single (item => item.Name == "CodeText");
+      var links = code.Inlines.OfType<System.Windows.Documents.Hyperlink> ().ToArray ();
+      foreach (var link in links) link.RaiseEvent (new RoutedEventArgs (System.Windows.Documents.Hyperlink.ClickEvent));
+      if (links.Length != 2 || !requested.SequenceEqual (new[] { 65537, 65538 })
+          || links.Any (link => link.TextDecorations != TextDecorations.Underline))
+        throw new Exception ("Both missing inline IDs must raise separate navigations and use underline");
+      if (vm.ShowSourceLine (8)?.Number != 8 || vm.DetailsTitle.Contains ("resource_links"))
+        throw new Exception ("Usage navigation must select exact non-trigger sections");
+      source.SelectLine (8);
+      vm.RefreshResourceHints ();
+      if (!vm.DetailsTitle.Contains ("NNObjective")) throw new Exception ("Reloading resources must retain non-trigger source context");
+      if (vm.SelectedSourceLine?.Number != 8 || vm.SelectedResourceLink?.Ids != 65539)
+        throw new Exception ("Resource reload must retain exact non-trigger line and selected resource role");
+      SavePreview (source, "resource-source");
+      source.Width = source.MinWidth;
+      source.UpdateLayout ();
+      SavePreview (source, "resource-source-narrow");
+      source.Close ();
+      var browser = new ResourceBrowserWindow { Owner = owner };
+      if (!browser.RefreshContext (vm.Script, null, path) || !browser.NavigateToId (65538))
+        throw new Exception ("Missing-resource links must navigate successfully");
+      browser.Show ();
+      browser.UpdateLayout ();
+      SavePreview (browser, "resource-browser-missing");
+      browser.Width = browser.MinWidth;
+      browser.UpdateLayout ();
+      SavePreview (browser, "resource-browser-narrow");
+      browser.Close ();
+      owner.Activate ();
+      owner.Dispatcher.Invoke (() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+      Console.WriteLine ("PASS separate source/browser windows, missing-resource navigation and non-trigger usage selection");
+    }
+    finally { File.Delete (path); }
   }
 
   // With MISSION_EDITOR_PREVIEW_DIR set, saves a DPI-aware picture of the window there for a visual check.
-  private static void SavePreview (FrameworkElement window, string name)
+  private static void SavePreview (FrameworkElement window, string name, double? renderScale = null)
   {
     if (Environment.GetEnvironmentVariable ("MISSION_EDITOR_PREVIEW_DIR") is not { Length: > 0 } folder)
       return;
     window.UpdateLayout ();
     var dpi = VisualTreeHelper.GetDpi (window);
-    var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap ((int)(window.ActualWidth * dpi.DpiScaleX), (int)(window.ActualHeight * dpi.DpiScaleY),
-        dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+    double scaleX = renderScale ?? dpi.DpiScaleX, scaleY = renderScale ?? dpi.DpiScaleY;
+    var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap ((int)(window.ActualWidth * scaleX), (int)(window.ActualHeight * scaleY),
+        96 * scaleX, 96 * scaleY, PixelFormats.Pbgra32);
     var visual = new DrawingVisual ();
     using (var drawing = visual.RenderOpen ())
       drawing.DrawRectangle (new VisualBrush (window), null, new Rect (0, 0, window.ActualWidth, window.ActualHeight));

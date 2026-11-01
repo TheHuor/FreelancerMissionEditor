@@ -164,7 +164,7 @@ public sealed partial class MainViewModel : ObservableObject
   public IReadOnlyList<SectionLineItem> SelectedSectionLines
   {
     get => _sectionLines;
-    private set => SetProperty (ref _sectionLines, value);
+    private set { if (SetProperty (ref _sectionLines, value)) RefreshSourceRows (); }
   }
 
   /// <summary>
@@ -403,7 +403,18 @@ public sealed partial class MainViewModel : ObservableObject
       while (lines.Count > 1 && lines[^1].Kind == IniLineKind.Blank)
         lines.RemoveAt (lines.Count - 1);
       items.AddRange (lines.Select (line => new SectionLineItem (line.Number, line.Text, _findingsByLine[line.Number].ToList (),
-          note: gameData?.DescribeIds (line, section.Name))));
+          note: gameData?.DescribeIds (line, section.Name))
+      {
+        ResourceLinks = ResourceReferences.Where (reference => reference.LineNumber == line.Number)
+            .Select (reference => new ResourceLinkItem (reference, gameData?.Texts?.Resolve (reference.Ids))).ToArray (),
+        ResourceErrors = MissionResourceIndex.Parameters (line, section.Name)
+            .Where (parameter => !int.TryParse (line.GetValue (parameter.Index), out _))
+            .Select (parameter => $"{parameter.Role}: '{line.GetValue (parameter.Index)}' ist keine gültige numerische IDS.")
+            .Concat (MissionResourceIndex.ObjectTargets (line, section)
+                .Where (target => gameData?.Definition (target.Kind, line.GetValue (target.Index))?.NameIds is null)
+                .Select (target => $"{target.Label} · {line.GetValue (target.Index)} · {(gameData is null ? "Spielressourcen nicht geladen" : "kein Anzeigename zugeordnet")}"))
+            .ToArray (),
+      }));
     }
     return items;
   }

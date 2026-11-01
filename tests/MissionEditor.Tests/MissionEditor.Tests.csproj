@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Compile Include="..\Fixtures\ResourceDllFixture.cs" Link="GameData\ResourceDllFixture.cs" />
   </ItemGroup>
 
   <ItemGroup>

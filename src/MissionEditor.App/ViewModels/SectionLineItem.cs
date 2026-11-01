@@ -6,6 +6,10 @@ namespace MissionEditor.App.ViewModels;
 /// <summary>One line of the section preview, marked when a finding points at it.</summary>
 public sealed class SectionLineItem (int number, string text, IReadOnlyList<FindingItem> findings, bool isCaption = false, IniSection? section = null, string? note = null)
 {
+  /// <summary>Structured, separate resource references on this physical line.</summary>
+  public IReadOnlyList<ResourceLinkItem> ResourceLinks { get; init; } = [];
+  /// <summary>Recognized malformed IDS parameters, kept separate from valid numeric navigation.</summary>
+  public IReadOnlyList<string> ResourceErrors { get; init; } = [];
   /// <summary>The text behind the line's IDS numbers, or null.</summary>
   public string? Note { get; } = note;
 

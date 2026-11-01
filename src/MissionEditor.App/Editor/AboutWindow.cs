@@ -66,7 +66,7 @@ public partial class AboutWindow : Window
     }
     catch (Win32Exception exception)
     {
-      MessageBox.Show (this, exception.Message, "Link kann nicht geöffnet werden", MessageBoxButton.OK, MessageBoxImage.Information);
+      ThemedMessageBox.Show (this, exception.Message, "Link kann nicht geöffnet werden", MessageBoxButton.OK, MessageBoxImage.Information);
     }
   }
 
