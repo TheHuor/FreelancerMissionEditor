@@ -1,0 +1,64 @@
+<Window x:Class="MissionEditor.App.ResourceBrowserWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Ressourcentexte" Width="1120" Height="760" MinWidth="840" MinHeight="560"
+ Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource TextBrush}" WindowStartupLocation="CenterOwner">
+ <Grid Margin="14">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel>
+   <TextBlock Text="Ressourcentexte" FontSize="24" FontWeight="SemiBold"/>
+   <DockPanel Margin="0,5,0,10"><Button DockPanel.Dock="Right" Content="Spielordner wählen…" Click="OnGameFolder"/><TextBlock x:Name="ContextText" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Foreground="{DynamicResource MutedTextBrush}"/></DockPanel>
+  </StackPanel>
+  <Grid Grid.Row="1" Margin="0,0,0,8">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <ComboBox x:Name="ScopeBox" SelectedIndex="0" SelectionChanged="OnScopeChanged" ToolTip="Suchbereich" Margin="0,0,8,0"><ComboBoxItem Content="Aktuelle Mission"/><ComboBoxItem Content="Gesamte Installation"/></ComboBox>
+   <TextBox x:Name="SearchBox" Grid.Column="1" TextChanged="OnFilterChanged" ToolTip="Nach IDS oder vollständigem Text suchen" AutomationProperties.Name="IDS oder Text suchen"/>
+   <Button Grid.Column="2" Content="Filter zurücksetzen" Click="OnResetFilters" Margin="8,0,0,0"/>
+   <Button Grid.Column="3" Content="Ressourcen neu laden" Click="OnReload" Margin="8,0,0,0"/>
+  </Grid>
+  <WrapPanel Grid.Row="2" Margin="0,0,0,8">
+   <TextBlock Text="Verwendung:" VerticalAlignment="Center" Margin="0,0,5,0"/><ComboBox x:Name="CategoryBox" Width="165" SelectionChanged="OnFilterChanged" Margin="0,0,12,0"/>
+   <TextBlock Text="DLL:" VerticalAlignment="Center" Margin="0,0,5,0"/><ComboBox x:Name="DllBox" Width="165" SelectionChanged="OnFilterChanged" Margin="0,0,12,0"/>
+   <TextBlock Text="Typ:" VerticalAlignment="Center" Margin="0,0,5,0"/><ComboBox x:Name="KindBox" Width="110" SelectedIndex="0" SelectionChanged="OnFilterChanged" Margin="0,0,12,0"><ComboBoxItem Content="Alle Typen"/><ComboBoxItem Content="String"/><ComboBoxItem Content="Infocard"/></ComboBox>
+   <TextBlock Text="Sortieren:" VerticalAlignment="Center" Margin="0,0,5,0"/><ComboBox x:Name="SortBox" Width="120" SelectedIndex="0" SelectionChanged="OnFilterChanged"><ComboBoxItem Content="IDS"/><ComboBoxItem Content="DLL"/><ComboBoxItem Content="Verwendung"/></ComboBox>
+  </WrapPanel>
+  <Grid Grid.Row="3" x:Name="BodyGrid">
+   <Grid.ColumnDefinitions><ColumnDefinition x:Name="ListColumn" Width="35*" MinWidth="210"/><ColumnDefinition Width="6"/><ColumnDefinition Width="65*" MinWidth="350"/></Grid.ColumnDefinitions>
+   <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <TextBlock x:Name="CountText" Margin="0,0,0,6" Foreground="{DynamicResource MutedTextBrush}"/>
+    <ListBox x:Name="ResourceList" Grid.Row="1" SelectionChanged="OnSelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" HorizontalContentAlignment="Stretch">
+     <ListBox.ItemTemplate><DataTemplate><Grid Margin="3,5" ToolTip="{Binding DllPath}"><Grid.ColumnDefinitions><ColumnDefinition Width="82"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <TextBlock Text="{Binding IdLabel}" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold"/>
+      <StackPanel Grid.Column="1"><TextBlock Text="{Binding Preview}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Detail}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource MutedTextBrush}"/></StackPanel>
+     </Grid></DataTemplate></ListBox.ItemTemplate>
+    </ListBox>
+   </Grid>
+   <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"/>
+   <Grid Grid.Column="2" Margin="12,0,0,0">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="6"/><RowDefinition x:Name="UsageRow" Height="170" MinHeight="32"/></Grid.RowDefinitions>
+    <ScrollViewer x:Name="DetailHeaderScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
+     <DockPanel><StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="ID kopieren" Click="OnCopyId"/><Button Content="Text kopieren" Click="OnCopyText" Margin="6,0,0,0"/></StackPanel><TextBlock x:Name="IdText" Text="ID auswählen" FontSize="21" FontWeight="SemiBold"/></DockPanel>
+     <TextBlock x:Name="MetadataText" TextWrapping="Wrap" Margin="0,5,0,4" Foreground="{DynamicResource MutedTextBrush}"/>
+     <DockPanel><ComboBox x:Name="LanguageBox" DockPanel.Dock="Right" MinWidth="140" MaxWidth="200" Margin="8,0,0,0" SelectionChanged="OnLanguageChanged" ToolTip="Tatsächliche Sprachvariante"/><TextBlock x:Name="ResolutionText" TextWrapping="Wrap"/></DockPanel>
+     <Expander Header="Technische Details" Margin="0,4,0,4"><TextBlock x:Name="TechnicalText" TextWrapping="Wrap"/></Expander>
+     <TextBlock x:Name="DraftText" TextWrapping="Wrap" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,5"/>
+    </StackPanel></ScrollViewer>
+    <Grid Grid.Row="1">
+     <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <TabControl x:Name="ContentTabs">
+      <TabItem Header="Vorschau"><TextBox x:Name="PreviewText" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" BorderThickness="0" Padding="9"/></TabItem>
+      <TabItem x:Name="EditTab" Header="Bearbeiten"><Grid><TextBox x:Name="StringEditor" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" TextChanged="OnEditorChanged"/><ScrollViewer x:Name="SegmentScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed"><StackPanel x:Name="SegmentPanel"/></ScrollViewer></Grid></TabItem>
+      <TabItem x:Name="XmlTab" Header="RDL/XML" Visibility="Collapsed"><TextBox x:Name="XmlEditor" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontFamily="Consolas" TextChanged="OnXmlChanged"/></TabItem>
+     </TabControl>
+     <WrapPanel Grid.Row="1" Margin="0,7,0,6"><Button x:Name="ApplyButton" Content="Änderungen übernehmen" Click="OnApply"/><Button x:Name="DiscardButton" Content="Diese ID verwerfen" Click="OnDiscard" Margin="6,0,0,0"/><Button x:Name="SaveButton" Content="Speichern" Click="OnSave" Margin="6,0,0,0"/><Button x:Name="SaveAsButton" Content="Speichern unter…" Click="OnSaveAs" Margin="6,0,0,0"/></WrapPanel>
+    </Grid>
+    <GridSplitter Grid.Row="2" Height="6" HorizontalAlignment="Stretch"/>
+    <Expander x:Name="UsageExpander" Grid.Row="3" Header="Wird verwendet von · Aktuelle Mission" IsExpanded="True">
+     <Grid><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><ListBox x:Name="UsageList" MouseDoubleClick="OnUsage" ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch"><ListBox.ItemTemplate><DataTemplate><StackPanel Margin="3"><TextBlock Text="{Binding Location}" TextWrapping="Wrap" Foreground="{DynamicResource AccentBrush}"/><TextBlock Text="{Binding Description}" TextWrapping="Wrap" FontSize="12"/></StackPanel></DataTemplate></ListBox.ItemTemplate></ListBox><Button Grid.Row="1" Content="Zur Fundstelle" Click="OnUsage" HorizontalAlignment="Left" Margin="0,4,0,0"/></Grid>
+    </Expander>
+   </Grid>
+  </Grid>
+  <DockPanel Grid.Row="4" Margin="0,9,0,0"><Button x:Name="CancelIndexButton" DockPanel.Dock="Right" Content="Indexierung abbrechen" Click="OnCancelIndex" Visibility="Collapsed"/><TextBlock x:Name="StatusText" Text="ID auswählen, um Text und Fundstellen zu lesen" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}"/></DockPanel>
+ </Grid>
+</Window>

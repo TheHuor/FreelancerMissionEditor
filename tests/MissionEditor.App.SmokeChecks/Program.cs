@@ -6,11 +6,13 @@ using System.Windows.Media;
 using MissionEditor.App;
 using MissionEditor.App.ViewModels;
 
-internal static class Program
+internal static partial class Program
 {
   [STAThread]
   private static void Main ()
   {
+    string geometryFolder = Path.Combine (Path.GetTempPath (), "mission-window-checks-" + Guid.NewGuid ());
+    Environment.SetEnvironmentVariable ("MISSION_EDITOR_WINDOW_SETTINGS_DIR", geometryFolder);
     using var bindingErrors = new StringWriter ();
     using var bindingListener = new System.Diagnostics.TextWriterTraceListener (bindingErrors);
     System.Diagnostics.PresentationTraceSources.DataBindingSource.Listeners.Add (bindingListener);
@@ -21,6 +23,8 @@ internal static class Program
     var fixture = Path.Combine (repository?.FullName ?? throw new Exception ("Repository root not found"), "tests", "Fixtures", "Missions", "m13sp.ini");
     var app = new App ();
     app.InitializeComponent ();
+    SynchronizationContext.SetSynchronizationContext (new System.Windows.Threading.DispatcherSynchronizationContext (
+        System.Windows.Threading.Dispatcher.CurrentDispatcher));
     // Load the same resource as application startup, including its feature folder.
     var window = (MainWindow)Application.LoadComponent (app.StartupUri);
     window.WindowState = WindowState.Normal;
@@ -68,6 +72,8 @@ internal static class Program
     foreach (var listName in new[] { "TriggerList", "SectionPreview" })
     {
       var list = (ListBox)window.FindName (listName);
+      list.ScrollIntoView (list.Items[0]);
+      window.UpdateLayout ();
       var item = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex (0);
       Assert (item is not null &&
           System.Windows.Data.BindingOperations.GetBindingExpression (item, Control.HorizontalContentAlignmentProperty) is null &&
@@ -227,6 +233,8 @@ internal static class Program
       encoder.Save (previewStream);
     }
     about.Close ();
+    CheckResourceNavigation (window);
+    CheckResourceEditing (window);
 
     // Agent connection: paths with spaces and backslashes survive all three configuration formats.
     const string ServerPath = @"C:\Program Files\Mission Editor\MissionEditor.Mcp.exe";
@@ -358,17 +366,80 @@ internal static class Program
     File.Delete (tmp + ".bak");
     window.Close ();
     app.Shutdown ();
+    if (Directory.Exists (geometryFolder)) Directory.Delete (geometryFolder, true);
+  }
+
+  private static void CheckResourceNavigation (MainWindow owner)
+  {
+    string path = Path.Combine (Path.GetTempPath (), "resource-navigation-" + Guid.NewGuid () + ".ini");
+    File.WriteAllText (path, "[Trigger]\nnickname = resource_links\nCnd_True = no_params\nAct_PopUpDialog = +065537, 00065538\n\n[NNObjective]\nnickname = objective\ntype = ids, 65539\n");
+    try
+    {
+      var vm = new MainViewModel ();
+      vm.ApplyGameFolder (new GameFolderSettings { GameFolder = path + ".no-installation" });
+      vm.Load (path);
+      var line = vm.SelectedSectionLines.Single (item => item.Text.StartsWith ("Act_PopUpDialog"));
+      if (line.ResourceLinks.Count != 2 || line.ResourceLinks[0].Ids == line.ResourceLinks[1].Ids)
+        throw new Exception ("Popup IDs must remain individually navigable without an installation");
+      var source = new SourceWindow (vm) { Owner = owner };
+      var requested = new List<int> ();
+      source.AddHandler (MissionEditor.App.Controls.SourceLineView.ResourceRequestedEvent,
+          new RoutedEventHandler ((_, args) => requested.Add (((ResourceLinkItem)args.OriginalSource).Ids)));
+      source.Show ();
+      source.UpdateLayout ();
+      static IEnumerable<DependencyObject> Descendants (DependencyObject parent)
+      {
+        for (int index = 0; index < VisualTreeHelper.GetChildrenCount (parent); index++)
+        {
+          DependencyObject child = VisualTreeHelper.GetChild (parent, index);
+          yield return child;
+          foreach (DependencyObject descendant in Descendants (child)) yield return descendant;
+        }
+      }
+      var renderedLine = Descendants (source).OfType<MissionEditor.App.Controls.SourceLineView> ().Single (item => item.Line == line);
+      var code = (TextBlock)((ScrollViewer)((StackPanel)renderedLine.Content).Children[0]).Content;
+      var links = code.Inlines.OfType<System.Windows.Documents.Hyperlink> ().ToArray ();
+      foreach (var link in links) link.RaiseEvent (new RoutedEventArgs (System.Windows.Documents.Hyperlink.ClickEvent));
+      if (links.Length != 2 || !requested.SequenceEqual (new[] { 65537, 65538 })
+          || links.Any (link => link.TextDecorations != TextDecorations.Underline))
+        throw new Exception ("Both missing inline IDs must raise separate navigations and use underline");
+      if (vm.ShowSourceLine (8)?.Number != 8 || vm.DetailsTitle.Contains ("resource_links"))
+        throw new Exception ("Usage navigation must select exact non-trigger sections");
+      source.SelectLine (8);
+      vm.RefreshResourceHints ();
+      if (!vm.DetailsTitle.Contains ("NNObjective")) throw new Exception ("Reloading resources must retain non-trigger source context");
+      SavePreview (source, "resource-source");
+      source.Width = source.MinWidth;
+      source.UpdateLayout ();
+      SavePreview (source, "resource-source-narrow");
+      source.Close ();
+      var browser = new ResourceBrowserWindow { Owner = owner };
+      if (!browser.RefreshContext (vm.Script, null, path) || !browser.NavigateToId (65538))
+        throw new Exception ("Missing-resource links must navigate successfully");
+      browser.Show ();
+      browser.UpdateLayout ();
+      SavePreview (browser, "resource-browser-missing");
+      browser.Width = browser.MinWidth;
+      browser.UpdateLayout ();
+      SavePreview (browser, "resource-browser-narrow");
+      browser.Close ();
+      owner.Activate ();
+      owner.Dispatcher.Invoke (() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+      Console.WriteLine ("PASS separate source/browser windows, missing-resource navigation and non-trigger usage selection");
+    }
+    finally { File.Delete (path); }
   }
 
   // With MISSION_EDITOR_PREVIEW_DIR set, saves a DPI-aware picture of the window there for a visual check.
-  private static void SavePreview (FrameworkElement window, string name)
+  private static void SavePreview (FrameworkElement window, string name, double? renderScale = null)
   {
     if (Environment.GetEnvironmentVariable ("MISSION_EDITOR_PREVIEW_DIR") is not { Length: > 0 } folder)
       return;
     window.UpdateLayout ();
     var dpi = VisualTreeHelper.GetDpi (window);
-    var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap ((int)(window.ActualWidth * dpi.DpiScaleX), (int)(window.ActualHeight * dpi.DpiScaleY),
-        dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+    double scaleX = renderScale ?? dpi.DpiScaleX, scaleY = renderScale ?? dpi.DpiScaleY;
+    var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap ((int)(window.ActualWidth * scaleX), (int)(window.ActualHeight * scaleY),
+        96 * scaleX, 96 * scaleY, PixelFormats.Pbgra32);
     var visual = new DrawingVisual ();
     using (var drawing = visual.RenderOpen ())
       drawing.DrawRectangle (new VisualBrush (window), null, new Rect (0, 0, window.ActualWidth, window.ActualHeight));

@@ -1,4 +1,8 @@
-<Window x:Class="MissionEditor.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:MissionEditor.App.Controls" xmlns:viewModels="clr-namespace:MissionEditor.App.ViewModels" Style="{StaticResource {x:Type Window}}" Title="{Binding WindowTitle}" Width="1400" Height="900" MinWidth="1120" MinHeight="700" WindowState="Maximized" AllowDrop="True" Drop="OnFileDrop" Closing="OnWindowClosing">
+<Window x:Class="MissionEditor.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:MissionEditor.App.Controls"
+        xmlns:viewModels="clr-namespace:MissionEditor.App.ViewModels"
+        Style="{StaticResource {x:Type Window}}" Title="{Binding WindowTitle}" Width="1400" Height="900" MinWidth="1120" MinHeight="700" WindowState="Maximized" AllowDrop="True" Drop="OnFileDrop" Closing="OnWindowClosing">
   <Window.DataContext>
     <viewModels:MainViewModel />
   </Window.DataContext>
@@ -88,6 +92,7 @@
       <WrapPanel>
         <Button Style="{StaticResource {x:Type Button}}" Command="{x:Static ApplicationCommands.Open}" Content="Öffnen…" ToolTip="Missions-INI öffnen (Strg+O, oder Datei hineinziehen)" />
         <Button Style="{StaticResource {x:Type Button}}" Command="{x:Static NavigationCommands.Refresh}" Content="Neu laden" ToolTip="Datei neu laden und prüfen (F5)" />
+        <Button Content="Ressourcentexte…" Click="OnOpenResources" ToolTip="Ressourcen der aktuellen Mission und Installation durchsuchen" />
         <Button Style="{StaticResource {x:Type Button}}" Command="{x:Static ApplicationCommands.Save}" Content="Speichern" ToolTip="Änderungen in die Datei schreiben (Strg+S); beim ersten Mal wird eine .bak-Sicherung angelegt" />
         <Button Style="{StaticResource {x:Type Button}}" Command="{x:Static ApplicationCommands.SaveAs}" Content="Speichern unter…" ToolTip="In eine andere Datei speichern" />
         <Button Style="{StaticResource {x:Type Button}}" Command="{Binding UndoCommand}" Content="↶ Rückgängig" ToolTip="Letzte Änderung zurücknehmen (Strg+Z)" />
@@ -114,7 +119,7 @@
             </ContextMenu>
           </Button.ContextMenu>
         </Button>
-        <Button Content="Über…" Click="OnAbout" Margin="6,0,0,0" ToolTip="Versionen und Referenzen"/>
+        <Button Content="Über…" Click="OnAbout" Margin="6,0,0,0" ToolTip="Versionen und Referenzen" />
       </WrapPanel>
     </Border>
     <!-- Shown when another program (e.g. the AI agent) changed the open file on disk. -->
@@ -378,8 +383,11 @@
         </TabControl>
         <GridSplitter Grid.Row="4" HorizontalAlignment="Stretch" />
         <DockPanel Grid.Row="5">
-          <TextBlock DockPanel.Dock="Top" Text="Quelltext" Style="{StaticResource PanelHeading}" Margin="0,8" />
-          <ListBox x:Name="SectionPreview" ItemsSource="{Binding SelectedSectionLines}" SelectionMode="Extended" MouseDoubleClick="OnSectionPreviewDoubleClick" ScrollViewer.HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="13" HorizontalContentAlignment="Stretch" KeyDown="OnSectionPreviewKeyDown" ToolTip="Strg+C kopiert die markierten Zeilen" ToolTipService.InitialShowDelay="2000">
+          <DockPanel DockPanel.Dock="Top" Margin="0,8">
+            <Button DockPanel.Dock="Right" Content="Groß öffnen…" Click="OnOpenSource" Padding="6,1" />
+            <TextBlock Text="Quelltext" Style="{StaticResource PanelHeading}" />
+          </DockPanel>
+          <ListBox x:Name="SectionPreview" ItemsSource="{Binding SelectedSectionLines}" SelectionMode="Extended" MouseDoubleClick="OnSectionPreviewDoubleClick" ScrollViewer.HorizontalScrollBarVisibility="Disabled" FontFamily="Consolas" FontSize="13" HorizontalContentAlignment="Stretch" KeyDown="OnSectionPreviewKeyDown" ToolTip="Strg+C kopiert die markierten Zeilen" ToolTipService.InitialShowDelay="2000">
             <ListBox.ItemContainerStyle>
               <Style TargetType="ListBoxItem" BasedOn="{StaticResource ClearSelectionItem}">
                 <Setter Property="Padding" Value="0" />
@@ -393,7 +401,7 @@
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="54" />
                       <ColumnDefinition Width="20" />
-                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                       <RowDefinition Height="Auto" />
@@ -405,12 +413,7 @@
                       <Button Content="Bearbeiten" Padding="6,0" Margin="0,0,4,0" FontFamily="Segoe UI" Click="OnEditSection" ToolTip="Diesen Abschnitt im Textfenster bearbeiten" />
                       <Button Content="Löschen" Style="{StaticResource DangerButton}" Padding="6,0" FontFamily="Segoe UI" Click="OnDeleteSection" ToolTip="Diesen Abschnitt aus der Datei entfernen (Strg+Z macht es rückgängig)" />
                     </StackPanel>
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                      <TextBlock x:Name="LineText" Text="{Binding Text}" TextWrapping="NoWrap" />
-                      <!-- The text behind IDS numbers, from the resource DLLs of the game. -->
-                      <TextBlock Text="{Binding NoteText}" Margin="16,0,0,0" FontFamily="Segoe UI" FontStyle="Italic" Foreground="{StaticResource MutedTextBrush}" TextWrapping="NoWrap"
-                                 Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}" ToolTip="Text aus den Ressourcen-DLLs des Spiels" />
-                    </StackPanel>
+                    <controls:SourceLineView x:Name="LineText" Grid.Column="2" Line="{Binding}" />
                   </Grid>
                 </Border>
                 <DataTemplate.Triggers>

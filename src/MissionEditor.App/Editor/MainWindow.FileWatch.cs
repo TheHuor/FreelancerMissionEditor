@@ -74,6 +74,8 @@ public partial class MainWindow
 
   private void OnReloadAfterDiskChange (object sender, RoutedEventArgs args)
   {
+    if (!CanLeaveResources ("Mission neu laden"))
+      return;
     if (ViewModel.FilePath is not { } path)
       return;
     if (ViewModel.IsModified && MessageBox.Show (this, "Deine ungespeicherten Änderungen gehen verloren. Trotzdem neu laden?", "Neu laden",

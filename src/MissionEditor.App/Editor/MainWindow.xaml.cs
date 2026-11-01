@@ -24,6 +24,7 @@ public partial class MainWindow : Window
   public MainWindow ()
   {
     InitializeComponent ();
+    InitializeResourceWindows ();
     SizeChanged += (_, _) => ConstrainFindingsHeight ();
     string[] arguments = Environment.GetCommandLineArgs ();
     if (arguments.Length > 1)
@@ -121,6 +122,8 @@ public partial class MainWindow : Window
 
   private void OnGameFolder (object sender, RoutedEventArgs args)
   {
+    if (!CanLeaveResources ("Spielinstallation wechseln"))
+      return;
     var dialog = new GameFolderWindow (GameFolderSettings.Load (), ViewModel.FilePath) { Owner = this };
     if (dialog.ShowDialog () == true)
     {
@@ -244,6 +247,8 @@ public partial class MainWindow : Window
 
   private void OnSaveAs (object sender, ExecutedRoutedEventArgs args)
   {
+    if (!CanLeaveResources ("Missionsdatei wechseln"))
+      return;
     var dialog = new SaveFileDialog { Filter = FileFilter, FileName = Path.GetFileName (ViewModel.FilePath ?? "mission.ini") };
     if (dialog.ShowDialog (this) != true)
       return;
@@ -282,6 +287,8 @@ public partial class MainWindow : Window
   // Asks what to do with unsaved changes; false means the caller should stop.
   private bool ConfirmDiscard ()
   {
+    if (!CanLeaveResources ("Mission schließen oder neu laden"))
+      return false;
     if (!ViewModel.IsModified)
       return true;
     MessageBoxResult answer = MessageBox.Show (this,
