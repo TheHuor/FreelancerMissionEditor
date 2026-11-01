@@ -27,7 +27,7 @@ public static class MissionChecker
   /// <summary>Runs every check, the game data check with the given game data (none: skipped), sorted by line.</summary>
   public static IReadOnlyList<Finding> Run (MissionScript script, GameData? gameData)
   {
-    IEnumerable<IMissionCheck> checks = gameData is null ? AllChecks : AllChecks.Append (new GameDataCheck (gameData));
+    IEnumerable<IMissionCheck> checks = gameData is null ? AllChecks : AllChecks.Concat ([new GameDataCheck (gameData), new ResourceRenderingCheck (gameData)]);
     return checks.SelectMany (check => check.Run (script)).OrderBy (finding => finding.LineNumber).ToArray ();
   }
 }

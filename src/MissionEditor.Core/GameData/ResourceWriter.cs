@@ -5,6 +5,30 @@ namespace MissionEditor.Core.Model;
 /// <summary>An immutable, validated change against an actual resource language and complete source-file fingerprint.</summary>
 public sealed record ResourceDraft (ResourceEntry Original, string EditedText, string OriginalFileHash)
 {
+  private byte[]? _editedBytes;
+  /// <summary>Exact validated infocard bytes, when edited in the byte editor.</summary>
+  public byte[]? EditedBytes => _editedBytes?.ToArray ();
+
+  /// <summary>Decode and validate an exact infocard byte edit before it can be saved.</summary>
+  public static string DecodeBytes (ResourceEntry original, byte[] bytes)
+  {
+    if (original.Identity?.Kind != ResourceKind.Infocard) throw new InvalidDataException ("Bytebearbeitung ist nur für Infocards verfügbar; Stringblöcke enthalten mehrere IDs.");
+    string text = ResourceEncoding.ReadInfocard (bytes);
+    Validate (original, text);
+    return text;
+  }
+
+  /// <summary>Encode edited text using the original infocard encoding and envelope.</summary>
+  public static byte[] EncodeText (ResourceEntry original, string text) => original.Identity?.Kind == ResourceKind.Infocard
+      ? ResourceEncoding.InfocardBytes (original.RawBytes ?? [], text)
+      : throw new InvalidDataException ("Keine Infocard ausgewählt.");
+
+  /// <summary>Create a draft preserving exact validated bytes and the existing conflict fingerprint.</summary>
+  public static ResourceDraft CreateBytes (ResourceEntry original, byte[] bytes, string? sourceHash = null)
+  {
+    byte[] snapshot = bytes.ToArray ();
+    return new (original, DecodeBytes (original, snapshot), sourceHash ?? CaptureSourceHash (original)) { _editedBytes = snapshot };
+  }
   /// <summary>Validate a draft and capture its source state. Original bytes remain a second direct-save conflict guard, permitting copy recovery from stale selections.</summary>
   public static ResourceDraft Create (ResourceEntry original, string editedText)
   {
@@ -28,7 +52,12 @@ public static class ResourceWriter
   public static ResourceSaveResult Save (IReadOnlyList<ResourceDraft> drafts, string? destinationPath = null)
   {
     if (drafts.Count == 0) throw new ArgumentException ("Keine Ressourcenentwürfe ausgewählt.", nameof (drafts));
-    foreach (ResourceDraft draft in drafts) Validate (draft.Original, draft.EditedText);
+    foreach (ResourceDraft draft in drafts)
+    {
+      Validate (draft.Original, draft.EditedText);
+      if (draft.EditedBytes is { } raw && ResourceDraft.DecodeBytes (draft.Original, raw) != draft.EditedText)
+        throw new InvalidDataException ("Byteentwurf und Text stimmen nicht überein.");
+    }
     string source = Path.GetFullPath (drafts[0].Original.Identity!.DllPath);
     if (drafts.Any (draft => !string.Equals (Path.GetFullPath (draft.Original.Identity!.DllPath), source, StringComparison.OrdinalIgnoreCase)))
       throw new ArgumentException ("Ressourcen müssen pro DLL gespeichert werden.", nameof (drafts));
@@ -64,7 +93,7 @@ public static class ResourceWriter
       else
       {
         if (group.Count () > 1) throw new ArgumentException ("Mehrere Entwürfe für dieselbe Infocard-Sprachvariante.");
-        expected[group.Key] = ResourceEncoding.InfocardBytes (blob.Bytes, group.First ().EditedText);
+        expected[group.Key] = group.First ().EditedBytes ?? ResourceEncoding.InfocardBytes (blob.Bytes, group.First ().EditedText);
       }
     }
     string parent = Path.GetDirectoryName (target)!;

@@ -183,6 +183,19 @@
       </Trigger>
     </Style.Triggers>
   </Style>
+  <Style TargetType="RichTextBox" BasedOn="{StaticResource BaseControl}">
+    <Setter Property="Background" Value="{StaticResource InputBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+    <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}" />
+    <Setter Property="SelectionBrush" Value="{StaticResource SelectionBrush}" />
+    <Setter Property="SelectionOpacity" Value="0.9" />
+    <Setter Property="SelectionTextBrush" Value="{StaticResource TextBrush}" />
+    <Style.Triggers>
+      <Trigger Property="IsKeyboardFocusWithin" Value="True">
+        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+      </Trigger>
+    </Style.Triggers>
+  </Style>
   <Style TargetType="ComboBox" BasedOn="{StaticResource BaseControl}">
     <Setter Property="Background" Value="{StaticResource InputBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />

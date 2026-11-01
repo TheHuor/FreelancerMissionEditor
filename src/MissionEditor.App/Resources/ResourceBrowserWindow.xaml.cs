@@ -32,6 +32,9 @@ public partial class ResourceBrowserWindow : Window
   private string _baseline = string.Empty;
   private bool _updating;
   private bool _editorDirty;
+  private bool _rdlXmlMode;
+  private bool _rawEditActive;
+  private byte[] _rawBaseline = [];
   private bool _catalogReady;
   private CancellationTokenSource? _indexCancellation;
   private int _generation;
@@ -153,13 +156,14 @@ public partial class ResourceBrowserWindow : Window
     _segments.Clear(); SegmentPanel.Children.Clear();
     IdText.Text = "ID auswählen"; MetadataText.Text = string.Empty; MetadataText.ToolTip = null;
     TechnicalText.Text = string.Empty; DraftText.Text = string.Empty;
+    ContentFormatText.Text = string.Empty; EditingHintText.Text = string.Empty; CompatibilityText.Text = string.Empty; EditTab.Header = "Bearbeiten";
     ResolutionText.Text = "ID auswählen, um Text und Fundstellen zu lesen";
     StringEditor.Clear(); XmlEditor.Clear(); PreviewText.Clear();
-    RawBytesText.Clear(); RawTab.Visibility = Visibility.Collapsed;
+    RawBytesEditor.LoadBytes([]); RawScopeText.Text = string.Empty; RawTab.Visibility = Visibility.Collapsed;
     ResetUndo(StringEditor); ResetUndo(XmlEditor);
     LanguageBox.ItemsSource = null; UsageList.ItemsSource = null;
     UsageExpander.Header = "Wird verwendet von · Aktuelle Mission";
-    XmlTab.Visibility = Visibility.Collapsed; ContentTabs.SelectedIndex = 0;
+    VisualTab.Visibility = Visibility.Collapsed; PreviewTab.Visibility = Visibility.Visible; EditTab.Visibility = Visibility.Visible; VisualEditor.LoadRdl(string.Empty); ContentTabs.SelectedIndex = 0;
     _updating = false;
     UpdateEnabled();
     SetStatus("ID auswählen, um Text und Fundstellen zu lesen");
@@ -288,27 +292,40 @@ public partial class ResourceBrowserWindow : Window
 
   private void ShowEntry(ResourceEntry entry)
   {
+    bool changedResource = _entry?.Identity != entry.Identity;
     _entry = entry;
     _updating = true;
     _editorDirty = false;
     IdText.Text = $"IDS {entry.Ids}";
-    MetadataText.Text = entry.HasRawResource && entry.Identity is { } key ? $"{key.Kind} · {Path.GetFileName(key.DllPath)} · {LanguageName(key.Language)}" : "Keine aufgelöste Ressource";
+    MetadataText.Text = entry.HasRawResource && entry.Identity is { } key ? $"Speichertyp: {ResourcePresentation.Storage(entry)} · {Path.GetFileName(key.DllPath)} · {LanguageName(key.Language)}" : "Keine aufgelöste Ressource";
     MetadataText.ToolTip = entry.Identity?.DllPath;
     TechnicalText.Text = entry.Identity is { } identity ? $"DLL: {identity.DllPath}\nSlot: {identity.Slot} · lokale ID: {identity.LocalId} · "
         + (entry.HasRawResource ? $"Sprache: {identity.Language} (0x{identity.Language:X4})" : "Keine Sprachvariante ermittelt") : entry.StatusText;
     if (entry.Identity is { } saved && _backups.TryGetValue(saved.DllPath, out string? backup)) TechnicalText.Text += "\nLetzte Sicherung: " + backup;
     ResolutionText.Text = entry.StatusText + (entry.Identity?.Kind == ResourceKind.Infocard && !entry.StatusText.Contains("Klartext aus Infocard") ? " · Klartext aus Infocard" : "");
     string content = entry.Identity is { } id && _drafts.TryGetValue(id, out var draft) ? draft.EditedText : entry.RawText ?? entry.Text;
+    UpdateContentDescription(entry, content);
     _baseline = content;
     _infocard = null;
     _segments.Clear();
     SegmentPanel.Children.Clear();
     StringEditor.Visibility = entry.Identity?.Kind == ResourceKind.Infocard ? Visibility.Collapsed : Visibility.Visible;
     SegmentScroll.Visibility = entry.Identity?.Kind == ResourceKind.Infocard ? Visibility.Visible : Visibility.Collapsed;
-    XmlTab.Visibility = entry.Identity?.Kind == ResourceKind.Infocard ? Visibility.Visible : Visibility.Collapsed;
+
     RawTab.Visibility = entry.HasRawResource ? Visibility.Visible : Visibility.Collapsed;
-    RawBytesText.Text = entry.RawBytes is { } rawBytes ? FormatRawBytes(rawBytes) : string.Empty;
-    if (!entry.IsResolved || (ContentTabs.SelectedItem == XmlTab && XmlTab.Visibility == Visibility.Collapsed)) ContentTabs.SelectedIndex = 0;
+    _rawEditActive = false;
+    byte[]? editedBytes = entry.Identity is { } rawId && _drafts.TryGetValue(rawId, out var rawDraft)
+        ? rawDraft.EditedBytes ?? (rawId.Kind == ResourceKind.Infocard ? ResourceDraft.EncodeText(entry, content) : null) : null;
+    RawBytesEditor.IsReadOnly = entry.Identity?.Kind != ResourceKind.Infocard || !entry.CanEdit;
+    byte[] originalBytes = ResourcePresentation.EntryBytes(entry);
+    if (entry.Identity?.Kind == ResourceKind.String)
+      editedBytes = new System.Text.UnicodeEncoding(false, false, true).GetBytes(content);
+    RawBytesEditor.LoadBytes(originalBytes, editedBytes);
+    RawScopeText.Text = entry.Identity?.Kind == ResourceKind.String
+        ? $"Nur IDS {entry.Ids} · UTF-16 LE · Offsets ab Textbeginn; ohne Längenfeld und Nachbareinträge."
+        : $"IDS {entry.Ids} · vollständige Infocard einschließlich Kodierungsmarkierung und Abschlussbytes.";
+    _rawBaseline = RawBytesEditor.Bytes;
+    if (!entry.IsResolved) ContentTabs.SelectedItem = PreviewTab;
     StringEditor.Text = content;
     XmlEditor.Text = content;
     ResetUndo(StringEditor);
@@ -341,17 +358,72 @@ public partial class ResourceBrowserWindow : Window
         SegmentPanel.Children.Add(new TextBlock { Text = "RDL konnte nicht gelesen werden: " + e.Message, TextWrapping = TextWrapping.Wrap });
       }
     }
-    else PreviewText.Text = content;
+    else PreviewText.Text = ResourcePresentation.Preview(content);
     if (!entry.IsResolved) PreviewText.Text = entry.StatusText;
     if (entry.Status == ResourceStatus.DecodeError)
     {
       PreviewText.Text = _infocard?.PlainText ?? content;
-      ContentTabs.SelectedItem = XmlTab;
+      _rdlXmlMode = true;
+      ContentTabs.SelectedItem = VisualTab;
     }
     _updating = false;
     UpdateDraftStatus();
     UpdateEnabled();
+    if (VisualTab.Visibility == Visibility.Visible)
+    {
+      SetRdlMode(_rdlXmlMode);
+      if (ContentTabs.SelectedItem is TabItem selected && selected.Visibility != Visibility.Visible) ContentTabs.SelectedItem = VisualTab;
+    }
+    else if (ContentTabs.SelectedItem == VisualTab) ContentTabs.SelectedItem = PreviewTab;
+    if (changedResource) ContentTabs.SelectedItem = VisualTab.Visibility == Visibility.Visible ? VisualTab : PreviewTab;
     SetStatus(entry.StatusText);
+  }
+
+  private void UpdateContentDescription(ResourceEntry entry, string content)
+  {
+    VisualTab.Visibility = entry.HasRawResource && (entry.Identity?.Kind == ResourceKind.Infocard || ResourcePresentation.IsRdl(content) || ResourcePresentation.IsRdl(ResourcePresentation.Source(entry))) ? Visibility.Visible : Visibility.Collapsed;
+
+    ContentFormatText.Text = $"Inhalt: {ResourcePresentation.Format(entry, content)} · Verwendung: {(_selected?.Categories is { Length: > 0 } category ? category : "Keine in aktueller Mission")}";
+    EditingHintText.Text = ResourcePresentation.Guidance(entry, content);
+    var uses = _referencesByIds[entry.Ids].ToArray();
+    bool shadowed = entry.Identity?.Kind == ResourceKind.Infocard && _gameData?.Texts?.Variants(entry.Ids)
+        .Any(candidate => candidate.Identity?.Kind == ResourceKind.String && candidate.Identity.Language == entry.Identity.Language) == true;
+    string[] warnings = shadowed ? [] : uses.Select(reference => MissionTextUsage.Warning(reference, content)).Where(message => message is not null).Distinct().Cast<string>().ToArray();
+    CompatibilityText.Text = "Anzeige im Spiel: " + MissionTextUsage.Summary(uses)
+        + (shadowed ? "\nFür diese Sprachvariante existiert auch ein String; die geprüften Missionswege laden diesen zuerst." : "")
+        + (warnings.Length == 0 ? "" : "\n" + string.Join("\n", warnings));
+    CompatibilityText.SetResourceReference(TextBlock.ForegroundProperty, warnings.Length == 0 ? "MutedTextBrush" : "WarningBrush");
+    bool rdl = VisualTab.Visibility == Visibility.Visible;
+    PreviewTab.Visibility = rdl ? Visibility.Collapsed : Visibility.Visible;
+    EditTab.Visibility = rdl ? Visibility.Collapsed : Visibility.Visible;
+    EditTab.Header = "Bearbeiten";
+  }
+
+  private void OnContentTabChanged(object sender, SelectionChangedEventArgs e)
+  {
+    if (_updating || !ReferenceEquals(e.Source, ContentTabs) || ContentTabs.SelectedItem != VisualTab || _entry is null) return;
+    SetRdlMode(_rdlXmlMode);
+  }
+
+  private void OnRdlVisualMode(object sender, RoutedEventArgs e) => SetRdlMode(false);
+  private void OnRdlXmlMode(object sender, RoutedEventArgs e) => SetRdlMode(true);
+  private void SetRdlMode(bool xml)
+  {
+    _rdlXmlMode = xml;
+    VisualModeButton.SetResourceReference(Button.BackgroundProperty, xml ? "InputBrush" : "SelectionBrush");
+    VisualModeButton.SetResourceReference(Button.BorderBrushProperty, xml ? "BorderBrush" : "AccentBrush");
+    XmlModeButton.SetResourceReference(Button.BackgroundProperty, xml ? "SelectionBrush" : "InputBrush");
+    XmlModeButton.SetResourceReference(Button.BorderBrushProperty, xml ? "AccentBrush" : "BorderBrush");
+    XmlEditor.Visibility = xml ? Visibility.Visible : Visibility.Collapsed;
+    VisualEditor.Visibility = xml ? Visibility.Collapsed : Visibility.Visible;
+    if (!xml && _entry is not null) VisualEditor.LoadRdl(_entry.Identity?.Kind == ResourceKind.String ? StringEditor.Text : XmlEditor.Text);
+  }
+
+  private void OnVisualRdlChanged(object? sender, EventArgs e)
+  {
+    if (_updating || _entry is null) return;
+    if (_entry.Identity?.Kind == ResourceKind.String) StringEditor.Text = VisualEditor.Rdl;
+    else XmlEditor.Text = VisualEditor.Rdl;
   }
 
   private void UpdateUsages(int ids)
@@ -388,8 +460,13 @@ public partial class ResourceBrowserWindow : Window
   private void OnEditorChanged(object sender, TextChangedEventArgs e)
   {
     if (_updating || _entry?.Identity?.Kind != ResourceKind.String) return;
+    _updating = true;
+    try { XmlEditor.Text = StringEditor.Text; } finally { _updating = false; }
     MarkEditorDirty(StringEditor.Text != _baseline);
-    PreviewText.Text = StringEditor.Text;
+    PreviewText.Text = ResourcePresentation.Preview(StringEditor.Text);
+    UpdateContentDescription(_entry, StringEditor.Text);
+    try { RawBytesEditor.LoadBytes(ResourcePresentation.EntryBytes(_entry), new System.Text.UnicodeEncoding(false, false, true).GetBytes(StringEditor.Text)); }
+    catch (ArgumentException error) { SetStatus("Ungültiges Unicode; HEX zeigt den letzten gültigen Stand: " + error.Message); }
   }
 
   private void OnSegmentChanged(object sender, TextChangedEventArgs e)
@@ -400,16 +477,21 @@ public partial class ResourceBrowserWindow : Window
       string xml = _infocard.WithTextSegments(_segments.Select(editor => editor.Text).ToArray());
       _updating = true; XmlEditor.Text = xml; _updating = false;
       PreviewText.Text = InfocardDocument.Parse(xml).PlainText;
+      UpdateContentDescription(_entry!, xml);
       MarkEditorDirty(xml != _baseline);
+      SyncHexFromText(xml);
     }
     catch (Exception error) when (error is InvalidDataException or ArgumentException) { SetStatus(error.Message); }
   }
 
   private void OnXmlChanged(object sender, TextChangedEventArgs e)
   {
-    if (_updating || _entry?.Identity?.Kind != ResourceKind.Infocard) return;
+    if (_updating || _entry is null) return;
+    if (_entry.Identity?.Kind == ResourceKind.String) { StringEditor.Text = XmlEditor.Text; return; }
+    UpdateContentDescription(_entry, XmlEditor.Text);
     MarkEditorDirty(XmlEditor.Text != _baseline);
-    try { PreviewText.Text = InfocardDocument.Parse(XmlEditor.Text).PlainText; }
+    SyncHexFromText(XmlEditor.Text);
+    try { PreviewText.Text = InfocardDocument.Parse(XmlEditor.Text).PlainText; SetStatus("RDL/XML gültig · Änderungen im Entwurf."); }
     catch (Exception error) when (error is InvalidDataException or System.Xml.XmlException or ArgumentException) { SetStatus("RDL/XML noch ungültig: " + error.Message); }
     // Segment editing must reflect the XML source; rebuilding on tab change avoids replacing focused controls.
     _infocard = null;
@@ -442,9 +524,15 @@ public partial class ResourceBrowserWindow : Window
     string text = identity.Kind == ResourceKind.Infocard ? XmlEditor.Text : StringEditor.Text;
     try
     {
-      ResourceDraft.Validate(_entry, text);
-      ResourceDraft draft = _fileHashes.TryGetValue(identity.DllPath, out string? hash)
-          ? new ResourceDraft(_entry, text, hash) : ResourceDraft.Create(_entry, text);
+      _fileHashes.TryGetValue(identity.DllPath, out string? hash);
+      ResourceDraft draft;
+      if (_rawEditActive) draft = ResourceDraft.CreateBytes(_entry, RawBytesEditor.Bytes, hash);
+      else
+      {
+        if (identity.Kind == ResourceKind.String && ResourcePresentation.IsRdl(ResourcePresentation.Source(_entry))) InfocardDocument.Validate(text);
+        ResourceDraft.Validate(_entry, text);
+        draft = hash is not null ? new ResourceDraft(_entry, text, hash) : ResourceDraft.Create(_entry, text);
+      }
       _drafts[identity] = draft;
       _exported.Remove(identity);
       _editorDirty = false;
@@ -625,7 +713,7 @@ public partial class ResourceBrowserWindow : Window
   private void UpdateEnabled()
   {
     bool enabled = _entry?.CanEdit == true;
-    EditTab.IsEnabled = enabled && _entry?.Status != ResourceStatus.DecodeError; XmlTab.IsEnabled = enabled;
+    EditTab.IsEnabled = enabled && _entry?.Status != ResourceStatus.DecodeError; VisualTab.IsEnabled = enabled;
     ApplyButton.IsEnabled = enabled; DiscardButton.IsEnabled = enabled; SaveButton.IsEnabled = enabled; SaveAsButton.IsEnabled = enabled;
   }
   private void ConstrainDetailLayout()
@@ -633,23 +721,44 @@ public partial class ResourceBrowserWindow : Window
     if (BodyGrid.ActualHeight <= 0) return;
     // Keep the actual text usable at minimum height. Metadata stays reachable by
     // scrolling, and the usage splitter cannot consume the entire text area.
-    DetailHeaderScroll.MaxHeight = Math.Max(68, Math.Min(220, BodyGrid.ActualHeight - 235));
+    DetailHeaderScroll.MaxHeight = Math.Max(48, Math.Min(220, BodyGrid.ActualHeight - 275));
     UsageRow.MaxHeight = Math.Max(40, BodyGrid.ActualHeight - Math.Min(DetailHeaderScroll.ActualHeight, DetailHeaderScroll.MaxHeight) - 196);
     if (UsageRow.MaxHeight < 85) UsageExpander.IsExpanded = false;
   }
   private void SetStatus(string text) { if (StatusText is not null) StatusText.Text = text; }
-  private static string FormatRawBytes(byte[] bytes)
+  private void SyncHexFromText(string text)
   {
-    var text = new System.Text.StringBuilder($"Unveränderte Originalbytes · {bytes.Length} Bytes\nKorrektur erfolgt im Reiter RDL/XML. Diese Hex-Ansicht ist schreibgeschützt.\n\n");
-    int shown = Math.Min(bytes.Length, 65536);
-    for (int offset = 0; offset < shown; offset += 16)
-      text.Append(offset.ToString("X8")).Append("  ").AppendLine(string.Join(" ", bytes.Skip(offset).Take(Math.Min(16, shown - offset)).Select(value => value.ToString("X2"))));
-    if (shown < bytes.Length) text.AppendLine("Anzeige auf 65536 Bytes begrenzt. Originalbytes speichern… exportiert die vollständigen Daten.");
-    return text.ToString();
+    _rawEditActive = false;
+    if (_entry?.Identity?.Kind != ResourceKind.Infocard) return;
+    try { RawBytesEditor.LoadBytes(_entry.RawBytes ?? [], ResourceDraft.EncodeText(_entry, text)); }
+    catch (Exception error) when (error is InvalidDataException or XmlException or ArgumentException)
+    { SetStatus("RDL/XML noch ungültig; HEX zeigt den letzten gültigen Stand: " + error.Message); }
+  }
+
+  private void OnRawBytesChanged(object? sender, EventArgs e)
+  {
+    if (_updating || _entry is null) return;
+    _rawEditActive = true;
+    MarkEditorDirty(!RawBytesEditor.Bytes.AsSpan().SequenceEqual(_rawBaseline));
+    try
+    {
+      string text = ResourceDraft.DecodeBytes(_entry, RawBytesEditor.Bytes);
+      _updating = true;
+      try { XmlEditor.Text = text; PreviewText.Text = InfocardDocument.Parse(text).PlainText; }
+      finally { _updating = false; }
+      _infocard = null;
+      SegmentPanel.Children.Clear();
+      SegmentPanel.Children.Add(new TextBlock { Text = "Bytes bearbeitet. Änderungen übernehmen, um die TEXT-Segmente neu aufzubauen.", TextWrapping = TextWrapping.Wrap });
+      UpdateContentDescription(_entry, text);
+      SetStatus("Byteentwurf · Kodierung und RDL/XML gültig. Noch nicht gespeichert.");
+    }
+    catch (Exception error) when (error is InvalidDataException or XmlException or ArgumentException)
+    { SetStatus("Byteentwurf noch ungültig; Übernehmen/Speichern prüft erneut: " + error.Message); }
   }
   private void OnExportRaw(object sender, RoutedEventArgs e)
   {
-    if (_entry?.RawBytes is not { } bytes) return;
+    if (_entry?.RawBytes is null) return;
+    byte[] bytes = ResourcePresentation.EntryBytes(_entry);
     var picker = new SaveFileDialog { FileName = $"IDS-{_entry.Ids}-original.bin", Filter = "Originalbytes (*.bin)|*.bin", OverwritePrompt = true };
     if (picker.ShowDialog(this) != true) return;
     if ((_gameData?.Texts?.DllPaths ?? []).Any(path => string.Equals(Path.GetFullPath(path), Path.GetFullPath(picker.FileName), StringComparison.OrdinalIgnoreCase)))
@@ -694,14 +803,14 @@ public partial class ResourceBrowserWindow : Window
   }
   private sealed record UsageRowItem(IdsReference Reference)
   {
-    public string Location => $"{Path.GetFileName(Reference.FilePath)} · [{Reference.SectionName}] {Reference.SectionNickname} · Zeile {Reference.LineNumber} · {Reference.Role}";
+    public string Location => $"{Path.GetFileName(Reference.FilePath)} · [{Reference.SectionName}] {Reference.SectionNickname} · Zeile {Reference.LineNumber} · {Reference.Role} · Anzeige: {MissionTextUsage.Label(Reference.Rendering)}";
     public string Description => Reference.SourceText + (Reference.Provenance is { Length: > 0 } path ? "\nBezug: " + path : "");
   }
   private sealed record ResourceRow(int Ids, ResourceEntry Entry, IReadOnlyList<IdsReference> References, bool HasDraft, string? DllPath, IReadOnlyList<ResourceEntry> Variants)
   {
     public string IdLabel => Ids + (HasDraft ? " *" : "");
-    public string Preview => Entry.HasRawResource ? Entry.Text.Replace('\r', ' ').Replace('\n', ' ') : Entry.StatusText;
+    public string Preview => Entry.HasRawResource ? ResourcePresentation.Preview(ResourcePresentation.Source(Entry)).Replace('\r', ' ').Replace('\n', ' ') : Entry.StatusText;
     public string Categories => string.Join(", ", References.Select(item => item.Category).Distinct());
-    public string Detail => $"{Path.GetFileName(DllPath) ?? "DLL nicht aufgelöst"} · {(References.Count == 0 ? "Keine Verwendung in aktueller Mission" : Categories)}";
+    public string Detail => $"{Path.GetFileName(DllPath) ?? "DLL nicht aufgelöst"} · Speicher: {ResourcePresentation.Storage(Entry)} · Inhalt: {ResourcePresentation.Format(Entry)}\nVerwendung: {(References.Count == 0 ? "Keine in aktueller Mission" : Categories)} · Anzeige: {MissionTextUsage.Summary(References)}";
   }
 }

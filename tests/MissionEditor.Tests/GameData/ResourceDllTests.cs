@@ -14,6 +14,29 @@ public sealed class ResourceDllTests : IDisposable
   private GameText Texts () => GameData.Load (_root).Texts!;
 
   [Fact]
+  public void ByteDraftSavesExactValidatedBytesAndIsIndependentOfCallerBuffers ()
+  {
+    byte[] original = System.Text.Encoding.UTF8.GetBytes ("\uFEFF<RDL><TEXT>before</TEXT></RDL>\0\0");
+    _fixture.AddInfocardBytes (59, original);
+    var texts = Texts ();
+    var entry = texts.Resolve (59, 1033);
+    byte[] edited = original.ToArray ();
+    edited[Array.IndexOf (edited, (byte)'b')] = (byte)'B';
+    byte[] expected = edited.ToArray ();
+    var draft = ResourceDraft.CreateBytes (entry, edited);
+    edited[0] = 0;
+    draft.EditedBytes![0] = 0;
+    Assert.Equal (expected, draft.EditedBytes);
+    ResourceWriter.Save ([draft]);
+    texts.Reload ();
+    Assert.Equal (expected, texts.Resolve (59, 1033).RawBytes);
+    Assert.Equal (LongText, texts.Resolve (1, 1033).Text);
+    expected[3] = (byte)'!';
+    Assert.ThrowsAny<Exception> (() => ResourceDraft.CreateBytes (entry, expected));
+    Assert.Throws<InvalidDataException> (() => ResourceDraft.CreateBytes (texts.Resolve (1, 1033), [65]));
+  }
+
+  [Fact]
   public void MalformedInfocardRetainsIdentityBytesAndRepairTextWithoutHidingOtherEntries ()
   {
     byte[] malformed = System.Text.Encoding.Unicode.GetBytes ("\uFEFF" + Card + "  ").Concat (new byte[] { 0 }).ToArray ();
