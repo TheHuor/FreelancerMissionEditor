@@ -126,6 +126,94 @@ public sealed class MissionFlow
     return spawned;
   }
 
+  /// <summary>
+  /// The ships and solars a name stands for the way conditions see it (CreateID, any case): an [MsnShip] or
+  /// [MsnSolar] with that nickname or label, or the member ships of an [MsnFormation] with that nickname.
+  /// </summary>
+  public IReadOnlyList<ScriptObject> ObjectsCalled (string nameOrLabel)
+  {
+    if (nameOrLabel.Length == 0)
+      return [];
+    var found = new List<ScriptObject> ();
+    foreach (ScriptObject item in Script.Objects)
+    {
+      bool named = item.Nickname.Equals (nameOrLabel, StringComparison.OrdinalIgnoreCase);
+      if (item.Kind is ScriptObjectKind.Ship or ScriptObjectKind.Solar
+          && (named || item.Section.Entries.Any (entry => entry.IsKey ("label") && entry.GetValue (0).Equals (nameOrLabel, StringComparison.OrdinalIgnoreCase))))
+        found.Add (item);
+      else if (item.Kind == ScriptObjectKind.Formation && named)
+        found.AddRange (FormationMembers (item));
+    }
+    return found.Distinct ().ToList ();
+  }
+
+  /// <summary>The ships a formation takes along ("ship =", exact names of earlier [MsnShip]).</summary>
+  public IEnumerable<ScriptObject> FormationMembers (ScriptObject formation) =>
+      formation.Section.Entries.Where (entry => entry.IsKey ("ship"))
+          .Select (entry => FindShipGroup (entry.GetValue (0)))
+          .OfType<ScriptObject> ()
+          .Where (item => item.Kind == ScriptObjectKind.Ship);
+
+  /// <summary>
+  /// The spawn actions that bring the objects into space, each with how many of <paramref name="wanted"/> it
+  /// spawns: Act_SpawnShip/SpawnShipRel/SpawnFormation on a ship or a formation containing it, Act_SpawnSolar on a solar.
+  /// </summary>
+  public IEnumerable<(ObjectReference Spawn, int Count)> SpawnsOf (IReadOnlyCollection<ScriptObject> wanted)
+  {
+    foreach (ObjectReference reference in References)
+    {
+      if (reference.Use == ObjectUse.SpawnSolar)
+      {
+        int solars = wanted.Count (item => item.Kind == ScriptObjectKind.Solar && item.Nickname == reference.Name);
+        if (solars > 0)
+          yield return (reference, solars);
+        continue;
+      }
+      if (reference.Use != ObjectUse.SpawnShip || FindShipGroup (reference.Name) is not { } group)
+        continue;
+      int ships = group.Kind == ScriptObjectKind.Formation ? FormationMembers (group).Count (wanted.Contains) : wanted.Contains (group) ? 1 : 0;
+      if (ships > 0)
+        yield return (reference, ships);
+    }
+  }
+
+  /// <summary>The effective triggers whose Act_ActTrig activates the target.</summary>
+  public IEnumerable<Trigger> ActivatorsOf (Trigger target) =>
+      Script.EffectiveTriggers.Where (trigger => trigger.References.Any (reference => reference.Kind == TriggerReferenceKind.Activate && reference.Target == target));
+
+  /// <summary>
+  /// The shortest chain of Act_ActTrig from one trigger to another (both included), or null when there is none
+  /// within <paramref name="maximumSteps"/> steps.
+  /// </summary>
+  public IReadOnlyList<Trigger>? ActivationPath (Trigger from, Trigger to, int maximumSteps = 8)
+  {
+    var previous = new Dictionary<Trigger, Trigger> ();
+    var seen = new HashSet<Trigger> { from };
+    var queue = new Queue<(Trigger Trigger, int Steps)> ();
+    queue.Enqueue ((from, 0));
+    while (queue.TryDequeue (out var item))
+    {
+      if (item.Steps == maximumSteps)
+        continue;
+      foreach (TriggerReference reference in item.Trigger.References)
+      {
+        if (reference.Kind != TriggerReferenceKind.Activate || reference.Target is not { } next || !seen.Add (next) && next != to)
+          continue;
+        previous.TryAdd (next, item.Trigger);
+        if (next == to)
+        {
+          var path = new List<Trigger> { to };
+          for (Trigger current = to; current != from; current = previous[current])
+            path.Add (previous[current]);
+          path.Reverse ();
+          return path;
+        }
+        queue.Enqueue ((next, item.Steps + 1));
+      }
+    }
+    return null;
+  }
+
   private static void AddActionReferences (List<ObjectReference> references, IniLine action, Trigger trigger)
   {
     switch (action.Key!.ToLowerInvariant ())

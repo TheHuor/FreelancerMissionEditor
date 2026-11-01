@@ -39,11 +39,27 @@ public sealed class UnknownTriggerTargetCheck : IMissionCheck
         IReadOnlyList<string> suggestions = NameSimilarity.FindClosest (reference.TargetName, names);
         if (suggestions.Count > 0)
           message += $" Gemeint vielleicht {string.Join (" oder ", suggestions.Select (name => $"'{name}'"))}?";
+        // A name of another section type: the line means something the trigger actions cannot do.
+        ScriptObject? other = script.Objects.FirstOrDefault (item => item.Nickname.Equals (reference.TargetName, StringComparison.OrdinalIgnoreCase));
+        if (other is not null)
+          message += $" '{reference.TargetName}' ist eine [{ScriptObject.SectionNameOf (other.Kind)}] (Zeile {other.LineNumber}), kein Trigger.";
+        // A misspelt Act_DeactTrig is not harmless when the trigger it meant keeps running and spawns or repeats.
+        Trigger? meant = reference.Kind == TriggerReferenceKind.Deactivate && suggestions.Count > 0 ? script.FindTrigger (suggestions[0]) : null;
+        bool meantKeepsRunning = meant is not null && (meant.Repeatable || meant.Actions.Any (action => action.Key!.StartsWith ("Act_Spawn", StringComparison.OrdinalIgnoreCase)));
+        if (meantKeepsRunning && !trigger.IsShadowed)
+        {
+          severity = FindingSeverity.Error;
+          message += $" '{meant!.Nickname}' bleibt dadurch aktiv und {(meant.Repeatable ? "löst weiter aus" : "spawnt weiter")}.";
+        }
         if (trigger.IsShadowed)
           message += " (Der Trigger ist doppelt definiert und wird ohnehin ignoriert.)";
         string hint = reference.Kind switch
         {
           TriggerReferenceKind.Activate => "Act_ActTrig auf einen Namen ohne [Trigger] ist im Spiel ein stiller No-op – es gibt keine Fehlermeldung, der Ablauf geht dort einfach nicht weiter.",
+          TriggerReferenceKind.Deactivate when other?.Kind == ScriptObjectKind.ObjList =>
+            "Act_DeactTrig schaltet nur Trigger ab; eine laufende Befehlsliste beendet es nicht. Dafür dem Schiff per Act_GiveObjList eine andere [ObjList] geben.",
+          TriggerReferenceKind.Deactivate when meantKeepsRunning =>
+            "Act_DeactTrig auf einen Namen ohne [Trigger] tut nichts – der vermutlich gemeinte Trigger läuft weiter, mit allen Spawns bzw. Wiederholungen.",
           TriggerReferenceKind.Deactivate => "Act_DeactTrig auf einen Namen ohne [Trigger] ist harmlos, aber meist ein Tippfehler oder ein Überbleibsel eines gelöschten Triggers.",
           TriggerReferenceKind.Watch => "Cnd_WatchTrigger wartet dann für immer; der Trigger löst nie aus.",
           _ => "Beim Laden dieses Spielstands wird kein Trigger aktiviert – die Mission steht still.",
