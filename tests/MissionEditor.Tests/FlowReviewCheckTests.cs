@@ -10,6 +10,35 @@ public class FlowReviewCheckTests
   private static MissionScript Load (string text) => MissionScript.FromDocument (IniDocument.ParseText (text));
 
   [Fact]
+  public void ADeadTriggerThatMovesThePlayerIsNamedAsDeveloperJumpPoint ()
+  {
+    // goto_hole_key in the original m13: never activated, puts the player at the jump hole with the whole party.
+    MissionScript script = Load ("""
+        [Trigger]
+        nickname = key_offer
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_DebugMsg = start
+
+        [Trigger]
+        nickname = goto_hole_key
+        Cnd_True = no_params
+        Act_MovePlayer = 25000, 0, -20000, 500
+        Act_SpawnShip = juni, no_ol, 25210, 0, -20090
+
+        [Trigger]
+        nickname = leftover
+        Cnd_True = no_params
+        Act_DebugMsg = old
+        """);
+    List<Finding> findings = new UnreachableTriggerCheck ().Run (script).ToList ();
+    Finding jump = Assert.Single (findings, finding => finding.Subject == "goto_hole_key");
+    Assert.Contains ("Entwickler-Sprungpunkt", jump.Message);
+    Assert.Contains ("InitState = ACTIVE", jump.Hint);
+    Assert.DoesNotContain ("Entwickler-Sprungpunkt", Assert.Single (findings, finding => finding.Subject == "leftover").Message);
+  }
+
+  [Fact]
   public void TargetsSpawnedBeforeTheCountingTriggerIsActiveAreReported ()
   {
     // Mission 26: spawn the relays, wait for the approach, only then start counting.
