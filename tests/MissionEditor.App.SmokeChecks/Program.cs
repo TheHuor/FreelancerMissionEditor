@@ -162,6 +162,7 @@ internal static partial class Program
     var drawer = (Expander)window.FindName ("FindingsExpander");
     var row = (RowDefinition)window.FindName ("FindingsRow");
     var tabs = (TabControl)window.FindName ("DetailTabs");
+    Assert (tabs.Items.IndexOf (window.FindName ("FindingsTab")) == 0 && tabs.Items.IndexOf (window.FindName ("ContextTab")) == 1, "findings come first, texts only on click");
     var original = row.ActualHeight;
     drawer.IsExpanded = false;
     window.UpdateLayout ();
@@ -186,7 +187,7 @@ internal static partial class Program
     var finding = vm.Findings.First (f => f.Finding.RelatedLineNumber is not null);
     typeof (MainWindow).GetMethod ("ShowInFindingsGrid", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke (window, [finding]);
     window.UpdateLayout ();
-    Assert (drawer.IsExpanded && tabs.SelectedIndex == 1, "finding navigation opens drawer and findings tab");
+    Assert (drawer.IsExpanded && tabs.SelectedItem == window.FindName ("FindingsTab"), "finding navigation opens drawer and findings tab");
     Assert (vm.SelectedSectionLines.Count (l => l.HasActions) >= 2, "duplicate preview keeps both editable definitions");
     var tmp = Path.Combine (Path.GetTempPath (), "mission-layout-check-" + Guid.NewGuid () + ".ini");
     File.Copy (fixture, tmp);

@@ -90,7 +90,7 @@ public partial class MainWindow
   {
     if (args.OriginalSource is not ResourceLinkItem link) return;
     ViewModel.InspectResource (link);
-    DetailTabs.SelectedIndex = 0;
+    ContextTab.IsSelected = true;
     args.Handled = true;
   }
 
@@ -106,7 +106,7 @@ public partial class MainWindow
       OnDeleteSection (new System.Windows.Controls.Button { Tag = ViewModel.SelectedSourceSection }, args);
   private void OnSourceLineSelectionChanged (object sender, System.Windows.Controls.SelectionChangedEventArgs args)
   {
-    if (DetailTabs is not null) DetailTabs.SelectedIndex = 0;
+    if (FindingsTab is not null) FindingsTab.IsSelected = true;
   }
 
   private Core.Ini.IniSection? ResolveSourceSection (object sender) => sender is FrameworkElement element

@@ -360,8 +360,7 @@
         <TextBlock Grid.Row="0" Text="{Binding DetailsTitle}" ToolTip="{Binding DetailsTitle}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
         <TextBlock Grid.Row="1" Text="{Binding SelectedSummary}" MaxHeight="48" ToolTip="{Binding SelectedSummary}" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,6" TextWrapping="Wrap" />
         <TabControl x:Name="DetailTabs" Grid.Row="2" Grid.RowSpan="2">
-          <TabItem Header="Kontext"><controls:SourceContextView /></TabItem>
-          <TabItem Header="{Binding SelectedFindingsHeader}">
+          <TabItem x:Name="FindingsTab" Header="{Binding SelectedFindingsHeader}">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontWeight="Normal" Margin="0,4,0,0" TextElement.Foreground="{StaticResource TextBrush}">
               <ItemsControl x:Name="DetailFindings" ItemsSource="{Binding SelectedFindings}">
                 <ItemsControl.ItemTemplate>
@@ -398,6 +397,8 @@
               </ItemsControl>
             </ScrollViewer>
           </TabItem>
+          <!-- Texts and resources come forward only when one is clicked in the source; selecting a line keeps the findings. -->
+          <TabItem x:Name="ContextTab" Header="Kontext"><controls:SourceContextView /></TabItem>
           <TabItem Header="Verweise">
             <ListView ItemsSource="{Binding References}">
               <ListView.View>
