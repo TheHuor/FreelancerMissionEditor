@@ -67,7 +67,7 @@ public sealed class SectionEditorWindow : Window
   {
     if (_validate?.Invoke (_editor.Text) is { } error)
     {
-      MessageBox.Show (this, error, "Ungültige Eingabe", MessageBoxButton.OK, MessageBoxImage.Warning);
+      ThemedMessageBox.Show (this, error, "Ungültige Eingabe", MessageBoxButton.OK, MessageBoxImage.Warning);
       return;
     }
     DialogResult = true;

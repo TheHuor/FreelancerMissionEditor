@@ -481,6 +481,7 @@ public partial class ResourceBrowserWindow : Window
   private GuardChoice AskGuard(string reason, string scope, int count)
   {
     var dialog = new Window { Owner = this, Title = "Ungespeicherte Ressourcenänderungen", Width = 530, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner, Background = Background, Foreground = Foreground };
+    dialog.SetResourceReference(StyleProperty, typeof(Window));
     GuardChoice answer = GuardChoice.Cancel;
     var panel = new StackPanel { Margin = new Thickness(20) };
     panel.Children.Add(new TextBlock { Text = $"{reason}?\n\n{scope}: {count} offene Änderungen.\nAls Kopie exportierte Entwürfe sind weiterhin nicht ins Original gespeichert.\nSpeichern schreibt alle Entwürfe der jeweiligen DLL ins Original; Verwerfen betrifft den genannten Umfang.", TextWrapping = TextWrapping.Wrap });

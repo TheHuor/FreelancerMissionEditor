@@ -19,6 +19,7 @@ public sealed class SourceWindow : Window
   /// <summary>Creates the large source view for the same selection as the main editor.</summary>
   public SourceWindow (MainViewModel viewModel)
   {
+    SetResourceReference (StyleProperty, typeof (Window));
     // Configure initial window metadata and default/restored geometry.
     Title = "Quelltext";
     Width = 1120;

@@ -114,6 +114,7 @@ public partial class MainWindow
         Height = 700,
         Content = source
       };
+      viewer.SetResourceReference (StyleProperty, typeof (Window));
       viewer.Show ();
       int lineIndex = Math.Clamp ((link.Reference.DefinitionLineNumber ?? 1) - 1, 0, Math.Max (0, source.LineCount - 1));
       int character = source.GetCharacterIndexFromLineIndex (lineIndex);
@@ -122,7 +123,7 @@ public partial class MainWindow
     }
     catch (Exception exception) when (exception is System.IO.IOException or UnauthorizedAccessException or System.IO.InvalidDataException)
     {
-      MessageBox.Show (this, exception.Message, "Herkunfts-INI kann nicht gelesen werden", MessageBoxButton.OK, MessageBoxImage.Error);
+      ThemedMessageBox.Show (this, exception.Message, "Herkunfts-INI kann nicht gelesen werden", MessageBoxButton.OK, MessageBoxImage.Error);
     }
   }
 }

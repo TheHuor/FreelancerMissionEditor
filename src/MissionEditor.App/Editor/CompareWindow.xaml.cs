@@ -109,7 +109,7 @@ public partial class CompareWindow : Window
   {
     if (_viewModel.Script?.Document != _baseDocument)
     {
-      MessageBox.Show (this, "Die Mission wurde inzwischen geändert. Bitte den Vergleich neu öffnen.", "Übernehmen", MessageBoxButton.OK, MessageBoxImage.Warning);
+      ThemedMessageBox.Show (this, "Die Mission wurde inzwischen geändert. Bitte den Vergleich neu öffnen.", "Übernehmen", MessageBoxButton.OK, MessageBoxImage.Warning);
       return;
     }
     List<SectionChange> chosen = _items.Where (item => item.IsChosen).Select (item => item.Change).ToList ();
@@ -120,7 +120,7 @@ public partial class CompareWindow : Window
     }
     catch (InvalidDataException exception)
     {
-      MessageBox.Show (this, exception.Message, "Übernehmen fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Warning);
+      ThemedMessageBox.Show (this, exception.Message, "Übernehmen fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
   }
 

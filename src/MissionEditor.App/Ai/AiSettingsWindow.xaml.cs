@@ -112,7 +112,7 @@ public partial class AiSettingsWindow : Window
     }
     catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or CryptographicException)
     {
-      MessageBox.Show (this, exception.Message, "Einstellungen nicht gespeichert", MessageBoxButton.OK, MessageBoxImage.Warning);
+      ThemedMessageBox.Show (this, exception.Message, "Einstellungen nicht gespeichert", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
   }
 }

@@ -49,6 +49,27 @@ internal static partial class Program
     vm.Load (fixture);
     window.Show ();
     window.UpdateLayout ();
+    var sourceStyleCheck = new SourceWindow (vm);
+    var browserStyleCheck = new ResourceBrowserWindow ();
+    foreach (Window dialog in new Window[] { sourceStyleCheck, browserStyleCheck })
+    {
+      Assert (ReferenceEquals (dialog.Style, app.FindResource (typeof (Window))), dialog.GetType ().Name + " uses the common window style");
+      Assert (Equals (dialog.Background, app.FindResource ("WindowBrush")), dialog.GetType ().Name + " uses the dark window background");
+      dialog.Close ();
+    }
+    foreach (var choice in new[] { MessageBoxResult.Yes, MessageBoxResult.No, MessageBoxResult.Cancel })
+    {
+      window.Dispatcher.BeginInvoke (() =>
+      {
+        Window dialog = window.OwnedWindows.Cast<Window> ().Single (item => item.Title == "Stilprüfung");
+        Assert (ReferenceEquals (dialog.Style, app.FindResource (typeof (Window))), "message dialog uses the common dark chrome");
+        var actions = (WrapPanel)((DockPanel)dialog.Content).Children[0];
+        actions.Children.OfType<Button> ().Single (button => Equals (button.Tag, choice))
+            .RaiseEvent (new RoutedEventArgs (System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+      });
+      Assert (ThemedMessageBox.Show (window, "Einheitliche Meldungsfenster", "Stilprüfung", MessageBoxButton.YesNoCancel,
+          MessageBoxImage.Question) == choice, "themed message preserves " + choice + " result");
+    }
     var triggerList = (ListBox)window.FindName ("TriggerList");
     var triggerRow = (FrameworkElement)triggerList.ItemTemplate.LoadContent ();
     Assert (triggerRow.FindName ("ConditionBadge") is Border && triggerRow.FindName ("ConditionValue") is TextBlock,

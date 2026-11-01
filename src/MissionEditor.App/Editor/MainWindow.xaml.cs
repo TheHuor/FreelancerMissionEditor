@@ -52,7 +52,7 @@ public partial class MainWindow : Window
     }
     catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
     {
-      MessageBox.Show (this, exception.Message, "Datei kann nicht geladen werden", MessageBoxButton.OK, MessageBoxImage.Error);
+      ThemedMessageBox.Show (this, exception.Message, "Datei kann nicht geladen werden", MessageBoxButton.OK, MessageBoxImage.Error);
     }
     finally
     {
@@ -235,7 +235,7 @@ public partial class MainWindow : Window
     }
     catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
     {
-      MessageBox.Show (this, exception.Message, "Datei kann nicht geladen werden", MessageBoxButton.OK, MessageBoxImage.Error);
+      ThemedMessageBox.Show (this, exception.Message, "Datei kann nicht geladen werden", MessageBoxButton.OK, MessageBoxImage.Error);
     }
   }
 
@@ -259,7 +259,7 @@ public partial class MainWindow : Window
     }
     catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
     {
-      MessageBox.Show (this, exception.Message, "Speichern fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error);
+      ThemedMessageBox.Show (this, exception.Message, "Speichern fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error);
     }
   }
 
@@ -279,7 +279,7 @@ public partial class MainWindow : Window
     }
     catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
     {
-      MessageBox.Show (this, exception.Message, "Speichern fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error);
+      ThemedMessageBox.Show (this, exception.Message, "Speichern fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error);
       return false;
     }
   }
@@ -291,7 +291,7 @@ public partial class MainWindow : Window
       return false;
     if (!ViewModel.IsModified)
       return true;
-    MessageBoxResult answer = MessageBox.Show (this,
+    MessageBoxResult answer = ThemedMessageBox.Show (this,
         $"Die Änderungen an {Path.GetFileName (ViewModel.FilePath)} sind noch nicht gespeichert. Jetzt speichern?",
         "Ungespeicherte Änderungen", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
     return answer switch
@@ -339,7 +339,7 @@ public partial class MainWindow : Window
       }
       catch (InvalidDataException exception)
       {
-        MessageBox.Show (this, exception.Message, "Ungültige BINI-Eingabe", MessageBoxButton.OK, MessageBoxImage.Warning);
+        ThemedMessageBox.Show (this, exception.Message, "Ungültige BINI-Eingabe", MessageBoxButton.OK, MessageBoxImage.Warning);
       }
     }
   }
@@ -351,7 +351,7 @@ public partial class MainWindow : Window
     (int firstLine, int lastLine) = Core.Ini.IniDocument.GetRemovalRange (section);
     string question = $"[{section.Name}] in den Zeilen {firstLine}–{lastLine} löschen?\n\n{ViewModel.DescribeDeletion (section)}\n\n"
         + "Gespeichert wird erst mit Strg+S; Strg+Z macht das Löschen rückgängig.";
-    if (MessageBox.Show (this, question, "Sektion löschen", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
+    if (ThemedMessageBox.Show (this, question, "Sektion löschen", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
       ViewModel.DeleteSection (section);
   }
 
