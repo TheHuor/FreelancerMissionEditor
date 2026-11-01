@@ -60,6 +60,56 @@ public class FlowReviewCheckTests
   }
 
   [Fact]
+  public void ACountingTriggerThatOnlySendsACommIsAHint ()
+  {
+    // The original m13 generators: generators_destroyed counts from the spawn and carries the mission,
+    // generator2_down only sends a comm and starts counting later.
+    MissionScript script = Load ("""
+        [MsnSolar]
+        nickname = generator_1
+        label = generator
+
+        [MsnSolar]
+        nickname = generator_2
+        label = generator
+
+        [Trigger]
+        nickname = in_story
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_SpawnSolar = generator_1
+        Act_SpawnSolar = generator_2
+        Act_ActTrig = generators_destroyed
+        Act_ActTrig = near_moon
+
+        [Trigger]
+        nickname = near_moon
+        Cnd_DistVec = inside, Player, 0, 0, 0, 2000
+        Act_ActTrig = generator2_down
+
+        [Trigger]
+        nickname = generator2_down
+        Cnd_Destroyed = generator, 2
+        Act_SendComm = king, Player, DX_M13_0840_KING
+
+        [Trigger]
+        nickname = generators_destroyed
+        Cnd_Destroyed = generator, 2
+        Act_ActTrig = dock
+
+        [Trigger]
+        nickname = dock
+        Cnd_BaseEnter = st03_base
+        Act_ChangeState = SUCCEED
+        """);
+    Finding finding = Assert.Single (new DestroyedCounterCheck ().Run (script));
+    Assert.Equal ("generator2_down", finding.Subject);
+    Assert.Equal (FindingSeverity.Info, finding.Severity);
+    Assert.Contains ("fehlen nur die Aktionen", finding.Message);
+    Assert.Contains ("Act_SendComm", finding.Message);
+  }
+
+  [Fact]
   public void CountingStartedTogetherWithTheSpawnOrCloakedTargetsAreFine ()
   {
     MissionScript script = Load ("""
