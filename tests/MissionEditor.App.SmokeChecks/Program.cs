@@ -46,6 +46,7 @@ internal static partial class Program
     alignmentList.ItemsSource = Array.Empty<string> ();
     alignmentWindow.UpdateLayout ();
     alignmentWindow.Close ();
+    CheckListSelection ();
     vm.Load (fixture);
     window.Show ();
     window.UpdateLayout ();

@@ -303,6 +303,53 @@
   <Style TargetType="ListBoxItem" BasedOn="{StaticResource BaseControl}">
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Padding" Value="6,4" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ListBoxItem">
+          <Border x:Name="Selection" Background="{TemplateBinding Background}" BorderBrush="Transparent"
+                  BorderThickness="3,0,0,0" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Selection" Property="Background" Value="{StaticResource HoverBrush}" />
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+              <Setter TargetName="Selection" Property="Background" Value="{StaticResource SelectionBrush}" />
+              <Setter TargetName="Selection" Property="BorderBrush" Value="{StaticResource SelectionAccentBrush}" />
+              <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <!-- GridView supplies its columns through this attached property, including while
+       containers are recycled. No ancestor binding is needed for the row presenter. -->
+  <Style TargetType="ListViewItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ListViewItem">
+          <Border x:Name="Selection" Background="{TemplateBinding Background}" BorderBrush="Transparent"
+                  BorderThickness="3,0,0,0" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+            <GridViewRowPresenter Content="{TemplateBinding Content}" Columns="{TemplateBinding GridView.ColumnCollection}"
+                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Selection" Property="Background" Value="{StaticResource HoverBrush}" />
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+              <Setter TargetName="Selection" Property="Background" Value="{StaticResource SelectionBrush}" />
+              <Setter TargetName="Selection" Property="BorderBrush" Value="{StaticResource SelectionAccentBrush}" />
+              <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
   </Style>
   <Style TargetType="ListBox" BasedOn="{StaticResource BaseControl}">
     <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
