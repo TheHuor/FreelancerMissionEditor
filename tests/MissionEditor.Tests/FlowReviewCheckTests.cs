@@ -422,7 +422,14 @@ public class FlowReviewCheckTests
         InitState = ACTIVE
         Cnd_True = no_params
         Act_DeactTrig = follow_trent
+        Act_DeactTrig = respawn_wing1b
         Act_DeactTrig = respawn_wing1bc
+
+        [Trigger]
+        nickname = respawn_wing1b
+        Cnd_Timer = 30
+        Act_SpawnShip = wing
+        Act_ActTrig = respawn_wing1c
 
         [Trigger]
         nickname = respawn_wing1c
@@ -434,9 +441,12 @@ public class FlowReviewCheckTests
     Finding objList = Assert.Single (findings, finding => finding.Message.Contains ("'follow_trent'"));
     Assert.Contains ("ist eine [ObjList]", objList.Message);
     Assert.Equal (FindingSeverity.Warning, objList.Severity);
+    // The mission goes on, only leftover spawns follow: a warning, not an error. respawn_wing1b is switched off in the
+    // line above, so only respawn_wing1c can have been meant (cf60respawnsequence1a, 1b, "1bc", 1d, 1e).
     Finding typo = Assert.Single (findings, finding => finding.Message.Contains ("'respawn_wing1bc'"));
-    Assert.Equal (FindingSeverity.Error, typo.Severity);
-    Assert.Contains ("'respawn_wing1c'", typo.Message);
+    Assert.Equal (FindingSeverity.Warning, typo.Severity);
+    Assert.Contains ("Gemeint vielleicht 'respawn_wing1c'?", typo.Message);
+    Assert.DoesNotContain ("'respawn_wing1b'", typo.Message);
     Assert.Contains ("bleibt er dadurch aktiv", typo.Message);
   }
 

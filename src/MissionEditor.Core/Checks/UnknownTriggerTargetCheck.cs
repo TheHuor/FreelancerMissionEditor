@@ -41,6 +41,14 @@ public sealed class UnknownTriggerTargetCheck : IMissionCheck
         // meant, and similar trigger names would only mislead.
         ScriptObject? other = script.Objects.FirstOrDefault (item => item.Nickname.Equals (reference.TargetName, StringComparison.OrdinalIgnoreCase));
         IReadOnlyList<string> suggestions = other is null ? NameSimilarity.FindClosest (reference.TargetName, names) : [];
+        // For a switch-off, a similar name the same trigger already switches off was not meant (a, b, "bc", d, e → c).
+        if (reference.Kind == TriggerReferenceKind.Deactivate)
+        {
+          string[] open = suggestions.Where (name => !trigger.References.Any (other => other.Kind == TriggerReferenceKind.Deactivate
+              && other.TargetName.Equals (name, StringComparison.OrdinalIgnoreCase))).ToArray ();
+          if (open.Length > 0)
+            suggestions = open;
+        }
         if (suggestions.Count > 0)
           message += $" Gemeint vielleicht {string.Join (" oder ", suggestions.Select (name => $"'{name}'"))}?";
         if (other is not null)
@@ -66,7 +74,8 @@ public sealed class UnknownTriggerTargetCheck : IMissionCheck
           message += $" Derselbe Trigger beendet die Befehle der Schiffe mit dieser Liste ohnehin ({replaced.Key} in Zeile {replaced.Number}) – die Zeile ist nur überflüssig.";
         }
         // A misspelt Act_DeactTrig is not harmless when the trigger it meant keeps running and spawns or repeats. Which
-        // of several similar names was meant is the author's call, so all running ones are named.
+        // of several similar names was meant is the author's call, so all running ones are named. It stays a warning:
+        // the mission goes on, only the leftover spawns or repeats are unwanted.
         string[] keepRunning = reference.Kind != TriggerReferenceKind.Deactivate || disabled is not null ? []
             : suggestions.Select (name => script.FindTrigger (name)).OfType<Trigger> ()
                 .Where (candidate => candidate.Repeatable || candidate.Actions.Any (action => action.Key!.StartsWith ("Act_Spawn", StringComparison.OrdinalIgnoreCase)))
@@ -74,7 +83,6 @@ public sealed class UnknownTriggerTargetCheck : IMissionCheck
         bool meantKeepsRunning = keepRunning.Length > 0;
         if (meantKeepsRunning && !trigger.IsShadowed)
         {
-          severity = FindingSeverity.Error;
           message += keepRunning.Length == 1
               ? $" Ist {keepRunning[0]} gemeint, bleibt er dadurch aktiv und spawnt bzw. wiederholt weiter."
               : $" Welcher auch gemeint ist ({string.Join (", ", keepRunning)}), er bleibt dadurch aktiv und spawnt bzw. wiederholt weiter.";

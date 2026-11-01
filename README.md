@@ -102,7 +102,7 @@ dotnet run --project src/MissionEditor.Cli -- hash <nickname>
 
 | Id | Findet |
 |---|---|
-| `unknown-trigger` | `Act_ActTrig`, `Act_DeactTrig`, `Cnd_WatchTrigger`, `Act_Save` auf einen Trigger, den es nicht gibt – mit Vorschlag ähnlicher Namen. Ist der Name eine `[ObjList]` o. Ä., sagt die Meldung das; ein vertippter `Act_DeactTrig`, dessen gemeinter Trigger weiter spawnt oder wiederholt, ist ein Fehler |
+| `unknown-trigger` | `Act_ActTrig`, `Act_DeactTrig`, `Cnd_WatchTrigger`, `Act_Save` auf einen Trigger, den es nicht gibt – mit Vorschlag ähnlicher Namen. Ist der Name eine `[ObjList]` o. Ä., sagt die Meldung das, und wird sie im selben Trigger ohnehin erledigt (`Act_DisableEnc`, neue Befehle, `Act_Destroy`), ist es nur ein Hinweis. Bei einem vertippten `Act_DeactTrig` nennt die Warnung, welcher gemeinte Trigger weiter spawnt oder wiederholt; Namen, die derselbe Trigger schon abschaltet, werden nicht vorgeschlagen |
 | `duplicate-nickname` | doppelte Namen bei Triggern, `[NPC]`, `[ObjList]`, `[Dialog]`, `[NNObjective]`, `[MsnShip]`/`[MsnFormation]`, `[MsnSolar]`, `[MsnLoot]`, `[MsnRandEnc]`; Namen, die sich nur in der Groß-/Kleinschreibung unterscheiden |
 | `trigger-structure` | `[Trigger]` ohne `nickname`, ohne oder mit mehreren Bedingungen, Zeilen vor `nickname`, falsch geschriebene `Cnd_`/`Act_`-Schlüssel |
 | `unreachable-trigger` | Trigger, die nie aktiv werden (nicht `InitState = ACTIVE`, kein `Act_ActTrig`/`Act_Save` aus einem laufenden Trigger). Hinweis; Warnung, wenn ein laufender Trigger per `Cnd_WatchTrigger` auf ihn wartet und deshalb hängt. Fehlt jeder Starttrigger, gibt es eine Warnung |
