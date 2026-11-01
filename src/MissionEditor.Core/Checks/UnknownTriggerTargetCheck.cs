@@ -1,3 +1,4 @@
+using MissionEditor.Core.Ini;
 using MissionEditor.Core.Model;
 
 namespace MissionEditor.Core.Checks;
@@ -36,16 +37,27 @@ public sealed class UnknownTriggerTargetCheck : IMissionCheck
           _ => "der Spielstand setzt an keinem Trigger fort",
         };
         string message = $"{TriggerReference.KeyOf (reference.Kind)} auf unbekannten Trigger '{reference.TargetName}' – {effect}.";
-        IReadOnlyList<string> suggestions = NameSimilarity.FindClosest (reference.TargetName, names);
+        // A name of another section type: the line means something the trigger actions cannot do. Then that section was
+        // meant, and similar trigger names would only mislead.
+        ScriptObject? other = script.Objects.FirstOrDefault (item => item.Nickname.Equals (reference.TargetName, StringComparison.OrdinalIgnoreCase));
+        IReadOnlyList<string> suggestions = other is null ? NameSimilarity.FindClosest (reference.TargetName, names) : [];
         if (suggestions.Count > 0)
           message += $" Gemeint vielleicht {string.Join (" oder ", suggestions.Select (name => $"'{name}'"))}?";
-        // A name of another section type: the line means something the trigger actions cannot do.
-        ScriptObject? other = script.Objects.FirstOrDefault (item => item.Nickname.Equals (reference.TargetName, StringComparison.OrdinalIgnoreCase));
         if (other is not null)
           message += $" '{reference.TargetName}' ist eine [{ScriptObject.SectionNameOf (other.Kind)}] (Zeile {other.LineNumber}), kein Trigger.";
+        // Act_DeactTrig on a random encounter that the same trigger also switches off properly (Act_DisableEnc, as in the
+        // original m13 watch_endgame_object) is only a superfluous line.
+        IniLine? disabled = reference.Kind == TriggerReferenceKind.Deactivate && other?.Kind == ScriptObjectKind.RandomEncounter
+            ? trigger.Actions.FirstOrDefault (action => action.IsKey ("Act_DisableEnc") && action.GetValue (0).Equals (reference.TargetName, StringComparison.OrdinalIgnoreCase))
+            : null;
+        if (disabled is not null)
+        {
+          severity = FindingSeverity.Info;
+          message += $" Derselbe Trigger schaltet den Zufallskampf in Zeile {disabled.Number} mit Act_DisableEnc ab – die Zeile ist nur überflüssig.";
+        }
         // A misspelt Act_DeactTrig is not harmless when the trigger it meant keeps running and spawns or repeats. Which
         // of several similar names was meant is the author's call, so all running ones are named.
-        string[] keepRunning = reference.Kind != TriggerReferenceKind.Deactivate ? []
+        string[] keepRunning = reference.Kind != TriggerReferenceKind.Deactivate || disabled is not null ? []
             : suggestions.Select (name => script.FindTrigger (name)).OfType<Trigger> ()
                 .Where (candidate => candidate.Repeatable || candidate.Actions.Any (action => action.Key!.StartsWith ("Act_Spawn", StringComparison.OrdinalIgnoreCase)))
                 .Select (candidate => $"'{candidate.Nickname}'").ToArray ();
@@ -64,6 +76,8 @@ public sealed class UnknownTriggerTargetCheck : IMissionCheck
           TriggerReferenceKind.Activate => "Act_ActTrig auf einen Namen ohne [Trigger] ist im Spiel ein stiller No-op – es gibt keine Fehlermeldung, der Ablauf geht dort einfach nicht weiter.",
           TriggerReferenceKind.Deactivate when other?.Kind == ScriptObjectKind.ObjList =>
             "Act_DeactTrig schaltet nur Trigger ab; eine laufende Befehlsliste beendet es nicht. Dafür dem Schiff per Act_GiveObjList eine andere [ObjList] geben.",
+          TriggerReferenceKind.Deactivate when disabled is not null =>
+            "Act_DeactTrig schaltet nur Trigger ab; den Zufallskampf schaltet hier schon das Act_DisableEnc desselben Triggers ab. Abhilfe: die Zeile entfernen – am Spielverhalten ändert sich nichts.",
           TriggerReferenceKind.Deactivate when other?.Kind == ScriptObjectKind.RandomEncounter =>
             "Act_DeactTrig schaltet nur Trigger ab; einen Zufallskampf ([MsnRandEnc]) schaltet Act_DisableEnc ab.",
           TriggerReferenceKind.Deactivate when meantKeepsRunning =>

@@ -49,7 +49,9 @@ public static partial class AgentPrompts
   /// <summary>Asks the agent to explain one finding and propose a fix.</summary>
   public static string ForFinding (string missionReference, Finding finding)
   {
-    if (finding.CheckId == "unknown-trigger" && MissingTargetName (finding.Message) is { } missing)
+    // A missing switch-off target never calls for a new trigger, only ActTrig/WatchTrigger/Save targets may be missing ones.
+    if (finding.CheckId == "unknown-trigger" && !finding.Message.StartsWith ("Act_DeactTrig", StringComparison.Ordinal)
+        && MissingTargetName (finding.Message) is { } missing)
       return ForMissingTrigger (missionReference, finding, missing);
 
     var text = new StringBuilder ();

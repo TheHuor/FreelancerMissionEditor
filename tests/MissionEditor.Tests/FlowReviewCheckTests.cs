@@ -332,4 +332,38 @@ public class FlowReviewCheckTests
     Assert.Contains ("'respawn_wing1c'", typo.Message);
     Assert.Contains ("bleibt er dadurch aktiv", typo.Message);
   }
+
+  [Fact]
+  public void DeactivatingARandomEncounterThatIsAlsoDisabledIsOnlyAHint ()
+  {
+    // The original m13 watch_endgame_object: Act_DeactTrig on the encounter, Act_DisableEnc right after does the job.
+    MissionScript script = Load ("""
+        [MsnRandEnc]
+        nickname = se_nomads_5_more
+
+        [Trigger]
+        nickname = watch_endgame_object
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_DeactTrig = se_nomads_5_more
+        Act_DisableEnc = se_nomads_5_more
+
+        [Trigger]
+        nickname = forgets_to_disable
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_DeactTrig = se_nomads_5_more
+
+        [Trigger]
+        nickname = nomads_5_more
+        repeatable = true
+        Cnd_EncLaunched = se_nomads_5_more
+        Act_SpawnShip = extra
+        """);
+    List<Finding> findings = new UnknownTriggerTargetCheck ().Run (script).ToList ();
+    Finding superfluous = Assert.Single (findings, finding => finding.Subject == "watch_endgame_object");
+    Assert.Equal (FindingSeverity.Info, superfluous.Severity);
+    Assert.Contains ("nur überflüssig", superfluous.Message);
+    Assert.NotEqual (FindingSeverity.Info, Assert.Single (findings, finding => finding.Subject == "forgets_to_disable").Severity);
+  }
 }

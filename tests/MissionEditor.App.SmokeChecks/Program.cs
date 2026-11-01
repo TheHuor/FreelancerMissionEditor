@@ -512,6 +512,9 @@ internal static partial class Program
     string missingPrompt = AgentPrompts.ForFinding (@"M13\m13.ini", missing);
     Check (missingPrompt.Contains ("suggest_missing_trigger für „turn_off_music“") && missingPrompt.Contains (@"Datei: M13\m13.ini")
         && missingPrompt.Contains (AgentConnection.ServerName), "missing-trigger prompt asks for evidence about the missing trigger");
+    var missingSwitchOff = new MissionEditor.Core.Checks.Finding (MissionEditor.Core.Checks.FindingSeverity.Warning, "unknown-trigger", 5226, "watch_endgame_object",
+        "Act_DeactTrig auf unbekannten Trigger 'se_nomads_5_more' – die Deaktivierung hat keine Wirkung.", "Hinweis");
+    Check (!AgentPrompts.ForFinding (@"M13\m13.ini", missingSwitchOff).Contains ("suggest_missing_trigger"), "an unknown switch-off target gets no 'create the trigger' request");
 
     var duplicate = new MissionEditor.Core.Checks.Finding (MissionEditor.Core.Checks.FindingSeverity.Warning, "duplicate-nickname", 4843, "follow_player",
         "[ObjList] 'follow_player' ist doppelt (erste Definition Zeile 4384).", "Die Engine verwirft die zweite Liste.", 4384);
