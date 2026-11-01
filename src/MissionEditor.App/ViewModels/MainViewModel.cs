@@ -164,7 +164,7 @@ public sealed partial class MainViewModel : ObservableObject
   public IReadOnlyList<SectionLineItem> SelectedSectionLines
   {
     get => _sectionLines;
-    private set => SetProperty (ref _sectionLines, value);
+    private set { if (SetProperty (ref _sectionLines, value)) RefreshSourceRows (); }
   }
 
   /// <summary>

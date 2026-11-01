@@ -310,7 +310,7 @@ public partial class MainWindow : Window
 
   private void OnEditSection (object sender, RoutedEventArgs args)
   {
-    if (sender is not FrameworkElement { DataContext: SectionLineItem { Section: { } section } })
+    if (ResolveSourceSection (sender) is not { } section)
       return;
     var editor = new SectionEditorWindow (
         $"[{section.Name}] ab Zeile {section.FirstLineNumber} bearbeiten",
@@ -346,7 +346,7 @@ public partial class MainWindow : Window
 
   private void OnDeleteSection (object sender, RoutedEventArgs args)
   {
-    if (sender is not FrameworkElement { DataContext: SectionLineItem { Section: { } section } })
+    if (ResolveSourceSection (sender) is not { } section)
       return;
     (int firstLine, int lastLine) = Core.Ini.IniDocument.GetRemovalRange (section);
     string question = $"[{section.Name}] in den Zeilen {firstLine}–{lastLine} löschen?\n\n{ViewModel.DescribeDeletion (section)}\n\n"
@@ -376,8 +376,11 @@ public partial class MainWindow : Window
   // Centres the selected node in the visible part of the graph once the new size is measured.
   private void OnGraphRedrawn (object? sender, Rect centerBounds)
   {
+    if (!ViewModel.IsGraphView) { _pendingGraphCenter = centerBounds; return; }
+    _pendingGraphCenter = null;
     Dispatcher.BeginInvoke (() =>
     {
+      if (!ViewModel.IsGraphView) { _pendingGraphCenter = centerBounds; return; }
       double zoom = ZoomSlider.Value;
       GraphScroller.ScrollToHorizontalOffset (Math.Max (0, (centerBounds.X + centerBounds.Width / 2) * zoom - GraphScroller.ViewportWidth / 2));
       GraphScroller.ScrollToVerticalOffset (Math.Max (0, (centerBounds.Y + centerBounds.Height / 2) * zoom - GraphScroller.ViewportHeight / 2));
@@ -419,7 +422,7 @@ public partial class MainWindow : Window
   // Brings the finding's line into the source preview and marks it.
   private void ShowInPreview (FindingItem finding)
   {
-    DetailTabs.SelectedIndex = 0;
+    ViewModel.IsGraphView = false;
     SectionLineItem? line = ViewModel.ShowFinding (finding);
     if (finding.Node is not null)
       Dispatcher.BeginInvoke (() => BringDetailFindingIntoView (finding), System.Windows.Threading.DispatcherPriority.Loaded);
@@ -427,6 +430,7 @@ public partial class MainWindow : Window
       return;
     SectionPreview.SelectedItem = line;
     SectionPreview.ScrollIntoView (line);
+    DetailTabs.SelectedIndex = 1;
   }
 
   // Double-click on a marked line in the source preview: open the findings above and highlight its finding.
@@ -437,7 +441,7 @@ public partial class MainWindow : Window
     FindingItem finding = line.Findings.OrderByDescending (item => item.Severity).First ();
     if (finding.Node is null || finding.Node != ViewModel.SelectedTrigger?.Node)
       return;
-    DetailTabs.SelectedIndex = 0;
+    DetailTabs.SelectedIndex = 1;
     ViewModel.FindingsExpanded = true;
     ViewModel.CurrentFinding = finding;
     Dispatcher.BeginInvoke (() => BringDetailFindingIntoView (finding), System.Windows.Threading.DispatcherPriority.Loaded);

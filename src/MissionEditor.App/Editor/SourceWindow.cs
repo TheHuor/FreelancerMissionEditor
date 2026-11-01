@@ -10,6 +10,8 @@ namespace MissionEditor.App;
 /// <summary>Reusable non-modal section source; resources remain in their own window.</summary>
 public sealed class SourceWindow : Window
 {
+  /// <summary>Requests editing the selected physical source section.</summary>
+  public event EventHandler? EditSectionRequested;
   private readonly ListBox _lines = new ()
   {
     SelectionMode = SelectionMode.Extended,
@@ -24,8 +26,8 @@ public sealed class SourceWindow : Window
     Title = "Quelltext";
     Width = 1120;
     Height = 760;
-    MinWidth = 640;
-    MinHeight = 400;
+    MinWidth = 840;
+    MinHeight = 560;
     DataContext = viewModel;
     WindowGeometry.Restore (this, "source");
 
@@ -46,8 +48,13 @@ public sealed class SourceWindow : Window
     panel.Children.Add (path);
 
     // Bind line data and render each entry through SourceLineView.
-    _lines.SetBinding (ItemsControl.ItemsSourceProperty, new Binding (nameof (MainViewModel.SelectedSectionLines)));
-    ScrollViewer.SetHorizontalScrollBarVisibility (_lines, ScrollBarVisibility.Disabled);
+    _lines.SetBinding (ItemsControl.ItemsSourceProperty, new Binding (nameof (MainViewModel.SourceLines)));
+    ScrollViewer.SetHorizontalScrollBarVisibility (_lines, ScrollBarVisibility.Auto);
+    _lines.SetBinding (ListBox.SelectedItemProperty, new Binding (nameof (MainViewModel.SelectedSourceLine)) { Mode = BindingMode.TwoWay });
+    var itemStyle = new Style (typeof (ListBoxItem), (Style)FindResource (typeof (ListBoxItem)));
+    itemStyle.Setters.Add (new Setter (Control.PaddingProperty, new Thickness (0)));
+    itemStyle.Setters.Add (new Setter (Control.MarginProperty, new Thickness (0)));
+    _lines.ItemContainerStyle = itemStyle;
     var row = new FrameworkElementFactory (typeof (SourceLineView));
     row.SetBinding (SourceLineView.LineProperty, new Binding ());
     _lines.ItemTemplate = new DataTemplate (typeof (SectionLineItem)) { VisualTree = row };
@@ -65,7 +72,19 @@ public sealed class SourceWindow : Window
       args.Handled = true;
     };
 
-    panel.Children.Add (_lines);
+    var body = new Grid ();
+    body.ColumnDefinitions.Add (new ColumnDefinition { Width = new GridLength (1, GridUnitType.Star), MinWidth = 320 });
+    body.ColumnDefinitions.Add (new ColumnDefinition { Width = new GridLength (6) });
+    body.ColumnDefinitions.Add (new ColumnDefinition { Width = new GridLength (320), MinWidth = 260 });
+    body.Children.Add (_lines);
+    var splitter = new GridSplitter { Width = 6, HorizontalAlignment = HorizontalAlignment.Stretch };
+    Grid.SetColumn (splitter, 1); body.Children.Add (splitter);
+    var inspector = new SourceContextView ();
+    Grid.SetColumn (inspector, 2); body.Children.Add (inspector);
+    panel.Children.Add (body);
+    var edit = new Button { Content = "Sektion bearbeiten…", HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness (0, 0, 0, 8) };
+    edit.Click += (_, _) => EditSectionRequested?.Invoke (this, EventArgs.Empty);
+    DockPanel.SetDock (edit, Dock.Top); panel.Children.Insert (0, edit);
     Content = panel;
 
     // Persist current window geometry when the window is closed.

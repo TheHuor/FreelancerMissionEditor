@@ -25,8 +25,9 @@ internal static partial class Program
     var line = new SectionLineItem (1, reference.SourceText, [])
     { ResourceLinks = [link, new ResourceLinkItem (reference with { Ids = 124, Role = "Basis · Infocard" }, null)] };
     var view = new SourceLineView { Line = line };
-    int origins = ((StackPanel)view.Content).Children.OfType<TextBlock> ().SelectMany (item => item.Inlines.OfType<Hyperlink> ()).Count ();
-    if (origins != 1) throw new Exception ("One definition must have one compact edit link for name and infocard");
+    var contextVm = new MainViewModel { SelectedSourceLine = line };
+    if (contextVm.SourceDefinitions.Count != 1 || view.Content is not Grid { Height: 24 } row || row.Children.OfType<Button> ().Any ())
+      throw new Exception ("One definition action belongs in context; code stays one physical row");
     void Edit (string label, string replacement)
     {
       owner.Dispatcher.BeginInvoke (() =>

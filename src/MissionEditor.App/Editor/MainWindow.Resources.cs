@@ -8,10 +8,12 @@ public partial class MainWindow
 {
   private ResourceBrowserWindow? _resourceWindow;
   private SourceWindow? _sourceWindow;
+  private Rect? _pendingGraphCenter;
 
   private void InitializeResourceWindows ()
   {
     AddHandler (SourceLineView.ResourceRequestedEvent, new RoutedEventHandler (OnSourceResourceRequested));
+    AddHandler (SourceLineView.ResourceSelectedEvent, new RoutedEventHandler (OnSourceResourceSelected));
     AddHandler (SourceLineView.DefinitionRequestedEvent, new RoutedEventHandler (OnDefinitionRequested));
     ViewModel.DocumentContextChanged += (_, _) =>
       _resourceWindow?.RefreshContext (ViewModel.Script, ViewModel.GameData, ViewModel.FilePath);
@@ -63,7 +65,9 @@ public partial class MainWindow
     {
       var source = new SourceWindow (ViewModel) { Owner = this };
       source.AddHandler (SourceLineView.ResourceRequestedEvent, new RoutedEventHandler (OnSourceResourceRequested));
+      source.AddHandler (SourceLineView.ResourceSelectedEvent, new RoutedEventHandler (OnSourceResourceSelected));
       source.AddHandler (SourceLineView.DefinitionRequestedEvent, new RoutedEventHandler (OnDefinitionRequested));
+      source.EditSectionRequested += (_, _) => OnEditSelectedSourceSection (this, new RoutedEventArgs ());
       source.Closed += (_, _) => _sourceWindow = null;
       _sourceWindow = source;
       source.Show ();
@@ -74,12 +78,39 @@ public partial class MainWindow
 
   private void ShowResourceUsage (int lineNumber)
   {
+    ViewModel.IsGraphView = false;
     if (ViewModel.ShowSourceLine (lineNumber) is not { } line)
       return;
     SectionPreview.SelectedItem = line;
     SectionPreview.ScrollIntoView (line);
     OpenSource ().SelectLine (lineNumber);
   }
+
+  private void OnSourceResourceSelected (object sender, RoutedEventArgs args)
+  {
+    if (args.OriginalSource is not ResourceLinkItem link) return;
+    ViewModel.InspectResource (link);
+    DetailTabs.SelectedIndex = 0;
+    args.Handled = true;
+  }
+
+  private void OnSourceMode (object sender, RoutedEventArgs args) => ViewModel.IsGraphView = false;
+  private void OnGraphMode (object sender, RoutedEventArgs args)
+  {
+    ViewModel.IsGraphView = true;
+    if (_pendingGraphCenter is { } center) OnGraphRedrawn (this, center);
+  }
+  private void OnEditSelectedSourceSection (object sender, RoutedEventArgs args) =>
+      OnEditSection (new System.Windows.Controls.Button { Tag = ViewModel.SelectedSourceSection }, args);
+  private void OnDeleteSelectedSourceSection (object sender, RoutedEventArgs args) =>
+      OnDeleteSection (new System.Windows.Controls.Button { Tag = ViewModel.SelectedSourceSection }, args);
+  private void OnSourceLineSelectionChanged (object sender, System.Windows.Controls.SelectionChangedEventArgs args)
+  {
+    if (DetailTabs is not null) DetailTabs.SelectedIndex = 0;
+  }
+
+  private Core.Ini.IniSection? ResolveSourceSection (object sender) => sender is FrameworkElement element
+      ? element.Tag as Core.Ini.IniSection ?? (element.DataContext as SectionLineItem)?.Section : null;
 
   private static void ActivateWindow (Window window)
   {

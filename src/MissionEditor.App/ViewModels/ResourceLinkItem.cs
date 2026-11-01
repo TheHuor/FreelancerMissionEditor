@@ -7,6 +7,10 @@ public sealed record ResourceLinkItem (IdsReference Reference, ResourceEntry? Re
 {
   /// <summary>Global resource ID.</summary>
   public int Ids => Reference.Ids;
+  /// <summary>Compact role choice in the inspector.</summary>
+  public string ContextLabel => $"{Reference.Role} · {Ids}";
+  /// <summary>Single origin-definition editing action.</summary>
+  public string DefinitionLabel => "Definition bearbeiten · " + System.IO.Path.GetFileName (Reference.DefinitionPath);
   /// <summary>Actual lookup outcome, also available on missing links.</summary>
   public bool IsResolved => Resource?.IsResolved == true;
   /// <summary>Short bounded-width hint below the source line.</summary>

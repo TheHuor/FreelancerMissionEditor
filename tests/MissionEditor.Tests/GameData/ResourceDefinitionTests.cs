@@ -32,6 +32,17 @@ public sealed class ResourceDefinitionTests : IDisposable
   }
 
   [Fact]
+  public void TriggerSystemNicknameIsAnExplicitContextTarget ()
+  {
+    Write (@"EXE\freelancer.ini", "[Data]\nuniverse = universe\\universe.ini\n");
+    Write (@"DATA\universe\universe.ini", "[System]\nnickname = CF106\nstrid_name = 101\n");
+    var document = IniDocument.ParseText ("[Trigger]\nnickname = start\nsystem = CF106\n");
+    var reference = Assert.Single (MissionResourceIndex.Build (document, "mission.ini", GameData.Load (_root)));
+    Assert.Equal (101, reference.Ids);
+    Assert.Equal (0, reference.ParameterIndex);
+  }
+
+  [Fact]
   public void MissionObjectNamesResolveThroughNpcWithoutAGameInstallation ()
   {
     Directory.CreateDirectory (_root);

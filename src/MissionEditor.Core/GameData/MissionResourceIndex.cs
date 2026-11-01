@@ -96,7 +96,7 @@ public static class MissionResourceIndex
       {
         case "cnd_baseenter": case "cnd_baseexit": case "act_forceland": yield return (0, GameDataKind.Base, "Basis"); break;
         case "act_setshipandloadout": yield return (0, GameDataKind.ShipArchetype, "Schiffstyp"); break;
-        case "cnd_systementer": case "cnd_systemexit": yield return (0, GameDataKind.System, "System"); break;
+        case "system": case "cnd_systementer": case "cnd_systemexit": yield return (0, GameDataKind.System, "System"); break;
       }
     }
   }

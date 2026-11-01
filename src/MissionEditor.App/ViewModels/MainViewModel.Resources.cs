@@ -14,11 +14,16 @@ public sealed partial class MainViewModel
   public void RefreshResourceHints ()
   {
     int? focusedSectionLine = _focusSection?.FirstLineNumber;
+    int? selectedLine = SelectedSourceLine?.Number;
+    ResourceLinkItem? selectedRole = SelectedResourceLink;
     GameData?.Texts?.Reload ();
     if (Script is not null)
       Analyze (Script.Document, keepHistory: true);
-    if (focusedSectionLine is { } number)
+    if ((selectedLine ?? focusedSectionLine) is { } number)
       ShowSourceLine (number);
+    if (selectedRole is not null)
+      SelectedResourceLink = SourceContextLinks.FirstOrDefault (link => link.Reference.Role == selectedRole.Reference.Role
+          && link.Reference.ParameterIndex == selectedRole.Reference.ParameterIndex) ?? SelectedResourceLink;
   }
 
   /// <summary>Selects the exact section and returns the physical source row for usage navigation.</summary>
@@ -42,6 +47,7 @@ public sealed partial class MainViewModel
       SelectedSectionLines = BuildPreview ([( $"[{section.Name}] ab Zeile {section.FirstLineNumber}", section)]);
       NotifyDetailsChanged ();
     }
-    return SelectedSectionLines.FirstOrDefault (line => line.Number == lineNumber);
+    SelectedSourceLine = SourceLines.FirstOrDefault (line => line.Number == lineNumber);
+    return SelectedSourceLine;
   }
 }

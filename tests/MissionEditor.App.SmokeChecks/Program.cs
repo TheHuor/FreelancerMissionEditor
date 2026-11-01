@@ -148,7 +148,14 @@ internal static partial class Program
       window.UpdateLayout ();
       var graph = (ScrollViewer)window.FindName ("GraphScroller");
       var preview = (ListBox)window.FindName ("SectionPreview");
-      Assert (graph.ActualWidth >= 350 && preview.ActualWidth >= 300, "graph/source available at " + size);
+      vm.IsGraphView = false; window.UpdateLayout ();
+      Assert (preview.ActualWidth >= 350 && !graph.IsVisible, "source is central default workspace at " + size);
+      SavePreview (window, "source-workspace-main-" + (int)size.Width);
+      ((Button)window.FindName ("GraphModeButton")).RaiseEvent (new RoutedEventArgs (System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+      window.UpdateLayout ();
+      Assert (graph.ActualWidth >= 350 && !preview.IsVisible, "optional graph shares workspace at " + size);
+      SavePreview (window, "source-workspace-graph-" + (int)size.Width);
+      vm.IsGraphView = false;
     }
     var drawer = (Expander)window.FindName ("FindingsExpander");
     var row = (RowDefinition)window.FindName ("FindingsRow");
@@ -172,12 +179,12 @@ internal static partial class Program
         $"drawer restoration respects remaining workspace height after resize (row {row.Height.Value}, workspace {workspace.ActualHeight}, window {window.ActualHeight})");
     window.Height = 1080;
     window.UpdateLayout ();
-    tabs.SelectedIndex = 1;
+    tabs.SelectedIndex = 2;
     drawer.IsExpanded = false;
     var finding = vm.Findings.First (f => f.Finding.RelatedLineNumber is not null);
     typeof (MainWindow).GetMethod ("ShowInFindingsGrid", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke (window, [finding]);
     window.UpdateLayout ();
-    Assert (drawer.IsExpanded && tabs.SelectedIndex == 0, "finding navigation opens drawer and findings tab");
+    Assert (drawer.IsExpanded && tabs.SelectedIndex == 1, "finding navigation opens drawer and findings tab");
     Assert (vm.SelectedSectionLines.Count (l => l.HasActions) >= 2, "duplicate preview keeps both editable definitions");
     var tmp = Path.Combine (Path.GetTempPath (), "mission-layout-check-" + Guid.NewGuid () + ".ini");
     File.Copy (fixture, tmp);
@@ -255,6 +262,7 @@ internal static partial class Program
     }
     about.Close ();
     CheckResourceNavigation (window);
+    CheckSourceWorkspace (window);
     CheckResourceEditing (window);
 
     // Agent connection: paths with spaces and backslashes survive all three configuration formats.
@@ -405,7 +413,7 @@ internal static partial class Program
         throw new Exception ("Popup IDs must remain individually navigable without an installation");
       var source = new SourceWindow (vm) { Owner = owner };
       var requested = new List<int> ();
-      source.AddHandler (MissionEditor.App.Controls.SourceLineView.ResourceRequestedEvent,
+      source.AddHandler (MissionEditor.App.Controls.SourceLineView.ResourceSelectedEvent,
           new RoutedEventHandler ((_, args) => requested.Add (((ResourceLinkItem)args.OriginalSource).Ids)));
       source.Show ();
       source.UpdateLayout ();
@@ -419,7 +427,7 @@ internal static partial class Program
         }
       }
       var renderedLine = Descendants (source).OfType<MissionEditor.App.Controls.SourceLineView> ().Single (item => item.Line == line);
-      var code = (TextBlock)((ScrollViewer)((StackPanel)renderedLine.Content).Children[0]).Content;
+      var code = ((Grid)renderedLine.Content).Children.OfType<TextBlock> ().Single (item => item.Name == "CodeText");
       var links = code.Inlines.OfType<System.Windows.Documents.Hyperlink> ().ToArray ();
       foreach (var link in links) link.RaiseEvent (new RoutedEventArgs (System.Windows.Documents.Hyperlink.ClickEvent));
       if (links.Length != 2 || !requested.SequenceEqual (new[] { 65537, 65538 })
@@ -430,6 +438,8 @@ internal static partial class Program
       source.SelectLine (8);
       vm.RefreshResourceHints ();
       if (!vm.DetailsTitle.Contains ("NNObjective")) throw new Exception ("Reloading resources must retain non-trigger source context");
+      if (vm.SelectedSourceLine?.Number != 8 || vm.SelectedResourceLink?.Ids != 65539)
+        throw new Exception ("Resource reload must retain exact non-trigger line and selected resource role");
       SavePreview (source, "resource-source");
       source.Width = source.MinWidth;
       source.UpdateLayout ();

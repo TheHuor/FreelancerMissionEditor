@@ -6,10 +6,13 @@ using MissionEditor.App.ViewModels;
 
 namespace MissionEditor.App.Controls;
 
-/// <summary>Unmodified source with per-parameter links and width-bounded resource hints.</summary>
+/// <summary>One uninterrupted physical source row with per-parameter context links.</summary>
 public sealed class SourceLineView : UserControl
 {
-  /// <summary>Raised by both the inline ID and its short hint.</summary>
+  /// <summary>Selects the exact parameter's context without opening a resource window.</summary>
+  public static readonly RoutedEvent ResourceSelectedEvent = EventManager.RegisterRoutedEvent (
+      "ResourceSelected", RoutingStrategy.Bubble, typeof (RoutedEventHandler), typeof (SourceLineView));
+  /// <summary>Explicit inspector action to open a resource editor.</summary>
   public static readonly RoutedEvent ResourceRequestedEvent = EventManager.RegisterRoutedEvent (
       nameof (ResourceRequested), RoutingStrategy.Bubble, typeof (RoutedEventHandler), typeof (SourceLineView));
 
@@ -36,130 +39,41 @@ public sealed class SourceLineView : UserControl
 
   private static void Changed (DependencyObject source, DependencyPropertyChangedEventArgs args) => ((SourceLineView)source).Rebuild ();
 
-  private void Request (ResourceLinkItem link) => RaiseEvent (new RoutedEventArgs (ResourceRequestedEvent, link));
-
-    /// <summary>
-    /// Baut den visuellen Inhalt für die aktuelle Quellzeile neu auf:
-    /// <list type="bullet">
-    /// <item><description>zeigt die Quellzeile mit klickbaren Parameter-Links an,</description></item>
-    /// <item><description>rendert darunter aufgelöste/ungeklärte Ressourcenhinweise,</description></item>
-    /// <item><description>und ergänzt gefundene Fehlertexte als eigene Zeilen.</description></item>
-    /// </list>
-    /// </summary>
+  /// <summary>Render one physical line; all explanatory text stays in the inspector.</summary>
   private void Rebuild ()
   {
-    // Ohne aktive Zeile wird die Anzeige vollständig geleert.
-    if (Line is not { } line)
-    {
-      Content = null;
-      return;
-    }
-
-    // Hauptcontainer: oben Quelltext, darunter Link-Hinweise und Fehler.
-    var panel = new StackPanel ();
-
-    // Quelltextdarstellung (Caption proportional, sonst Monospace für Code).
-    var code = new TextBlock { FontFamily = new FontFamily (line.IsCaption ? "Segoe UI" : "Consolas"), FontSize = 13 };
+    if (Line is not { } line) { Content = null; return; }
+    var row = new Grid { Height = 24, Background = Brushes.Transparent, ToolTip = line.ToolTip };
+    row.ColumnDefinitions.Add (new ColumnDefinition { Width = new GridLength (54) });
+    row.ColumnDefinitions.Add (new ColumnDefinition { Width = new GridLength (20) });
+    row.ColumnDefinitions.Add (new ColumnDefinition { Width = GridLength.Auto });
+    row.Children.Add (new TextBlock { Text = line.NumberText, Foreground = (Brush)FindResource ("MutedTextBrush"),
+      TextAlignment = TextAlignment.Right, Margin = new Thickness (0, 2, 8, 0), FontFamily = new FontFamily ("Consolas"), FontSize = 13 });
+    var marker = new System.Windows.Shapes.Ellipse { Width = 5, Height = 5, VerticalAlignment = VerticalAlignment.Center,
+      HorizontalAlignment = HorizontalAlignment.Center,
+      Fill = (Brush)FindResource (line.HasError || line.ResourceErrors.Count > 0 ? "ErrorBrush" : "AccentBrush"),
+      Visibility = line.ResourceLinks.Count > 0 || line.ResourceErrors.Count > 0 ? Visibility.Visible : Visibility.Hidden,
+      ToolTip = $"Zusatzinfos · {line.ResourceLinks.Count} Ressourcenverweise" };
+    Grid.SetColumn (marker, 1); row.Children.Add (marker);
+    var code = new TextBlock { Name = "CodeText", FontFamily = new FontFamily ("Consolas"), FontSize = 13,
+      TextWrapping = TextWrapping.NoWrap, VerticalAlignment = VerticalAlignment.Center };
     string text = line.Text;
     int position = 0;
-
-    // Zerlegt den Text in normale Runs + klickbare Parameterbereiche.
     foreach (var span in ParameterSpans (text, line.ResourceLinks))
     {
-      // Unverlinkter Abschnitt vor dem aktuellen Parameter.
       code.Inlines.Add (new Run (text[position..span.Start]));
-
-      // Verlinkter Parameterbereich mit Statusfarbe/Tooltip.
       var hyperlink = new Hyperlink (new Run (text.Substring (span.Start, span.Length)))
-      {
-        Foreground = Brush (span.Link),
-        ToolTip = span.Link.ToolTip,
-        TextDecorations = span.Link.IsResolved ? null : TextDecorations.Underline,
-      };
-
-      // Lokale Kopie für korrektes Capturing in der Lambda.
+      { Foreground = Brush (span.Link), ToolTip = span.Link.ToolTip,
+        TextDecorations = span.Link.IsResolved ? null : TextDecorations.Underline };
       var link = span.Link;
-      hyperlink.Click += (_, _) => Request (link);
+      hyperlink.Click += (_, _) => RaiseEvent (new RoutedEventArgs (ResourceSelectedEvent, link));
       code.Inlines.Add (hyperlink);
-
-      // Cursor auf das Ende des verarbeiteten Parameterbereichs setzen.
       position = span.Start + span.Length;
     }
-
-    // Restlicher Text nach dem letzten Parameter.
     code.Inlines.Add (new Run (text[position..]));
-
-    // Quelltext in horizontal scrollbarfähiger Fläche anzeigen.
-    panel.Children.Add (new ScrollViewer
-    {
-      HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-      VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-      Content = code,
-      Focusable = false
-    });
-
-    // Zusätzliche, kompakte Linkliste unterhalb der Quellzeile.
-    foreach (ResourceLinkItem link in line.ResourceLinks)
-    {
-      var button = new Button
-      {
-        Content = new TextBlock { Text = link.Label, TextTrimming = TextTrimming.CharacterEllipsis },
-        HorizontalContentAlignment = HorizontalAlignment.Left,
-        HorizontalAlignment = HorizontalAlignment.Stretch,
-        Padding = new Thickness (0, 1, 0, 1),
-        Margin = new Thickness (0, 1, 0, 0),
-        Foreground = Brush (link),
-        ToolTip = link.ToolTip,
-        FontFamily = new FontFamily ("Segoe UI"),
-        FontSize = 12
-      };
-
-      // Schlichtes Template, damit der Inhalt über die volle Breite links ausgerichtet bleibt.
-      var presenter = new FrameworkElementFactory (typeof (ContentPresenter));
-      presenter.SetValue (HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
-      button.Template = new ControlTemplate (typeof (Button)) { VisualTree = presenter };
-      button.Cursor = System.Windows.Input.Cursors.Hand;
-
-      // Unaufgelöste Ressourcen optisch markieren.
-      if (!link.IsResolved && button.Content is TextBlock label)
-        label.TextDecorations = TextDecorations.Underline;
-
-      // Klick fordert die Ressource an.
-      button.Click += (_, _) => Request (link);
-      panel.Children.Add (button);
-
-    }
-
-    // Eine Definition kann Name und Infocard liefern; der Bearbeitungslink erscheint nur einmal.
-    foreach (ResourceLinkItem link in line.ResourceLinks.Where (item => item.Reference.DefinitionPath is not null)
-        .DistinctBy (item => (item.Reference.DefinitionPath!.ToUpperInvariant (), item.Reference.DefinitionLineNumber)))
-    {
-      string definition = link.Reference.DefinitionPath!;
-      var origin = new Hyperlink (new Run ("Definition bearbeiten · " + System.IO.Path.GetFileName (definition)))
-      {
-        Foreground = (Brush)FindResource ("AccentBrush"),
-        ToolTip = $"{definition}\nSektion ab Zeile {link.Reference.DefinitionLineNumber} bearbeiten",
-      };
-      origin.Click += (_, _) => RaiseEvent (new RoutedEventArgs (DefinitionRequestedEvent, link));
-      var originLine = new TextBlock { FontFamily = new FontFamily ("Segoe UI"), FontSize = 11, Margin = new Thickness (0, 3, 0, 2) };
-      originLine.Inlines.Add (origin);
-      panel.Children.Add (originLine);
-    }
-    // Alle erkannten Ressourcenfehler als gut sichtbare Textblöcke ausgeben.
-    foreach (string error in line.ResourceErrors)
-      panel.Children.Add (new TextBlock
-      {
-        Text = error,
-        TextWrapping = TextWrapping.Wrap,
-        FontFamily = new FontFamily ("Segoe UI"),
-        FontSize = 12,
-        Foreground = (Brush)FindResource ("ErrorBrush")
-      });
-
-    // Fertig aufgebautes UI in das Control übernehmen.
-    Content = panel;
+    Grid.SetColumn (code, 2); row.Children.Add (code);
+    Content = row;
   }
-
   private Brush Brush (ResourceLinkItem link) => (Brush)FindResource (link.IsResolved ? "AccentBrush" : "ErrorBrush");
 
   /// <summary>
@@ -175,7 +89,7 @@ public sealed class SourceLineView : UserControl
   /// Das Parsing beginnt hinter dem ersten <c>=</c>, trennt Parameter über <c>,</c> und beendet die
   /// Verarbeitung bei <c>;</c> oder am Zeilenende. Leerzeichen um Parameterwerte werden ignoriert.
   /// Es werden nur numerische Parameter berücksichtigt, deren Parameterindex sowie ID mit einem
-  /// Link ohne <c>Provenance</c> übereinstimmen.
+  /// direkten IDS-Verweis übereinstimmen; indirekte Nicknames stammen ausschließlich aus bekannten Parameterpositionen.
   /// </remarks>
   private static IEnumerable<(int Start, int Length, ResourceLinkItem Link)> ParameterSpans (string text, IReadOnlyList<ResourceLinkItem> links)
   {
@@ -203,7 +117,7 @@ public sealed class SourceLineView : UserControl
 
       // Passenden Link für die aktuelle Parameterposition und numerische ID suchen.
       ResourceLinkItem? link = links.FirstOrDefault (item => item.Reference.ParameterIndex == parameter
-          && item.Reference.Provenance is null && int.TryParse (text[first..last], out int numeric) && numeric == item.Ids);
+          && (item.Reference.Provenance is not null || (int.TryParse (text[first..last], out int numeric) && numeric == item.Ids)));
 
       if (link is not null)
         yield return (first, last - first, link);
