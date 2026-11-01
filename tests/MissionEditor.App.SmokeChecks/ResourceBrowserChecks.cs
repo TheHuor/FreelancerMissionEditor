@@ -35,6 +35,11 @@ internal static partial class Program
     bool WriteCopy (string path) => (bool)typeof (ResourceBrowserWindow).GetMethod ("WriteFile", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke (browser, [fixture.DllPath, path])!;
     browser.RefreshContext (script, game, mission);
     browser.Show ();
+    Check (browser.NavigateToId (999), "missing IDS in a readable DLL stays navigable");
+    Check (((TextBlock)browser.FindName ("MetadataText")).Text == "Keine aufgelöste Ressource"
+        && ((ComboBox)browser.FindName ("LanguageBox")).SelectedItem!.ToString () == "Keine Sprachvariante"
+        && !((Button)browser.FindName ("SaveButton")).IsEnabled,
+        "missing IDS has no invented culture or editable resource");
     browser.NavigateToId (1);
     var languages = (ComboBox)browser.FindName ("LanguageBox");
     languages.SelectedItem = languages.Items.Cast<object> ().Single (choice =>

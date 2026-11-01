@@ -291,9 +291,10 @@ public partial class ResourceBrowserWindow : Window
     _updating = true;
     _editorDirty = false;
     IdText.Text = $"IDS {entry.Ids}";
-    MetadataText.Text = entry.Identity is { } key ? $"{key.Kind} · {Path.GetFileName(key.DllPath)} · {LanguageName(key.Language)}" : "Keine aufgelöste Ressource";
+    MetadataText.Text = entry.IsResolved && entry.Identity is { } key ? $"{key.Kind} · {Path.GetFileName(key.DllPath)} · {LanguageName(key.Language)}" : "Keine aufgelöste Ressource";
     MetadataText.ToolTip = entry.Identity?.DllPath;
-    TechnicalText.Text = entry.Identity is { } identity ? $"DLL: {identity.DllPath}\nSlot: {identity.Slot} · lokale ID: {identity.LocalId} · Sprache: {identity.Language} (0x{identity.Language:X4})" : entry.StatusText;
+    TechnicalText.Text = entry.Identity is { } identity ? $"DLL: {identity.DllPath}\nSlot: {identity.Slot} · lokale ID: {identity.LocalId} · "
+        + (entry.IsResolved ? $"Sprache: {identity.Language} (0x{identity.Language:X4})" : "Keine Sprachvariante ermittelt") : entry.StatusText;
     if (entry.Identity is { } saved && _backups.TryGetValue(saved.DllPath, out string? backup)) TechnicalText.Text += "\nLetzte Sicherung: " + backup;
     ResolutionText.Text = entry.StatusText + (entry.Identity?.Kind == ResourceKind.Infocard && !entry.StatusText.Contains("Klartext aus Infocard") ? " · Klartext aus Infocard" : "");
     string content = entry.Identity is { } id && _drafts.TryGetValue(id, out var draft) ? draft.EditedText : entry.RawText ?? entry.Text;
@@ -634,7 +635,12 @@ public partial class ResourceBrowserWindow : Window
   private static bool MatchesVariant(ResourceEntry entry, string query, int kind, int ids) =>
       (kind == 0 || entry.Identity?.Kind == (kind == 1 ? ResourceKind.String : ResourceKind.Infocard))
       && (query.Length == 0 || ids.ToString().Contains(query, StringComparison.OrdinalIgnoreCase) || entry.Text.Contains(query, StringComparison.OrdinalIgnoreCase));
-  private static string LanguageName(ushort language) { try { return $"{CultureInfo.GetCultureInfo(language).DisplayName} ({language})"; } catch (CultureNotFoundException) { return $"Sprache {language}"; } }
+  private static string LanguageName(ushort language)
+  {
+    if (language == 0) return "Keine Sprache (0)";
+    try { return $"{CultureInfo.GetCultureInfo(language).DisplayName} ({language})"; }
+    catch (CultureNotFoundException) { return $"Sprache {language}"; }
+  }
   private static int[] SegmentParagraphs(string xml)
   {
     var paragraphs = new List<int>();
@@ -651,7 +657,7 @@ public partial class ResourceBrowserWindow : Window
   }
   private sealed record LanguageChoice(ResourceEntry Entry)
   {
-    public string Label => Entry.Identity is { } id ? $"{LanguageName(id.Language)} · {id.Kind}" : "Keine Sprache";
+    public string Label => Entry.IsResolved && Entry.Identity is { } id ? $"{LanguageName(id.Language)} · {id.Kind}" : "Keine Sprachvariante";
     public override string ToString() => Label;
   }
   private sealed record DllChoice(string? Path, int Slot)
