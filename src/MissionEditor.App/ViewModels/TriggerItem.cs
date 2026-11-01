@@ -29,6 +29,22 @@ public sealed class TriggerItem (TriggerNode node, IReadOnlyList<FindingItem> fi
   /// <summary>The nickname.</summary>
   public string Name => Node.Name;
 
+  /// <summary>The effective condition's key, or a readable placeholder.</summary>
+  public string ConditionKey => Node.Trigger?.Condition?.Key ?? (IsMissing ? "nicht definiert" : "keine Bedingung");
+
+  /// <summary>The effective condition's parameters, kept separate from its label.</summary>
+  public string ConditionValue => Node.Trigger?.Condition?.RawValue ?? string.Empty;
+
+  /// <summary>Semantic colour group; other conditions retain the event colour.</summary>
+  public string ConditionKind => ConditionKey.ToUpperInvariant () switch
+  {
+    "CND_TRUE" => "Always",
+    "CND_TIMER" => "Timer",
+    "CND_INSPACE" or "CND_SPACEENTER" or "CND_SPACEEXIT" or "CND_SYSTEMENTER" or "CND_SYSTEMEXIT"
+      or "CND_NPCSYSTEMENTER" or "CND_NPCSYSTEMEXIT" => "System",
+    _ => Node.Trigger?.Condition is null ? "None" : "Event",
+  };
+
   /// <summary>Second line in the list: condition or "not defined".</summary>
   public string Detail => Node.Trigger is { } trigger
       ? $"{trigger.ConditionText}   · Z. {trigger.LineNumber}"
