@@ -31,7 +31,7 @@ public partial class AboutWindow : Window
   /// <summary>The loaded WPF assembly version.</summary>
   public string WpfLabel => $"WPF {typeof (Window).Assembly.GetName ().Version}";
 
-  /// <summary>Versioned repository components; CLI ships separately with the shared build version.</summary>
+  /// <summary>Versioned repository components sharing the same build version.</summary>
   public IReadOnlyList<ModuleInfo> Modules
   {
     get;
@@ -39,8 +39,8 @@ public partial class AboutWindow : Window
   [
       new("GUI", "WPF-Oberfläche", BuildVersion),
         new("Core", "INI, BINI und Prüfungen", VersionOf(typeof(IniDocument).Assembly)),
-        new("CLI", "Kommandozeile · separat", BuildVersion),
-        new("MCP", "Agent-Schnittstelle · separat", BuildVersion),
+        new("CLI", "Kommandozeile", BuildVersion),
+        new("MCP", "Agent-Schnittstelle", BuildVersion),
     ];
 
   /// <summary>Creates the themed information dialog.</summary>

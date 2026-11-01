@@ -78,7 +78,7 @@ public static class AgentConnection
   }
 
   /// <summary>
-  /// The server executable to suggest: next to the editor, in a sibling "mcp" folder of an extracted
+  /// The server executable to suggest: in the bundled "mcp" folder, next to the editor, in a sibling "mcp" folder of an extracted
   /// release, or in the build output of a source checkout. Null when none exists.
   /// </summary>
   public static string? FindServerExecutable ()
@@ -86,6 +86,7 @@ public static class AgentConnection
     string baseDirectory = AppContext.BaseDirectory;
     var candidates = new List<string>
         {
+            Path.Combine(baseDirectory, "mcp", ServerExecutable),
             Path.Combine(baseDirectory, ServerExecutable),
             Path.GetFullPath(Path.Combine(baseDirectory, "..", "mcp", ServerExecutable)),
         };

@@ -301,8 +301,10 @@ dotnet build src/MissionEditor.Mcp -c Release
 dotnet run --project src/MissionEditor.Mcp -- [--allow-root <Ordner>]... [--game <Ordner>] [--allow-writes]
 ```
 
-Ein Release enthält zusätzlich `MissionEditorMcp-<version>-win-x64.zip` mit
-`MissionEditor.Mcp.exe`, das ohne installiertes .NET läuft.
+Das App-ZIP enthält den MCP-Server im Unterordner `mcp` und die Kommandozeile im
+Unterordner `cli`. Beide laufen ohne installiertes .NET. Der Editor findet den mitgelieferten
+MCP-Server automatisch. Ein zusätzlicher Download ist nicht nötig. Für die Nutzung ohne
+Editor gibt es außerdem separate MCP- und CLI-ZIPs.
 
 Claude Code (für alle Projekte des Benutzers, ohne Ordnerbeschränkung):
 
@@ -438,5 +440,10 @@ Der Verpackungsschritt lässt sich lokal ausführen:
 ```
 
 Die Ausgaben liegen im ignorierten Verzeichnis `artifacts/`. Für eine andere Ausgabestelle kann
-`-OutputDirectory` angegeben werden. Die ZIPs enthalten jeweils den Inhalt des entsprechenden
-GUI-, CLI- bzw. MCP-Verzeichnisses und können ohne vorherige .NET-Installation entpackt gestartet werden.
+`-OutputDirectory` angegeben werden. Das App-ZIP enthält die GUI sowie CLI und MCP in den
+Unterordnern `cli` und `mcp`; ein Download genügt. Die separaten CLI- und MCP-ZIPs enthalten
+jeweils nur das entsprechende Werkzeug. Jedes Werkzeug wird als einzelne Self-contained-EXE
+einschließlich der .NET-Laufzeit ausgeliefert; lose Laufzeit-DLLs sind nicht nötig. Das App-ZIP
+enthält also drei EXEs: die App sowie `cli/MissionEditor.Cli.exe` und `mcp/MissionEditor.Mcp.exe`.
+Beim Start entpackt .NET die eingebetteten Dateien automatisch in seinen temporären Cache.
+Alle Pakete laufen ohne vorherige .NET-Installation.

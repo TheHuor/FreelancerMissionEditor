@@ -112,7 +112,7 @@ public partial class AgentConnectionWindow : Window
   private void RefreshServerStatus ()
   {
     if (Executable.Length == 0)
-      ShowStatus (ServerStatus, false, "Kein MCP-Server gefunden. Das Release-ZIP „MissionEditorMcp“ entpacken und hier die MissionEditor.Mcp.exe wählen.");
+      ShowStatus (ServerStatus, false, "Kein MCP-Server gefunden. Das App-ZIP vollständig entpacken; der Server liegt im Unterordner „mcp“. Hier die MissionEditor.Mcp.exe wählen.");
     else if (!File.Exists (Executable))
       ShowStatus (ServerStatus, false, "Datei nicht gefunden.");
     else if (Workspace.Length > 0 && !Directory.Exists (Workspace))
