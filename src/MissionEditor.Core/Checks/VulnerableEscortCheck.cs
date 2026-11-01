@@ -40,8 +40,12 @@ public sealed class VulnerableEscortCheck : IMissionCheck
             && names.Contains (action.GetValue (0)) && action.GetBoolean (1)));
         if (invulnerable || HasDeathTrigger (flow, section, ships))
           continue;
+        // The condition resolves the name on every check; a ship that is gone gives no object and the condition stays
+        // false – there is no fallback to the player (fl_decomp CndDistShip::Matches, GetLabelObjectId). A formation name
+        // resolves to one of its live ships.
+        string destroyed = ships.Count > 1 ? $"werden alle Schiffe von '{shipName}' zerstört" : "wird das Schiff zerstört";
         yield return new Finding (FindingSeverity.Warning, Id, condition.Number, trigger.Nickname,
-            $"'{trigger.Nickname}' wartet auf '{shipName}' ({condition.Key}); wird das Schiff zerstört, geht es hier nicht weiter – "
+            $"'{trigger.Nickname}' wartet auf '{shipName}' ({condition.Key}); {destroyed}, geht es hier nicht weiter – "
             + "weder Act_Invulnerable noch ein Cnd_Destroyed-Trigger in diesem Abschnitt fängt das ab.",
             "Die Bedingung tritt nur ein, solange das Schiff existiert. Abhilfe: das Schiff mit 'Act_Invulnerable = <schiff>, true' schützen "
             + "oder im selben Abschnitt (beim Spawnen oder beim Aktivieren des wartenden Triggers) einen Trigger mit 'Cnd_Destroyed = <schiff>' "

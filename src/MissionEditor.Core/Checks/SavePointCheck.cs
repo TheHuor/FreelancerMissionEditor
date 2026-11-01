@@ -7,7 +7,10 @@ namespace MissionEditor.Core.Checks;
 /// Story save points (Act_Save = target). Loading the save puts the target into the start set and sends MissionStart
 /// while the save file is still being read (fl_decomp Story.cpp, PlayerLoad); ActivateMissionTrigger probes the
 /// condition at once. Reported: a save made in space whose target never sets the start position
-/// (Act_SetInitialPlayerPos – the original missions do this for nearly every save in space), and Act_NNPath or
+/// (Act_SetInitialPlayerPos – the original missions do this for nearly every save in space) as a note only: the save
+/// writes the live ship position (fl_decomp server_pub.cpp, "pos"), and loading copies it to the start position
+/// (server_savegame.cpp, PlayerData_ApplySavedCharacter) before PlayerLoad runs the target – without the action the
+/// player starts where he saved. Also Act_NNPath or
 /// Act_PopUpDialog in a target with Cnd_True, which therefore runs before the player is in the game: the waypoint or
 /// popup is lost. Triggers the target activates are only queued and run with the next event, in the game – they are fine.
 /// </summary>
@@ -42,10 +45,13 @@ public sealed class SavePointCheck : IMissionCheck
             .Prepend (target);
         if (!OnBase (flow, saver, 4) && !afterLoad.Any (step => step.Actions.Any (action => action.IsKey ("Act_SetInitialPlayerPos"))))
         {
-          yield return new Finding (FindingSeverity.Warning, Id, save.Line.Number, saver.Nickname,
-              $"'{saver.Nickname}' speichert im Weltraum, aber das Speicherziel '{target.Nickname}' setzt keine Startposition (Act_SetInitialPlayerPos).",
-              "Beim Laden aktiviert die Engine nur das Speicherziel; wo der Spieler steht, legt Act_SetInitialPlayerPos fest. Die Originalmissionen "
-              + "setzen es in fast jedem Speicherziel im Weltraum (z. B. m02 key_save_first_save_game). Abhilfe: im Speicherziel "
+          yield return new Finding (FindingSeverity.Info, Id, save.Line.Number, saver.Nickname,
+              $"'{saver.Nickname}' speichert im Weltraum, das Speicherziel '{target.Nickname}' setzt keine Startposition (Act_SetInitialPlayerPos) – "
+              + "nach dem Laden beginnt der Spieler dort, wo er beim Speichern war.",
+              "Der Spielstand enthält die Position des Schiffs beim Speichern; dort beginnt der Spieler nach dem Laden. Act_SetInitialPlayerPos im "
+              + "Speicherziel ersetzt sie durch eine feste Stelle. Die Originalmissionen setzen es in fast jedem Speicherziel im Weltraum "
+              + "(z. B. m02 key_save_first_save_game), damit der Spieler an einer bekannten Stelle beginnt, etwa nicht mitten in Schiffen, die "
+              + "das Speicherziel neu spawnt. Nötig ist es nicht. Für eine feste Stelle im Speicherziel "
               + "'Act_SetInitialPlayerPos = x, y, z, w, x, y, z' (Position und Drehung) eintragen.",
               target.LineNumber);
         }

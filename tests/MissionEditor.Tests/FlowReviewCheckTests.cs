@@ -266,7 +266,8 @@ public class FlowReviewCheckTests
         Act_DebugMsg = welcome
         """);
     List<Finding> findings = new SavePointCheck ().Run (script).ToList ();
-    Assert.Single (findings, finding => finding.Subject == "reach_point" && finding.Message.Contains ("Startposition"));
+    // The save holds the ship position, so a missing start position is only a hint.
+    Assert.Equal (FindingSeverity.Info, Assert.Single (findings, finding => finding.Subject == "reach_point" && finding.Message.Contains ("Startposition")).Severity);
     // A lost popup is only a message: a hint.
     Assert.Equal (FindingSeverity.Info, Assert.Single (findings, finding => finding.Subject == "mission20save" && finding.Message.Contains ("Act_Popupdialog")).Severity);
     // What the target activates is only queued and runs in the game: its waypoint is not lost.
