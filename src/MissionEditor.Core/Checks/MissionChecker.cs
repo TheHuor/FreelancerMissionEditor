@@ -19,6 +19,10 @@ public static class MissionChecker
     new ImpossibleConditionCheck (),
     new UnusedObjectCheck (),
     new MissionEndCheck (),
+    new DestroyedCounterCheck (),
+    new VulnerableEscortCheck (),
+    new SavePointCheck (),
+    new CancelledActivationCheck (),
   ];
 
   /// <summary>Runs every check with the game data of the installation the script's file lies in, sorted by line.</summary>
