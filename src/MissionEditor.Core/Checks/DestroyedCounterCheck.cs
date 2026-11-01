@@ -61,6 +61,10 @@ public sealed class DestroyedCounterCheck : IMissionCheck
           continue;
         if (flow.ActivationPath (spawner, trigger, MaximumChainSteps) is not { Count: >= 3 } path)
           continue;
+        // A Cnd_True step fires with the next event, practically at once; only a step that waits (approach, timer,
+        // comm …) leaves time to shoot the targets before counting starts.
+        if (!path.Skip (1).Take (path.Count - 2).Any (step => step.Condition?.IsKey ("Cnd_True") == false))
+          continue;
         bool cloaked = path.Skip (1).Any (step => step.Actions.Any (action => action.IsKey ("Act_Cloak")
             && !action.GetBoolean (1) && Names (target, holders).Contains (action.GetValue (0))));
         string chain = string.Join (" → ", path.Select (step => step.Nickname));

@@ -189,9 +189,90 @@ public class FlowReviewCheckTests
     List<Finding> findings = new SavePointCheck ().Run (script).ToList ();
     Assert.Single (findings, finding => finding.Subject == "reach_point" && finding.Message.Contains ("Startposition"));
     Assert.Single (findings, finding => finding.Subject == "mission20save" && finding.Message.Contains ("Act_Popupdialog"));
-    Assert.Single (findings, finding => finding.Subject == "next_waypoint" && finding.Message.Contains ("Act_NNPath"));
+    // What the target activates is only queued and runs in the game: its waypoint is not lost.
+    Assert.DoesNotContain (findings, finding => finding.Subject == "next_waypoint");
     Assert.DoesNotContain (findings, finding => finding.Subject == "docked");
-    Assert.Equal (3, findings.Count);
+    Assert.Equal (2, findings.Count);
+  }
+
+  [Fact]
+  public void ASaveAfterACutsceneOnABaseNeedsNoStartPosition ()
+  {
+    MissionScript script = Load ("""
+        [Trigger]
+        nickname = docked
+        InitState = ACTIVE
+        Cnd_BaseEnter = cf01_01_base
+        Act_AddRTC = missions\m13\scene.ini
+        Act_ActTrig = scene_done
+
+        [Trigger]
+        nickname = scene_done
+        Cnd_RTCDone = missions\m13\scene.ini
+        Act_Save = after_scene
+
+        [Trigger]
+        nickname = after_scene
+        Cnd_BaseEnter = cf01_01_base
+        Act_DebugMsg = loaded
+        """);
+    Assert.Empty (new SavePointCheck ().Run (script));
+  }
+
+  [Fact]
+  public void AnImmediateStepBetweenSpawnAndCountingIsNoRace ()
+  {
+    // Cnd_True fires with the next event, the count starts practically together with the spawn.
+    MissionScript script = Load ("""
+        [MsnShip]
+        nickname = nomad_1
+        label = nomad
+
+        [MsnShip]
+        nickname = nomad_2
+        label = nomad
+
+        [Trigger]
+        nickname = spawn_nomads
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_SpawnShip = nomad_1
+        Act_SpawnShip = nomad_2
+        Act_ActTrig = go_on
+
+        [Trigger]
+        nickname = go_on
+        Cnd_True = no_params
+        Act_ActTrig = count_nomads
+
+        [Trigger]
+        nickname = count_nomads
+        Cnd_Destroyed = nomad, 2, ALL
+        Act_ChangeState = SUCCEED
+        """);
+    Assert.Empty (new DestroyedCounterCheck ().Run (script));
+  }
+
+  [Fact]
+  public void AShipThatOnlyGetsNewOrdersOnArrivalBlocksNothing ()
+  {
+    MissionScript script = Load ("""
+        [MsnShip]
+        nickname = wing_b
+
+        [Trigger]
+        nickname = spawn_wing
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_SpawnShip = wing_b
+        Act_ActTrig = wing_arrives
+
+        [Trigger]
+        nickname = wing_arrives
+        Cnd_DistVec = inside, wing_b, 0, 0, 0, 1000
+        Act_GiveObjList = wing_b, break_formation
+        """);
+    Assert.Empty (new VulnerableEscortCheck ().Run (script));
   }
 
   [Fact]
@@ -248,6 +329,7 @@ public class FlowReviewCheckTests
     Assert.Equal (FindingSeverity.Warning, objList.Severity);
     Finding typo = Assert.Single (findings, finding => finding.Message.Contains ("'respawn_wing1bc'"));
     Assert.Equal (FindingSeverity.Error, typo.Severity);
-    Assert.Contains ("'respawn_wing1c' bleibt dadurch aktiv", typo.Message);
+    Assert.Contains ("'respawn_wing1c'", typo.Message);
+    Assert.Contains ("bleibt er dadurch aktiv", typo.Message);
   }
 }

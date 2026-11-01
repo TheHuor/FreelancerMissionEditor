@@ -53,6 +53,8 @@ public sealed class GameDataTests : IDisposable
             Cnd_BaseEnter = ANY
             Act_SetShipAndLoadout = li_eltie, li_elite_loadout
             Act_ForceLand = li01_01_base
+            Act_SetRep = Player, li_n_grp, REP_FRIEND_THRESHOLD
+            Act_SetRep = li_n_grp, pilot_a, REP_NEUTRAL
             """);
   }
 
@@ -104,8 +106,10 @@ public sealed class GameDataTests : IDisposable
     Assert.Single (findings, finding => finding.Message.Contains ("'lost_fighter'") && finding.Message.Contains (@"missions\m99\npcships.ini"));
     Assert.Single (findings, finding => finding.Message.Contains ("'Li01_02_Base'") && finding.Message.Contains ("'Li01_01_Base'"));
     Assert.Single (findings, finding => finding.Message.Contains ("'li_eltie'") && finding.Message.Contains ("'li_elite'"));
+    // Act_SetRep takes <object>, <faction>: the swapped line is named as such, the right one passes.
+    Assert.Single (findings, finding => finding.Message.Contains ("vertauscht") && finding.Message.Contains ("'li_n_grp' ist eine Fraktion"));
     // Case does not matter, keywords are not names, and shared NPC ships count.
-    Assert.Equal (4, findings.Count);
+    Assert.Equal (5, findings.Count);
     Assert.All (findings, finding => Assert.Equal (FindingSeverity.Error, finding.Severity));
   }
 

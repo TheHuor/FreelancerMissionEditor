@@ -43,13 +43,19 @@ public sealed class UnknownTriggerTargetCheck : IMissionCheck
         ScriptObject? other = script.Objects.FirstOrDefault (item => item.Nickname.Equals (reference.TargetName, StringComparison.OrdinalIgnoreCase));
         if (other is not null)
           message += $" '{reference.TargetName}' ist eine [{ScriptObject.SectionNameOf (other.Kind)}] (Zeile {other.LineNumber}), kein Trigger.";
-        // A misspelt Act_DeactTrig is not harmless when the trigger it meant keeps running and spawns or repeats.
-        Trigger? meant = reference.Kind == TriggerReferenceKind.Deactivate && suggestions.Count > 0 ? script.FindTrigger (suggestions[0]) : null;
-        bool meantKeepsRunning = meant is not null && (meant.Repeatable || meant.Actions.Any (action => action.Key!.StartsWith ("Act_Spawn", StringComparison.OrdinalIgnoreCase)));
+        // A misspelt Act_DeactTrig is not harmless when the trigger it meant keeps running and spawns or repeats. Which
+        // of several similar names was meant is the author's call, so all running ones are named.
+        string[] keepRunning = reference.Kind != TriggerReferenceKind.Deactivate ? []
+            : suggestions.Select (name => script.FindTrigger (name)).OfType<Trigger> ()
+                .Where (candidate => candidate.Repeatable || candidate.Actions.Any (action => action.Key!.StartsWith ("Act_Spawn", StringComparison.OrdinalIgnoreCase)))
+                .Select (candidate => $"'{candidate.Nickname}'").ToArray ();
+        bool meantKeepsRunning = keepRunning.Length > 0;
         if (meantKeepsRunning && !trigger.IsShadowed)
         {
           severity = FindingSeverity.Error;
-          message += $" '{meant!.Nickname}' bleibt dadurch aktiv und {(meant.Repeatable ? "löst weiter aus" : "spawnt weiter")}.";
+          message += keepRunning.Length == 1
+              ? $" Ist {keepRunning[0]} gemeint, bleibt er dadurch aktiv und spawnt bzw. wiederholt weiter."
+              : $" Welcher auch gemeint ist ({string.Join (", ", keepRunning)}), er bleibt dadurch aktiv und spawnt bzw. wiederholt weiter.";
         }
         if (trigger.IsShadowed)
           message += " (Der Trigger ist doppelt definiert und wird ohnehin ignoriert.)";
@@ -58,6 +64,8 @@ public sealed class UnknownTriggerTargetCheck : IMissionCheck
           TriggerReferenceKind.Activate => "Act_ActTrig auf einen Namen ohne [Trigger] ist im Spiel ein stiller No-op – es gibt keine Fehlermeldung, der Ablauf geht dort einfach nicht weiter.",
           TriggerReferenceKind.Deactivate when other?.Kind == ScriptObjectKind.ObjList =>
             "Act_DeactTrig schaltet nur Trigger ab; eine laufende Befehlsliste beendet es nicht. Dafür dem Schiff per Act_GiveObjList eine andere [ObjList] geben.",
+          TriggerReferenceKind.Deactivate when other?.Kind == ScriptObjectKind.RandomEncounter =>
+            "Act_DeactTrig schaltet nur Trigger ab; einen Zufallskampf ([MsnRandEnc]) schaltet Act_DisableEnc ab.",
           TriggerReferenceKind.Deactivate when meantKeepsRunning =>
             "Act_DeactTrig auf einen Namen ohne [Trigger] tut nichts – der vermutlich gemeinte Trigger läuft weiter, mit allen Spawns bzw. Wiederholungen.",
           TriggerReferenceKind.Deactivate => "Act_DeactTrig auf einen Namen ohne [Trigger] ist harmlos, aber meist ein Tippfehler oder ein Überbleibsel eines gelöschten Triggers.",

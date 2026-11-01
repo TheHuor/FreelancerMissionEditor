@@ -110,6 +110,15 @@ public sealed class GameDataCheck : IMissionCheck
     string value = line.GetValue (index);
     if (value.Length == 0 || gameData.Contains (kind, value) || Keywords.Contains (value))
       return null;
+    // Act_SetRep = <object or label>, <faction>, …: a faction in front and an object behind is the swapped order.
+    if (line.IsKey ("Act_SetRep") && gameData.Contains (GameDataKind.Faction, line.GetValue (0)))
+    {
+      return new Finding (FindingSeverity.Error, CheckId, line.Number, subject,
+          $"{line.Key} = {line.RawValue}: die Argumente sind vertauscht – '{line.GetValue (0)}' ist eine Fraktion, an erster Stelle steht aber das Objekt bzw. Label.",
+          "Die Engine liest Act_SetRep als <Objekt oder Label>, <Fraktion>, <Wert> (fl_decomp ActSetRep::Parse). In dieser Reihenfolge findet sie kein "
+          + "Objekt namens Fraktion und tut nichts. Abhilfe: die ersten beiden Werte tauschen, z. B. 'Act_SetRep = "
+          + $"{line.GetValue (1)}, {line.GetValue (0)}, {line.GetValue (2)}'.");
+    }
     return new Finding (FindingSeverity.Error, CheckId, line.Number, subject,
         $"{line.Key} = {line.RawValue}: {NameOf (kind)} '{value}' gibt es im Spiel nicht.{Suggest (value, gameData.Nicknames (kind))}",
         $"Abgeglichen mit {SourceOf (kind)} der Installation {gameData.Root}. Unbekannte Nicknames übergeht das Spiel still oder es stürzt ab "

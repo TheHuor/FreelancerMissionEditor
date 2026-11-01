@@ -24,7 +24,9 @@ public sealed class VulnerableEscortCheck : IMissionCheck
     Trigger[] reachable = script.EffectiveTriggers.Where (flow.Reachable.Contains).ToArray ();
     foreach (Trigger trigger in reachable)
     {
-      if (trigger.Condition is not { } condition)
+      // Only progress counts: the waiting trigger must be the one way on – it saves, ends the mission or is the only
+      // activator of a further trigger. A trigger that just gives the ship new orders blocks nothing.
+      if (trigger.Condition is not { } condition || !CarriesProgress (flow, trigger))
         continue;
       foreach (string shipName in ShipArguments (condition).Where (name => name.Length > 0 && !name.Equals ("Player", StringComparison.OrdinalIgnoreCase)).Distinct (StringComparer.OrdinalIgnoreCase))
       {
@@ -61,6 +63,11 @@ public sealed class VulnerableEscortCheck : IMissionCheck
   };
 
   private static bool IsPlayer (string name) => name.Equals ("Player", StringComparison.OrdinalIgnoreCase);
+
+  private static bool CarriesProgress (MissionFlow flow, Trigger trigger) =>
+      trigger.Actions.Any (action => action.IsKey ("Act_Save") || action.IsKey ("Act_ChangeState"))
+      || trigger.References.Any (reference => reference.Kind == TriggerReferenceKind.Activate && reference.Target is { } next
+          && flow.ActivatorsOf (next).Where (flow.Reachable.Contains).All (activator => activator == trigger));
 
   // The section around the waiting trigger, while the ship exists: the triggers that spawn it and those they
   // activate within a few steps, plus the waiting trigger's activators.
