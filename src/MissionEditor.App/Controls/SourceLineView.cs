@@ -128,23 +128,23 @@ public sealed class SourceLineView : UserControl
       button.Click += (_, _) => Request (link);
       panel.Children.Add (button);
 
-      // Optionaler Zusatz-Button: Ursprungskonfiguration (Definition) öffnen.
-      if (link.Reference.DefinitionPath is { } definition)
-      {
-        var origin = new Button
-        {
-          Content = "Herkunfts-INI öffnen…",
-          FontFamily = new FontFamily ("Segoe UI"),
-          FontSize = 11,
-          HorizontalAlignment = HorizontalAlignment.Left,
-          Padding = new Thickness (4, 0, 4, 0),
-          ToolTip = definition
-        };
-        origin.Click += (_, _) => RaiseEvent (new RoutedEventArgs (DefinitionRequestedEvent, link));
-        panel.Children.Add (origin);
-      }
     }
 
+    // Eine Definition kann Name und Infocard liefern; der Bearbeitungslink erscheint nur einmal.
+    foreach (ResourceLinkItem link in line.ResourceLinks.Where (item => item.Reference.DefinitionPath is not null)
+        .DistinctBy (item => (item.Reference.DefinitionPath!.ToUpperInvariant (), item.Reference.DefinitionLineNumber)))
+    {
+      string definition = link.Reference.DefinitionPath!;
+      var origin = new Hyperlink (new Run ("Definition bearbeiten · " + System.IO.Path.GetFileName (definition)))
+      {
+        Foreground = (Brush)FindResource ("AccentBrush"),
+        ToolTip = $"{definition}\nSektion ab Zeile {link.Reference.DefinitionLineNumber} bearbeiten",
+      };
+      origin.Click += (_, _) => RaiseEvent (new RoutedEventArgs (DefinitionRequestedEvent, link));
+      var originLine = new TextBlock { FontFamily = new FontFamily ("Segoe UI"), FontSize = 11, Margin = new Thickness (0, 3, 0, 2) };
+      originLine.Inlines.Add (origin);
+      panel.Children.Add (originLine);
+    }
     // Alle erkannten Ressourcenfehler als gut sichtbare Textblöcke ausgeben.
     foreach (string error in line.ResourceErrors)
       panel.Children.Add (new TextBlock

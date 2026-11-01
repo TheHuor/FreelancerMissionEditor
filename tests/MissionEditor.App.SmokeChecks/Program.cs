@@ -378,6 +378,7 @@ internal static partial class Program
     about.Close ();
     window.Dispatcher.Invoke (() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     bindingListener.Flush ();
+    CheckDefinitionEditing (window);
     Assert (!bindingErrors.ToString ().Split (Environment.NewLine).Any (line => line.Contains ("ListBoxItem") &&
         (line.Contains ("HorizontalContentAlignment") || line.Contains ("VerticalContentAlignment"))),
         "list item alignment has no binding errors: " + bindingErrors);

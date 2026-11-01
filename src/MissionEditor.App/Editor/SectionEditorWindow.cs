@@ -16,7 +16,8 @@ public sealed class SectionEditorWindow : Window
   /// <param name="text">The section text to edit.</param>
   /// <param name="note">A line of advice shown above the text.</param>
   /// <param name="validate">Optional validation error; the dialog remains open on invalid input.</param>
-  public SectionEditorWindow (string title, string text, string note, Func<string, string?>? validate = null)
+  /// <param name="acceptLabel">Label describing whether accepting applies a mission edit or saves an external file.</param>
+  public SectionEditorWindow (string title, string text, string note, Func<string, string?>? validate = null, string acceptLabel = "Übernehmen · Strg+Enter")
   {
     _validate = validate;
     Title = title;
@@ -39,7 +40,7 @@ public sealed class SectionEditorWindow : Window
       VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
       Margin = new Thickness (0, 6, 0, 8),
     };
-    var okButton = new Button { Content = "Übernehmen · Strg+Enter", IsDefault = false, Padding = new Thickness (14, 3, 14, 3), Margin = new Thickness (0, 0, 8, 0) };
+    var okButton = new Button { Content = acceptLabel, IsDefault = false, Padding = new Thickness (14, 3, 14, 3), Margin = new Thickness (0, 0, 8, 0) };
     okButton.Click += (_, _) => Accept ();
     var cancelButton = new Button { Content = "Abbrechen", IsCancel = true, Padding = new Thickness (14, 3, 14, 3) };
     var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };

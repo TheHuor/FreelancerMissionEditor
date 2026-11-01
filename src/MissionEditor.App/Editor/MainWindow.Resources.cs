@@ -95,35 +95,44 @@ public partial class MainWindow
     args.Handled = true;
     try
     {
-      var document = string.Equals (path, ViewModel.FilePath, StringComparison.OrdinalIgnoreCase) && ViewModel.Script is { } script
-          ? script.Document : Core.Ini.IniDocument.Load (path);
-      var source = new System.Windows.Controls.TextBox
+      bool currentMission = string.Equals (path, ViewModel.FilePath, StringComparison.OrdinalIgnoreCase) && ViewModel.Script is not null;
+      Core.Ini.IniSectionFileEdit? external = currentMission ? null
+          : Core.Ini.IniSectionFileEdit.Open (path, link.Reference.DefinitionLineNumber ?? 1, link.Ids);
+      var document = currentMission ? ViewModel.Script!.Document : external!.Document;
+      var section = external?.Section ?? document.Sections.FirstOrDefault (item => item.FirstLineNumber == link.Reference.DefinitionLineNumber)
+          ?? throw new System.IO.InvalidDataException ("Die Definition wurde verschoben. Bitte erneut öffnen.");
+      string? backup = null;
+      var editor = new SectionEditorWindow (
+          $"Definition bearbeiten · [{section.Name}] {section.Find ("nickname")?.GetValue (0)}",
+          Core.Ini.IniDocument.GetEditableText (section),
+          $"Datei: {path}\nSektion ab Zeile {section.FirstLineNumber}. " + (currentMission
+              ? "Übernehmen ändert die offene Mission. Strg+Z macht die Änderung rückgängig; Strg+S speichert die Mission."
+              : "Speichern schreibt nur diese Sektion in die Herkunfts-INI und erstellt eine Sicherung. Andere Sektionen bleiben erhalten."),
+          text =>
+          {
+            try
+            {
+              if (external is not null) backup = external.Save (text);
+              else _ = Core.Ini.IniSectionFileEdit.ApplySection (document, section, text);
+              return null;
+            }
+            catch (Exception error) when (error is System.IO.IOException or UnauthorizedAccessException or System.IO.InvalidDataException or ArgumentException)
+            { return error.Message; }
+          }, currentMission ? "Übernehmen · Strg+Enter" : "Speichern · Strg+Enter")
+      { Owner = this, Width = 1000, Height = 700 };
+      if (editor.ShowDialog () != true) return;
+      if (currentMission)
+        ViewModel.ReplaceSection (section, editor.Text);
+      else
       {
-        Text = string.Join (Environment.NewLine, document.Lines.Select (line => line.Text)),
-        IsReadOnly = true,
-        AcceptsReturn = true,
-        FontFamily = new System.Windows.Media.FontFamily ("Consolas"),
-        HorizontalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Auto,
-        VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Auto,
-      };
-      var viewer = new Window
-      {
-        Owner = this,
-        Title = "Herkunfts-INI · " + path,
-        Width = 1000,
-        Height = 700,
-        Content = source
-      };
-      viewer.SetResourceReference (StyleProperty, typeof (Window));
-      viewer.Show ();
-      int lineIndex = Math.Clamp ((link.Reference.DefinitionLineNumber ?? 1) - 1, 0, Math.Max (0, source.LineCount - 1));
-      int character = source.GetCharacterIndexFromLineIndex (lineIndex);
-      source.Select (character, source.GetLineLength (lineIndex));
-      source.ScrollToLine (lineIndex);
+        if (ViewModel.GameData is { } game) Core.Model.GameData.Invalidate (game.Root);
+        ViewModel.RefreshResourceHints ();
+        ViewModel.ReportStatus ($"Herkunfts-INI gespeichert: {path} · Sicherung: {backup}");
+      }
     }
     catch (Exception exception) when (exception is System.IO.IOException or UnauthorizedAccessException or System.IO.InvalidDataException)
     {
-      ThemedMessageBox.Show (this, exception.Message, "Herkunfts-INI kann nicht gelesen werden", MessageBoxButton.OK, MessageBoxImage.Error);
+      ThemedMessageBox.Show (this, exception.Message, "Herkunftsdefinition kann nicht bearbeitet werden", MessageBoxButton.OK, MessageBoxImage.Error);
     }
   }
 }
