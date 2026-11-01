@@ -50,17 +50,26 @@ public sealed class SavePointCheck : IMissionCheck
               target.LineNumber);
         }
 
-        if (target.Condition?.IsKey ("Cnd_True") != true || !reported.Add (target)
-            || target.Actions.FirstOrDefault (action => action.IsKey ("Act_NNPath") || action.IsKey ("Act_PopUpDialog")) is not { } lost)
+        if (target.Condition?.IsKey ("Cnd_True") != true || !reported.Add (target))
           continue;
-        yield return new Finding (FindingSeverity.Warning, Id, lost.Number, target.Nickname,
-            $"{lost.Key} im Speicherziel '{target.Nickname}' (Cnd_True) läuft beim Laden des Speicherpunkts von '{saver.Nickname}' sofort, noch während "
-            + "der Spielstand gelesen wird – der Wegpunkt bzw. das Popup geht verloren.",
-            "Beim Laden schickt die Engine MissionStart, noch während sie den Spielstand liest, und prüft das Speicherziel dabei sofort. "
-            + "Abhilfe: Wegpunkt und Popup in "
-            + "einen Trigger verschieben, den das Speicherziel per Act_ActTrig aktiviert (der läuft erst im Spiel), oder statt Cnd_True "
-            + "'Cnd_Timer = 1, 1, RUN_ON_BASE' verwenden.",
-            save.Line.Number);
+        // A lost waypoint leaves the player without direction after loading; a lost popup is only a message – in the
+        // Crossfire missionNsave targets it repeats the "mission completed" popup the player already saw.
+        foreach (IniLine lost in new[] { "Act_NNPath", "Act_PopUpDialog" }
+                     .Select (key => target.Actions.FirstOrDefault (action => action.IsKey (key))).OfType<IniLine> ())
+        {
+          bool waypoint = lost.IsKey ("Act_NNPath");
+          bool shownWhenSaving = !waypoint && saver.Actions.Any (action => action.IsKey ("Act_PopUpDialog") && action.RawValue == lost.RawValue);
+          yield return new Finding (waypoint ? FindingSeverity.Warning : FindingSeverity.Info, Id, lost.Number, target.Nickname,
+              $"{lost.Key} im Speicherziel '{target.Nickname}' (Cnd_True) läuft beim Laden des Speicherpunkts von '{saver.Nickname}' sofort, noch während "
+              + "der Spielstand gelesen wird – "
+              + (waypoint
+                  ? "der Wegpunkt fehlt dann nach dem Laden."
+                  : "das Popup erscheint dann nicht." + (shownWhenSaving ? " Beim Speichern hat der Spieler es schon gesehen; es fehlt nur die Wiederholung." : string.Empty)),
+              "Beim Laden schickt die Engine MissionStart, noch während sie den Spielstand liest, und prüft das Speicherziel dabei sofort. "
+              + "Abhilfe: " + (waypoint ? "den Wegpunkt" : "das Popup") + " in einen Trigger verschieben, den das Speicherziel per Act_ActTrig "
+              + "aktiviert (der läuft erst im Spiel), oder statt Cnd_True 'Cnd_Timer = 1, 1, RUN_ON_BASE' verwenden.",
+              save.Line.Number);
+        }
       }
     }
   }

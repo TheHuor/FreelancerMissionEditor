@@ -238,10 +238,38 @@ public class FlowReviewCheckTests
         """);
     List<Finding> findings = new SavePointCheck ().Run (script).ToList ();
     Assert.Single (findings, finding => finding.Subject == "reach_point" && finding.Message.Contains ("Startposition"));
-    Assert.Single (findings, finding => finding.Subject == "mission20save" && finding.Message.Contains ("Act_Popupdialog"));
+    // A lost popup is only a message: a hint.
+    Assert.Equal (FindingSeverity.Info, Assert.Single (findings, finding => finding.Subject == "mission20save" && finding.Message.Contains ("Act_Popupdialog")).Severity);
     // What the target activates is only queued and runs in the game: its waypoint is not lost.
     Assert.DoesNotContain (findings, finding => finding.Subject == "next_waypoint");
     Assert.DoesNotContain (findings, finding => finding.Subject == "docked");
+    Assert.Equal (2, findings.Count);
+  }
+
+  [Fact]
+  public void AWaypointInTheSaveTargetIsAWarningARepeatedPopupAHint ()
+  {
+    // Crossfire missionNsave: the saving trigger shows the completion popup, the target repeats it on loading.
+    MissionScript script = Load ("""
+        [Trigger]
+        nickname = mission_done
+        InitState = ACTIVE
+        Cnd_DistVec = inside, Player, 0, 0, 0, 500
+        Act_Popupdialog = 500729, 500730, CLOSE
+        Act_Save = mission10save, 500725
+
+        [Trigger]
+        nickname = mission10save
+        Cnd_True = no_params
+        Act_SetInitialPlayerPos = 0, 0, 0, 1, 0, 0, 0
+        Act_Popupdialog = 500729, 500730, CLOSE
+        Act_NNPath = 12345, 0, 0, 0, sys
+        """);
+    List<Finding> findings = new SavePointCheck ().Run (script).ToList ();
+    Finding popup = Assert.Single (findings, finding => finding.Message.Contains ("Act_Popupdialog"));
+    Assert.Equal (FindingSeverity.Info, popup.Severity);
+    Assert.Contains ("nur die Wiederholung", popup.Message);
+    Assert.Equal (FindingSeverity.Warning, Assert.Single (findings, finding => finding.Message.Contains ("Act_NNPath")).Severity);
     Assert.Equal (2, findings.Count);
   }
 
