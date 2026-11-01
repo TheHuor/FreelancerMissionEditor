@@ -437,8 +437,15 @@ public class FlowReviewCheckTests
         Act_DeactTrig = escort_follows
         Act_GiveObjList = juni, die
         Act_Destroy = juni, SILENT
+        Act_ActTrig = next_mission
+
+        [Trigger]
+        nickname = next_mission
+        Cnd_Timer = 10
+        Act_GiveObjList = king_next, JUNI_FOLLOWS
         """);
     List<Finding> findings = new UnknownTriggerTargetCheck ().Run (script).ToList ();
+    // king_next gets the list only in the next mission, after the cleanup: he does not follow it yet.
     Finding handled = Assert.Single (findings, finding => finding.Message.Contains ("'juni_follows'"));
     Assert.Equal (FindingSeverity.Info, handled.Severity);
     Assert.Contains ("nur überflüssig", handled.Message);

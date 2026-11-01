@@ -28,6 +28,8 @@
   <SolidColorBrush x:Key="DeactivateEdgeBrush" Color="#A6B8C9" />
   <SolidColorBrush x:Key="ErrorSurfaceBrush" Color="#34202B" />
   <SolidColorBrush x:Key="WarningSurfaceBrush" Color="#302B22" />
+  <!-- Neutral grey for hints: clearly not a warning, and not blue like the selection. -->
+  <SolidColorBrush x:Key="InfoSurfaceBrush" Color="#1F252D" />
   <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#173C56" />
   <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#E4EDF5" />
   <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#173C56" />

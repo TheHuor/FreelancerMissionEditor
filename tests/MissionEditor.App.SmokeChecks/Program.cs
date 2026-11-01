@@ -398,6 +398,13 @@ internal static partial class Program
         (line.Contains ("HorizontalContentAlignment") || line.Contains ("VerticalContentAlignment"))),
         "list item alignment has no binding errors: " + bindingErrors);
     System.Diagnostics.PresentationTraceSources.DataBindingSource.Listeners.Remove (bindingListener);
+
+    // Source lines take the colour of their most serious finding: a hint is grey, not warning brown.
+    var sourceRows = ((ListBox)window.FindName ("SectionPreview")).ItemContainerStyle;
+    Brush? RowBrush (string kind) => sourceRows.Triggers.OfType<DataTrigger> ().FirstOrDefault (trigger => Equals (trigger.Value, kind))
+        ?.Setters.OfType<Setter> ().FirstOrDefault (setter => setter.Property == Control.BackgroundProperty)?.Value as Brush;
+    Assert (RowBrush ("Info") == window.FindResource ("InfoSurfaceBrush") && RowBrush ("Warning") == window.FindResource ("WarningSurfaceBrush")
+        && RowBrush ("Error") == window.FindResource ("ErrorSurfaceBrush"), "source lines are coloured by severity, hints grey");
     Console.WriteLine ("ALL CHECKS PASSED");
     File.Delete (tmp);
     File.Delete (tmp + ".bak");

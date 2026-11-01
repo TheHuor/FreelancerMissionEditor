@@ -111,24 +111,14 @@ public sealed class UnknownTriggerTargetCheck : IMissionCheck
   }
 
   // The line in the trigger that ends the orders of every ship using the object list (another Act_GiveObjList or
-  // Act_Destroy on it), or null when a ship keeps them or no ship gets the list.
+  // Act_Destroy on it), or null when a ship keeps them or no ship gets the list. Only ships that got the list before –
+  // in a trigger on the way to this one – count; ships that get it later (e.g. in the next mission) do not follow it yet.
   private static IniLine? OrdersEnded (MissionScript script, Trigger trigger, string objList)
   {
-    var ships = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
-    foreach (Trigger giver in script.EffectiveTriggers)
-    {
-      foreach (IniLine action in giver.Actions)
-      {
-        if (action.IsKey ("Act_GiveObjList") && action.GetValue (1).Equals (objList, StringComparison.OrdinalIgnoreCase)
-            || (action.IsKey ("Act_SpawnShip") || action.IsKey ("Act_SpawnShipRel")) && action.GetValue (1).Equals (objList, StringComparison.OrdinalIgnoreCase))
-          ships.Add (action.GetValue (0));
-      }
-    }
-    foreach (ScriptObject ship in script.Objects.Where (item => item.Kind == ScriptObjectKind.Ship))
-    {
-      if (ship.Section.FindAll ("init_objectives").Any (line => line.GetValue (0).Equals (objList, StringComparison.OrdinalIgnoreCase)))
-        ships.Add (ship.Nickname);
-    }
+    // The way there may also run over a save point; when no ship gets the list on the Act_ActTrig way, all ships count.
+    HashSet<string> ships = ShipsWithList (script, Upstream (script, trigger), objList);
+    if (ships.Count == 0)
+      ships = ShipsWithList (script, script.EffectiveTriggers, objList);
     if (ships.Count == 0)
       return null;
     IniLine? first = null;
@@ -141,5 +131,49 @@ public sealed class UnknownTriggerTargetCheck : IMissionCheck
       first ??= ending;
     }
     return first;
+  }
+
+  // The ships the given triggers hand the object list to (Act_GiveObjList, spawn with the list, init_objectives of a spawned ship).
+  private static HashSet<string> ShipsWithList (MissionScript script, IEnumerable<Trigger> givers, string objList)
+  {
+    var ships = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
+    var spawned = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
+    foreach (Trigger giver in givers)
+    {
+      foreach (IniLine action in giver.Actions)
+      {
+        if (action.IsKey ("Act_GiveObjList") && action.GetValue (1).Equals (objList, StringComparison.OrdinalIgnoreCase)
+            || (action.IsKey ("Act_SpawnShip") || action.IsKey ("Act_SpawnShipRel")) && action.GetValue (1).Equals (objList, StringComparison.OrdinalIgnoreCase))
+          ships.Add (action.GetValue (0));
+        if (action.IsKey ("Act_SpawnShip") || action.IsKey ("Act_SpawnShipRel"))
+          spawned.Add (action.GetValue (0));
+      }
+    }
+    foreach (ScriptObject ship in script.Objects.Where (item => item.Kind == ScriptObjectKind.Ship && spawned.Contains (item.Nickname)))
+    {
+      if (ship.Section.FindAll ("init_objectives").Any (line => line.GetValue (0).Equals (objList, StringComparison.OrdinalIgnoreCase)))
+        ships.Add (ship.Nickname);
+    }
+    return ships;
+  }
+
+  // The trigger itself and every effective trigger that leads to it over Act_ActTrig.
+  private static HashSet<Trigger> Upstream (MissionScript script, Trigger trigger)
+  {
+    var activators = script.EffectiveTriggers
+        .SelectMany (source => source.References.Where (reference => reference.Kind == TriggerReferenceKind.Activate && reference.Target is not null)
+            .Select (reference => (Source: source, Target: reference.Target!)))
+        .ToLookup (edge => edge.Target, edge => edge.Source);
+    var upstream = new HashSet<Trigger> { trigger };
+    var queue = new Queue<Trigger> ([trigger]);
+    while (queue.TryDequeue (out Trigger? current))
+    {
+      foreach (Trigger source in activators[current])
+      {
+        if (upstream.Add (source))
+          queue.Enqueue (source);
+      }
+    }
+    return upstream;
   }
 }
