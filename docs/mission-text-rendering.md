@@ -65,3 +65,29 @@ Warnungen für den aktuellen Entwurf. Der Quelltext-Inspektor zeigt die konkrete
 Anzeigeart und eine Warnung beim betroffenen Parameter. Nach einem verifizierten
 DLL-Speichern aktualisiert RefreshResourceHints auch die Missionsprüfung.
 Die Prüfung repariert oder konvertiert Texte nicht automatisch.
+
+## Ladereihenfolge bei gleicher ID und unlesbares RDL
+
+Gibt es zu einer ID einen String und eine Infocard, hängt die geladene Variante
+vom Anzeigeweg ab:
+
+- FmtStr und die daraus gebauten Missionstexte laden zuerst den String und nur
+  ohne String die Infocard (src/freelancer/Client/ids_strings.cpp,
+  GetIdsStringWWithRawFallback). Darauf beruht ResourceRenderingCheck
+  (`ResourceLookup.StringFirst`).
+- Infocard-Anzeigen wie ids_info laden zuerst die Infocard (RT_HTML) und nur ohne
+  Infocard den String (src/freelancer/Client/ids_rdl.cpp, LoadIdsIntoRdl,
+  `ResourceLookup.InfocardFirst`).
+
+LoadIdsIntoRdl übergibt den Text an XMLReader::read_buffer. Schlägt das fehl,
+hängt AppendTextAsRdl den Text als Klartext mit Zeilenumbrüchen an. Daraus folgt
+für die Kennzeichnung „RDL/XML nicht lesbar“ im Ressourcen-Editor:
+
+- Eine Infocard, deren erstes Nicht-Leerzeichen kein `<` ist, ist gültiger
+  Klartext und wird nicht markiert; sie hat nur keine Formatierung.
+- Beginnt der Text mit XML und ist abgeschnitten oder kaputt, bleiben die bis zum
+  Fehler erzeugten Knoten stehen (read_buffer liefert nur bei S_OK true, der
+  SAX-Handler baut schrittweise auf, src/Common/common_rdlio.cpp), danach folgt
+  der gesamte Rohtext samt Tags. Die Meldung nennt fehlende schließende Tags;
+  bei einem abgeschnittenen String empfiehlt sie eine Infocard mit derselben ID,
+  weil Infocard-Anzeigen diese vor dem String laden.
