@@ -40,8 +40,8 @@ public sealed class ResourceHealthTests
   public void MalformedEncodingIsADecodeErrorOnly()
   {
     using var fixture = new ResourceDllFixture();
-    // An odd trailing byte after the RDL, as in real infocards with damaged padding.
-    fixture.AddInfocardBytes(60, [.. Encoding.Unicode.GetBytes("﻿" + ResourceDllFixture.Card + "  "), 0]);
+    // An odd trailing byte that is not padding; a single 0x00 would be.
+    fixture.AddInfocardBytes(60, [.. Encoding.Unicode.GetBytes("﻿" + ResourceDllFixture.Card + "  "), 0x41]);
     fixture.AddInfocardBytes(60, Encoding.Unicode.GetBytes("<RDL><TEXT>Deutsch</TEXT></RDL>\0"), 1031);
     var game = GameData.Load(fixture.Root);
     Assert.Equal(ResourceStatus.DecodeError, game.Texts!.Resolve(60, 1033).Status);
@@ -50,6 +50,16 @@ public sealed class ResourceHealthTests
     Assert.Contains("Sprache 1033", problem.Reason);
     Assert.Contains("unvollständiges Byte", problem.Reason);
     Assert.Contains("RDL/XML-Reiter", problem.Reason);
+  }
+
+  [Fact]
+  public void PaddingByteIsNotAProblem()
+  {
+    using var fixture = new ResourceDllFixture();
+    fixture.AddInfocardBytes(60, [.. Encoding.Unicode.GetBytes("﻿" + ResourceDllFixture.Card), 0]);
+    var game = GameData.Load(fixture.Root);
+    Assert.Equal(ResourceStatus.Resolved, game.Texts!.Resolve(60, 1033).Status);
+    Assert.Empty(Assess(game, 60));
   }
 
   [Fact]

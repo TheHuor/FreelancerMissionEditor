@@ -61,12 +61,15 @@ internal static class ResourceEncoding
     return (encoding, bom, terminal, trailing);
   }
 
+  /// <summary>A single 0x00 after whole UTF-16 characters is padding: the game reads complete characters only and ignores it.</summary>
+  internal static bool HasPaddingByte (byte[] bytes, int trailingLength) => trailingLength == 1 && bytes[^1] == 0;
+
   internal static string ReadInfocard (byte[] bytes)
   {
     var encoding = InfocardEncoding (bytes);
-    if (encoding.TrailingLength != 0)
+    if (encoding.TrailingLength != 0 && !HasPaddingByte (bytes, encoding.TrailingLength))
       throw new DecoderFallbackException ($"Ungültige {encoding.Encoding.WebName}-Länge: {bytes.Length} Bytes; {encoding.TrailingLength} unvollständiges Byte am Ende.");
-    return encoding.Encoding.GetString (bytes, encoding.BomLength, bytes.Length - encoding.BomLength - encoding.TerminatorLength);
+    return encoding.Encoding.GetString (bytes, encoding.BomLength, bytes.Length - encoding.BomLength - encoding.TerminatorLength - encoding.TrailingLength);
   }
 
   internal static string InfocardRepairText (byte[] bytes)
@@ -76,7 +79,7 @@ internal static class ResourceEncoding
     lenient.DecoderFallback = new DecoderReplacementFallback ("\uFFFD");
     int length = bytes.Length - info.BomLength - info.TerminatorLength - info.TrailingLength;
     string text = lenient.GetString (bytes, info.BomLength, length);
-    return info.TrailingLength == 0 ? text : text + "\uFFFD";
+    return info.TrailingLength == 0 || HasPaddingByte (bytes, info.TrailingLength) ? text : text + "\uFFFD";
   }
 
   internal static byte[] InfocardBytes (byte[] original, string raw)
@@ -84,7 +87,9 @@ internal static class ResourceEncoding
     InfocardDocument.Validate (raw);
     var encoding = InfocardEncoding (original);
     byte[] content = encoding.Encoding.GetBytes (raw);
-    int terminator = encoding.TrailingLength > 0 ? Math.Max (2, encoding.TerminatorLength) : encoding.TerminatorLength;
+    // A padding byte is kept so unchanged text saves byte for byte; any other incomplete ending becomes a whole terminator.
+    int terminator = encoding.TrailingLength == 0 ? encoding.TerminatorLength
+        : HasPaddingByte (original, encoding.TrailingLength) ? encoding.TerminatorLength + 1 : Math.Max (2, encoding.TerminatorLength);
     byte[] result = new byte[encoding.BomLength + content.Length + terminator];
     original.AsSpan (0, encoding.BomLength).CopyTo (result);
     content.CopyTo (result, encoding.BomLength);
