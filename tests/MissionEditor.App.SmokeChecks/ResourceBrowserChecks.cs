@@ -103,6 +103,7 @@ internal static partial class Program
     browser.Close ();
     CheckResourceIndexCompletion (owner);
     CheckResourceRepair (owner);
+    CheckResourceProblems (owner);
     owner.Activate ();
   }
 
@@ -290,5 +291,53 @@ internal static partial class Program
       throw new Exception("Selected string HEX view must preserve the neighboring entries on save");
     browser.Close();
     Console.WriteLine("PASS HEX displays only selected string bytes, follows text edits and applied drafts, and preserves neighbors on save");
+  }
+
+  private static void CheckResourceProblems (Window owner)
+  {
+    using var fixture = new ResourceDllFixture ();
+    fixture.AddInfocardBytes (60, [.. System.Text.Encoding.Unicode.GetBytes ("﻿" + ResourceDllFixture.Card + "  "), 0]);
+    fixture.AddInfocard (61, "<RDL><TEXT>Unclosed</RDL>");
+    GameData game = GameData.Load (fixture.Root);
+    ResourceWriter.Save ([ResourceDraft.Create (game.Texts!.Resolve (3, 1033), "<RDL><TEXT>Rich</TEXT></RDL>")]);
+    game.Texts.Reload ();
+    string mission = Path.Combine (fixture.Root, "mission.ini");
+    var script = MissionScript.FromDocument (IniDocument.ParseText (
+        "[Trigger]\nnickname = problems\nAct_PopUpDialog = 3, 1\nAct_SetOffer = 50\nAct_SetOffer = 60\nAct_SetOffer = 61\nAct_PopUpDialog = 999, 2\n"), mission);
+    var browser = new ResourceBrowserWindow { Owner = owner, Width = 1120, Height = 760 };
+    void Check (bool value, string message)
+    {
+      if (!value) throw new Exception (message);
+      Console.WriteLine ("PASS " + message);
+    }
+    var list = (ListBox)browser.FindName ("ResourceList");
+    var problemBox = (ComboBox)browser.FindName ("ProblemBox");
+    object? Property (object row, string name) => row.GetType ().GetProperty (name)!.GetValue (row);
+    Dictionary<int, string?> Shown () => list.Items.Cast<object> ().ToDictionary (row => (int)Property (row, "Ids")!, row => (string?)Property (row, "BadgeKind"));
+    browser.RefreshContext (script, game, mission);
+    browser.Show ();
+    var all = Shown ();
+    Check (all.Count == 7 && all[1] is null && all[2] is null && all[50] is null && all[3] == "Warning" && all[60] == "Error" && all[61] == "Error" && all[999] == "Error",
+        "resource list marks broken entries as errors, display conflicts as warnings and leaves readable ones unmarked");
+    Check (((TextBlock)browser.FindName ("CountText")).Text.EndsWith ("· 4 auffällig"), "count line names the number of conspicuous entries");
+    object decode = list.Items.Cast<object> ().Single (row => (int)Property (row, "Ids")! == 60);
+    Check (Property (decode, "ProblemText") as string == "Kodierung fehlerhaft" && ((string)Property (decode, "ProblemSummary")!).Contains ("unvollständiges Byte"),
+        "marker names the kind and its tooltip the reason and remedy");
+    SavePreview (browser, "resource-browser-problems");
+    problemBox.SelectedIndex = 1;
+    Check (Shown ().Keys.Order ().SequenceEqual ([3, 60, 61, 999]), "filter shows only conspicuous entries");
+    problemBox.SelectedItem = "RDL/XML nicht lesbar";
+    Check (Shown ().Keys.SequenceEqual ([61]), "filter narrows to one kind of problem");
+    problemBox.SelectedItem = "Unpassend für die Spielanzeige";
+    Check (Shown ().Keys.SequenceEqual ([3]), "filter shows rendering conflicts of the current mission");
+    browser.UpdateLayout ();
+    SavePreview (browser, "resource-browser-problems-filtered");
+    browser.Width = browser.MinWidth;
+    problemBox.SelectedIndex = 1;
+    browser.UpdateLayout ();
+    SavePreview (browser, "resource-browser-problems-narrow");
+    Check (browser.NavigateToId (1) && problemBox.SelectedIndex == 0 && Shown ().ContainsKey (1), "navigating to an ID resets the problem filter");
+    browser.Close ();
+    owner.Activate ();
   }
 }

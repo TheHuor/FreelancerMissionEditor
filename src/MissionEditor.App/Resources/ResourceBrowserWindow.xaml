@@ -27,13 +27,17 @@
   <Grid Grid.Row="3" x:Name="BodyGrid">
    <Grid.ColumnDefinitions><ColumnDefinition x:Name="ListColumn" Width="35*" MinWidth="210"/><ColumnDefinition Width="6"/><ColumnDefinition Width="65*" MinWidth="350"/></Grid.ColumnDefinitions>
    <Grid>
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-    <TextBlock x:Name="CountText" Margin="0,0,0,6" Foreground="{DynamicResource MutedTextBrush}"/>
-    <ListBox x:Name="ResourceList" Grid.Row="1" SelectionChanged="OnSelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" HorizontalContentAlignment="Stretch">
-     <ListBox.ItemTemplate><DataTemplate><Grid Margin="3,5" ToolTip="{Binding DllPath}"><Grid.ColumnDefinitions><ColumnDefinition Width="82"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-      <TextBlock Text="{Binding IdLabel}" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold"/>
-      <StackPanel Grid.Column="1"><TextBlock Text="{Binding Preview}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Detail}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}"/></StackPanel>
-     </Grid></DataTemplate></ListBox.ItemTemplate>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <!-- Sits above the list rather than in the filter row, so the minimum window width keeps that row on one line. -->
+    <ComboBox x:Name="ProblemBox" Margin="0,0,0,6" SelectionChanged="OnFilterChanged" ToolTip="Auffällige Einträge: fehlende Texte, fehlerhafte Kodierung, nicht lesbares RDL/XML oder RDL/XML in einer Klartext-Anzeige der aktuellen Mission" AutomationProperties.Name="Nach auffälligen Einträgen filtern"/>
+    <TextBlock x:Name="CountText" Grid.Row="1" Margin="0,0,0,6" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}"/>
+    <ListBox x:Name="ResourceList" Grid.Row="2" SelectionChanged="OnSelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" HorizontalContentAlignment="Stretch">
+     <ListBox.ItemTemplate><DataTemplate><Grid Margin="3,5" ToolTip="{Binding DllPath}"><Grid.ColumnDefinitions><ColumnDefinition Width="22"/><ColumnDefinition Width="82"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <ContentControl Template="{StaticResource SeverityBadge}" VerticalAlignment="Top" Margin="0,1,0,0" Focusable="False" ToolTip="{Binding ProblemSummary}" AutomationProperties.Name="{Binding ProblemText}"/>
+      <TextBlock Grid.Column="1" Text="{Binding IdLabel}" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold"/>
+      <StackPanel Grid.Column="2"><TextBlock Text="{Binding Preview}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Detail}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}"/>
+       <TextBlock x:Name="ProblemLine" Text="{Binding ProblemText}" ToolTip="{Binding ProblemSummary}" Visibility="{Binding ProblemVisibility}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource ErrorBrush}" Margin="0,2,0,0"/></StackPanel>
+     </Grid><DataTemplate.Triggers><DataTrigger Binding="{Binding BadgeKind}" Value="Warning"><Setter TargetName="ProblemLine" Property="Foreground" Value="{DynamicResource WarningBrush}"/></DataTrigger></DataTemplate.Triggers></DataTemplate></ListBox.ItemTemplate>
     </ListBox>
    </Grid>
    <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"/>

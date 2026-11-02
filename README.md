@@ -25,6 +25,8 @@ Entstanden beim Aufteilen der Crossfire-Kampagne (ein 36 000-Zeilen-Skript) in e
 - **Bearbeiten**: Abschnitt im Textfenster ändern oder löschen (die Rückfrage sagt, was sich im Spiel
   ändert), danach wird sofort neu geprüft; Rückgängig (Strg+Z), Speichern (Strg+S) mit `.bak`-Sicherung
   beim ersten Speichern.
+- **Ressourcentexte** der Spielinstallation durchsuchen und bearbeiten; auffällige Einträge (fehlend,
+  falsch kodiert, nicht lesbares RDL/XML, unpassend für die Anzeige) sind markiert und filterbar.
 - **Kommandozeile** für Skripte und Stapelprüfungen.
 - **MCP-Server**, über den KI-Agenten Missionen untersuchen und Änderungen als Entwurf vorschlagen.
 
@@ -81,6 +83,28 @@ Text dazu – Namen (`individual_name`, `string_id`), Ziele (`[NNObjective] type
 Die Texte kommen aus `resources.dll` und den DLLs unter `[Resources]` in `freelancer.ini`
 (Index = IDS >> 16), in der Sprache der Installation. Der MCP-Server liefert sie in
 `read_mission_source` als `note` mit.
+
+### Ressourcentexte
+
+„Ressourcentexte…“ öffnet ein eigenes Fenster für die Texte der Ressourcen-DLLs: alle IDs der aktuellen
+Mission oder der gesamten Installation, mit Suche, Filtern nach Verwendung, DLL und Typ, Vorschau,
+Bearbeiten (Strings als Text, Infocards visuell oder als RDL/XML, Rohdaten als Hex) und Speichern mit
+Sicherung. Die Fundstellen in der Mission sind anklickbar.
+
+Einträge, die kaputt scheinen, sind in der Liste markiert, wie in der Prüfliste:
+
+| Symbol | Art | Bedeutung |
+|---|---|---|
+| roter Kreis mit ✕ | DLL fehlt oder nicht lesbar | Der DLL-Slot der ID ist nicht registriert, die DLL fehlt oder lässt sich nicht lesen. |
+| roter Kreis mit ✕ | Text fehlt | Die DLL hat keinen Eintrag für diese ID. |
+| roter Kreis mit ✕ | Kodierung fehlerhaft | Die Infocard ist kein gültiges UTF-16, meist wegen eines einzelnen Bytes zu viel am Ende. Die Rohdaten bleiben erhalten; im XML-Modus korrigieren und übernehmen. |
+| roter Kreis mit ✕ | RDL/XML nicht lesbar | Der Text ist RDL/XML, aber kein gültiges oder enthält nicht unterstützte Elemente. |
+| gelbes Dreieck mit ! | Unpassend für die Spielanzeige | Eine Stelle der aktuellen Mission zeigt den Text als Klartext an (etwa ein Dialogtitel), er enthält aber RDL/XML. Gilt nur für die Sprachvariante, die das Spiel tatsächlich lädt. |
+
+Unter dem Eintrag steht die Art in Rot bzw. Gelb, der Tooltip nennt den genauen Grund. Die Auswahl über
+der Liste zeigt „Alle Einträge“, „Nur auffällige“ oder nur eine Art; die Zählzeile nennt die Zahl der
+auffälligen Einträge. Übernommene Entwürfe werden mit ihrem neuen Text bewertet. Ohne geladene
+Installation wird nichts markiert.
 
 ### Kommandozeile
 
@@ -375,8 +399,8 @@ dotnet run --project tests/MissionEditor.App.SmokeChecks
 ```
 
 Die Checks öffnen kurz ein Fenster, verwenden die Repository-Beispielmission und prüfen unter anderem
-Fenstergrößen, Prüfleisten-Navigation, Kontraste sowie Bearbeiten/Rückgängig/Speichern auf einer
-temporären Kopie. Die Fixture bleibt unverändert. Diese Checks sind nicht Teil von `dotnet test`.
+Fenstergrößen, Prüfleisten-Navigation, Kontraste, Markierungen und Zustandsfilter im Ressourcenfenster
+(auch bei Mindestgröße) sowie Bearbeiten/Rückgängig/Speichern auf einer temporären Kopie. Die Fixture bleibt unverändert. Diese Checks sind nicht Teil von `dotnet test`.
 
 ### Binäre Missionsdateien (BINI)
 
