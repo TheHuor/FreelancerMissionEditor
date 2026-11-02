@@ -58,6 +58,9 @@ public partial class ResourceBrowserWindow : Window
     DllBox.ItemsSource = new[] { new DllChoice(null, -1) };
     DllBox.DisplayMemberPath = nameof(DllChoice.Label);
     DllBox.SelectedIndex = 0;
+    // Index 0: all entries, 1: any problem, then one entry per ResourceProblemKind in declaration order.
+    ProblemBox.ItemsSource = new[] { "Alle Einträge", "Nur auffällige" }.Concat(Enum.GetValues<ResourceProblemKind>().Select(ResourceHealth.Label)).ToArray();
+    ProblemBox.SelectedIndex = 0;
     _updating = false;
     var geometry = WindowGeometry.Restore(this, "resources");
     if (geometry is not null)
@@ -207,7 +210,13 @@ public partial class ResourceBrowserWindow : Window
     }
     int slot = ids >> 16;
     string? dllPath = entry.Identity?.DllPath ?? (_gameData?.Texts?.DllPaths is { } paths && slot >= 0 && slot < paths.Count ? paths[slot] : null);
-    return new ResourceRow(ids, entry, usages, hasDraft, dllPath, available);
+    // Applied drafts were validated, so the marker reflects the drafted text instead of the disk bytes.
+    ResourceEntry Drafted(ResourceEntry variant) => variant.Identity is { } key && _drafts.TryGetValue(key, out var pending)
+        ? variant with { RawText = pending.EditedText, Status = ResourceStatus.Resolved } : variant;
+    ResourceEntry assessedEntry = Drafted(entry);
+    ResourceEntry[] assessedVariants = available.Select(Drafted).ToArray();
+    var problems = new Lazy<IReadOnlyList<ResourceProblem>>(() => ResourceHealth.Assess(assessedEntry, assessedVariants, usages));
+    return new ResourceRow(ids, entry, usages, hasDraft, dllPath, available, problems);
   }
 
   private void BuildRows()
@@ -237,6 +246,7 @@ public partial class ResourceBrowserWindow : Window
     DllBox.ToolTip = dll ?? "Alle tatsächlich registrierten Ressourcen-DLLs";
     int kind = KindBox.SelectedIndex;
     int sort = SortBox.SelectedIndex;
+    int problemFilter = Math.Max(0, ProblemBox.SelectedIndex);
     int generation = ++_filterGeneration;
     ResourceRow[] snapshot = _rows.ToArray();
     ResourceRow[] Filter()
@@ -245,11 +255,18 @@ public partial class ResourceBrowserWindow : Window
         row.Variants.Any(variant => MatchesVariant(variant, query, kind, row.Ids))
         && (category == "Alle Verwendungen" || row.References.Any(reference => reference.Category == category))
         && (dll is null || string.Equals(row.DllPath, dll, StringComparison.OrdinalIgnoreCase))
+        && MatchesProblem(row, problemFilter)
         );
     rows = sort switch { 1 => rows.OrderBy(row => row.DllPath).ThenBy(row => row.Ids), 2 => rows.OrderBy(row => row.Categories).ThenBy(row => row.Ids), _ => rows.OrderBy(row => row.Ids) };
     return rows.ToArray();
     }
-    var result = snapshot.Length > 300 ? await Task.Run(Filter) : Filter();
+    // Assessing parses RDL; for large lists this, too, stays off the UI thread.
+    (ResourceRow[] Rows, int Problems) Evaluate()
+    {
+      ResourceRow[] filtered = Filter();
+      return (filtered, filtered.Count(row => row.Problems.Count > 0));
+    }
+    var (result, problemCount) = snapshot.Length > 300 ? await Task.Run(Evaluate) : Evaluate();
     if (generation != _filterGeneration) return;
     _updating = true;
     ResourceList.ItemsSource = result;
@@ -259,7 +276,7 @@ public partial class ResourceBrowserWindow : Window
         && !MatchesVariant(shown, query, kind, shown.Ids) && !_editorDirty
         && (shown.Identity is null || !_drafts.ContainsKey(shown.Identity)))
       SelectRow(selected);
-    CountText.Text = $"{result.Length} von {snapshot.Length} eindeutigen IDs";
+    CountText.Text = $"{result.Length} von {snapshot.Length} eindeutigen IDs" + (problemCount > 0 ? $" · {problemCount} auffällig" : "");
     if (result.Length == 0) SetStatus("Keine Suchtreffer. Suchbegriff und Filter zurücksetzen.");
   }
 
@@ -690,7 +707,7 @@ public partial class ResourceBrowserWindow : Window
     if (installationScope && ScopeBox.SelectedIndex == 1 && ReferenceEquals(source, _gameData) && mission == _missionPath) _ = IndexInstallation();
   }
   private void OnFilterChanged(object sender, RoutedEventArgs e) => ApplyFilters();
-  private void ResetFilterControls() { SearchBox.Clear(); CategoryBox.SelectedIndex = 0; DllBox.SelectedIndex = 0; KindBox.SelectedIndex = 0; }
+  private void ResetFilterControls() { SearchBox.Clear(); CategoryBox.SelectedIndex = 0; DllBox.SelectedIndex = 0; KindBox.SelectedIndex = 0; ProblemBox.SelectedIndex = 0; }
   private void OnResetFilters(object sender, RoutedEventArgs e) { _updating = true; ResetFilterControls(); _updating = false; ApplyFilters(); }
   private void OnApply(object sender, RoutedEventArgs e) => ApplyEditor();
   private void OnDiscard(object sender, RoutedEventArgs e)
@@ -771,6 +788,12 @@ public partial class ResourceBrowserWindow : Window
   private static bool MatchesVariant(ResourceEntry entry, string query, int kind, int ids) =>
       (kind == 0 || entry.Identity?.Kind == (kind == 1 ? ResourceKind.String : ResourceKind.Infocard))
       && (query.Length == 0 || ids.ToString().Contains(query, StringComparison.OrdinalIgnoreCase) || entry.Text.Contains(query, StringComparison.OrdinalIgnoreCase));
+  private static bool MatchesProblem(ResourceRow row, int problemFilter) => problemFilter switch
+  {
+    0 => true,
+    1 => row.Problems.Count > 0,
+    _ => row.Problems.Any(problem => (int)problem.Kind == problemFilter - 2),
+  };
   private static string LanguageName(ushort language)
   {
     if (language == 0) return "Keine Sprache (0)";
@@ -806,8 +829,15 @@ public partial class ResourceBrowserWindow : Window
     public string Location => $"{Path.GetFileName(Reference.FilePath)} · [{Reference.SectionName}] {Reference.SectionNickname} · Zeile {Reference.LineNumber} · {Reference.Role} · Anzeige: {MissionTextUsage.Label(Reference.Rendering)}";
     public string Description => Reference.SourceText + (Reference.Provenance is { Length: > 0 } path ? "\nBezug: " + path : "");
   }
-  private sealed record ResourceRow(int Ids, ResourceEntry Entry, IReadOnlyList<IdsReference> References, bool HasDraft, string? DllPath, IReadOnlyList<ResourceEntry> Variants)
+  // ProblemSource is assessed once per row on first use; the Lazy reference keeps record equality stable.
+  private sealed record ResourceRow(int Ids, ResourceEntry Entry, IReadOnlyList<IdsReference> References, bool HasDraft, string? DllPath, IReadOnlyList<ResourceEntry> Variants,
+      Lazy<IReadOnlyList<ResourceProblem>> ProblemSource)
   {
+    public IReadOnlyList<ResourceProblem> Problems => ProblemSource.Value;
+    public string? BadgeKind => Problems.Count == 0 ? null : Problems.All(problem => problem.Kind == ResourceProblemKind.RenderingConflict) ? "Warning" : "Error";
+    public string? ProblemText => Problems.Count == 0 ? null : string.Join(" · ", Problems.Select(problem => ResourceHealth.Label(problem.Kind)).Distinct());
+    public string? ProblemSummary => Problems.Count == 0 ? null : string.Join("\n", Problems.Select(problem => problem.Reason));
+    public Visibility ProblemVisibility => Problems.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
     public string IdLabel => Ids + (HasDraft ? " *" : "");
     public string Preview => Entry.HasRawResource ? ResourcePresentation.Preview(ResourcePresentation.Source(Entry)).Replace('\r', ' ').Replace('\n', ' ') : Entry.StatusText;
     public string Categories => string.Join(", ", References.Select(item => item.Category).Distinct());

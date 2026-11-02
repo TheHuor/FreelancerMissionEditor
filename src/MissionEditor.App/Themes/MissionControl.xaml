@@ -30,6 +30,32 @@
   <SolidColorBrush x:Key="WarningSurfaceBrush" Color="#302B22" />
   <!-- Neutral grey for hints: clearly not a warning, and not blue like the selection. -->
   <SolidColorBrush x:Key="InfoSurfaceBrush" Color="#1F252D" />
+  <!-- Severity badge: red circle with a cross for errors, yellow triangle with "!" for warnings,
+       grey circle with "i" for hints. Bound to BadgeKind of the DataContext; shared by the main window and the resource browser. -->
+  <ControlTemplate x:Key="SeverityBadge" TargetType="ContentControl">
+    <Grid Width="16" Height="16">
+      <Ellipse x:Name="ErrorShape" Fill="#C62828" Visibility="Collapsed" />
+      <TextBlock x:Name="ErrorGlyph" Text="✕" Foreground="White" FontWeight="Bold" FontSize="10" FontFamily="Segoe UI" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+      <Path x:Name="WarningShape" Data="M8,0.5 L15.5,15 L0.5,15 Z" Fill="#FBC02D" Stroke="#E6A100" StrokeThickness="1" Visibility="Collapsed" />
+      <TextBlock x:Name="WarningGlyph" Text="!" Foreground="#3E2723" FontWeight="Bold" FontSize="11" FontFamily="Segoe UI" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,0" Visibility="Collapsed" />
+      <Ellipse x:Name="InfoShape" Fill="#9E9E9E" Visibility="Collapsed" />
+      <TextBlock x:Name="InfoGlyph" Text="i" Foreground="White" FontWeight="Bold" FontSize="11" FontFamily="Segoe UI" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+    </Grid>
+    <ControlTemplate.Triggers>
+      <DataTrigger Binding="{Binding BadgeKind}" Value="Error">
+        <Setter TargetName="ErrorShape" Property="Visibility" Value="Visible" />
+        <Setter TargetName="ErrorGlyph" Property="Visibility" Value="Visible" />
+      </DataTrigger>
+      <DataTrigger Binding="{Binding BadgeKind}" Value="Warning">
+        <Setter TargetName="WarningShape" Property="Visibility" Value="Visible" />
+        <Setter TargetName="WarningGlyph" Property="Visibility" Value="Visible" />
+      </DataTrigger>
+      <DataTrigger Binding="{Binding BadgeKind}" Value="Info">
+        <Setter TargetName="InfoShape" Property="Visibility" Value="Visible" />
+        <Setter TargetName="InfoGlyph" Property="Visibility" Value="Visible" />
+      </DataTrigger>
+    </ControlTemplate.Triggers>
+  </ControlTemplate>
   <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#173C56" />
   <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#E4EDF5" />
   <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#173C56" />
