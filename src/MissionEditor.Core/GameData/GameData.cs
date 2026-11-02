@@ -234,7 +234,11 @@ public sealed partial class GameData
             Id (section, "ids_name") ?? Id (section, "strid_name"), Id (section, "ids_info"),
             section.Find ("archetype")?.GetValue (0));
         if (kind == GameDataKind.System && section.Find ("file") is { } systemFile)
-          _systemFiles.Add (Path.Combine (Path.GetDirectoryName (file)!, systemFile.GetValue (0)));
+        {
+          string systemPath = Path.Combine (Path.GetDirectoryName (file)!, systemFile.GetValue (0));
+          _systemFiles.Add (systemPath);
+          _systemFileOf[nickname] = systemPath;
+        }
       }
     }
   }
