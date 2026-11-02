@@ -21,7 +21,7 @@ public sealed class ResourceRenderingCheck(GameData gameData) : IMissionCheck
       // An unrelated RT_HTML resource with the same numeric ID must not produce a false warning.
       var preferred = texts.Resolve(group.Key);
       if (!preferred.HasRawResource) continue;
-      var offending = ResourceHealth.DisplayedVariants(Variants(texts, group.Key))
+      var offending = ResourceHealth.DisplayedVariants(Variants(texts, group.Key), ResourceLookup.StringFirst)
           .Where(entry => MissionTextUsage.ContainsRdl(entry.RawText ?? entry.Text)).ToArray();
       if (offending.Length == 0) continue;
       foreach (var reference in group)
