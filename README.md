@@ -97,7 +97,7 @@ Einträge, die kaputt scheinen, sind in der Liste markiert, wie in der Prüflist
 |---|---|---|
 | roter Kreis mit ✕ | DLL fehlt oder nicht lesbar | Der DLL-Slot der ID ist nicht registriert, die DLL fehlt oder lässt sich nicht lesen. |
 | roter Kreis mit ✕ | Text fehlt | Die DLL hat keinen Eintrag für diese ID. |
-| roter Kreis mit ✕ | Kodierung fehlerhaft | Die Infocard ist kein gültiges UTF-16, meist wegen eines einzelnen Bytes zu viel am Ende. Die Rohdaten bleiben erhalten; im XML-Modus korrigieren und übernehmen. |
+| roter Kreis mit ✕ | Kodierung fehlerhaft | Die Infocard ist kein gültiges UTF-16, etwa wegen eines ungültigen Zeichens oder eines unvollständigen Zeichens am Ende. Die Rohdaten bleiben erhalten; im XML-Modus korrigieren und übernehmen. |
 | roter Kreis mit ✕ | RDL/XML nicht lesbar | Der Text ist RDL/XML, aber kein gültiges oder enthält nicht unterstützte Elemente. |
 | gelbes Dreieck mit ! | Unpassend für die Spielanzeige | Eine Stelle der aktuellen Mission zeigt den Text als Klartext an (etwa ein Dialogtitel), er enthält aber RDL/XML. Gilt nur für die Sprachvariante, die das Spiel tatsächlich lädt. |
 
@@ -105,6 +105,11 @@ Unter dem Eintrag steht die Art in Rot bzw. Gelb, der Tooltip nennt den genauen 
 der Liste zeigt „Alle Einträge“, „Nur auffällige“ oder nur eine Art; die Zählzeile nennt die Zahl der
 auffälligen Einträge. Übernommene Entwürfe werden mit ihrem neuen Text bewertet. Ohne geladene
 Installation wird nichts markiert.
+
+Viele Infocards haben nach dem Text ein einzelnes Nullbyte, sodass ihre Länge ungerade ist. Das Spiel liest
+nur ganze Zeichen und übergeht dieses Füllbyte; der Editor tut dasselbe und zeigt solche Einträge nicht als
+fehlerhaft. Beim Speichern bleibt das Füllbyte erhalten, unveränderte Texte werden Byte für Byte gleich
+geschrieben.
 
 ### Kommandozeile
 

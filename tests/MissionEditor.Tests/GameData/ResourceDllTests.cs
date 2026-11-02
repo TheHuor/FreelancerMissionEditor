@@ -39,7 +39,7 @@ public sealed class ResourceDllTests : IDisposable
   [Fact]
   public void MalformedInfocardRetainsIdentityBytesAndRepairTextWithoutHidingOtherEntries ()
   {
-    byte[] malformed = System.Text.Encoding.Unicode.GetBytes ("\uFEFF" + Card + "  ").Concat (new byte[] { 0 }).ToArray ();
+    byte[] malformed = System.Text.Encoding.Unicode.GetBytes ("\uFEFF" + Card + "  ").Concat (new byte[] { 0x41 }).ToArray ();
     _fixture.AddInfocardBytes (51, malformed);
     _fixture.AddInfocardBytes (51, System.Text.Encoding.Unicode.GetBytes ("<RDL><TEXT>Deutsch erhalten</TEXT></RDL>\0"), 1031);
     var texts = Texts ();
@@ -62,6 +62,48 @@ public sealed class ResourceDllTests : IDisposable
     Assert.Equal (repaired, texts.Resolve (51, 1033).RawText);
     Assert.Equal ("Deutsch", texts.Resolve (1, 1031).Text);
     Assert.Equal ("Deutsch erhalten", texts.Resolve (51, 1031).Text);
+  }
+
+  [Fact]
+  public void SingleTrailingZeroIsPaddingThatSurvivesSaving ()
+  {
+    byte[] padded = System.Text.Encoding.Unicode.GetBytes ("﻿" + Card).Concat (new byte[] { 0 }).ToArray ();
+    _fixture.AddInfocardBytes (51, padded);
+    var texts = Texts ();
+    var entry = texts.Resolve (51, 1033);
+    Assert.Equal (ResourceStatus.Resolved, entry.Status);
+    Assert.Equal (Card, entry.RawText);
+    Assert.Equal ("First\nSecond", entry.Text);
+    Assert.Equal (padded, entry.RawBytes);
+    Assert.Equal (padded, ResourceDraft.EncodeText (entry, entry.RawText!));
+    Assert.Equal (Card, ResourceDraft.CreateBytes (entry, padded).EditedText);
+
+    string edited = Card.Replace ("First", "Erste");
+    ResourceWriter.Save ([ResourceDraft.Create (entry, edited)]);
+    texts.Reload ();
+    var saved = texts.Resolve (51, 1033);
+    Assert.Equal (ResourceStatus.Resolved, saved.Status);
+    Assert.Equal (edited, saved.RawText);
+    Assert.Equal (padded.Length, saved.RawBytes!.Length);
+    Assert.Equal (System.Text.Encoding.Unicode.GetBytes ("﻿" + edited).Concat (new byte[] { 0 }), saved.RawBytes);
+
+    // Saving again keeps exactly one padding byte.
+    ResourceWriter.Save ([ResourceDraft.Create (saved, saved.RawText!)]);
+    texts.Reload ();
+    Assert.Equal (saved.RawBytes, texts.Resolve (51, 1033).RawBytes);
+  }
+
+  [Fact]
+  public void PaddingByteDoesNotExcuseOtherEncodingErrors ()
+  {
+    // A lone high surrogate inside the text remains a coding error even with valid padding.
+    byte[] broken = System.Text.Encoding.Unicode.GetBytes ("<RDL><TEXT>A").Concat (new byte[] { 0x00, 0xD8 })
+        .Concat (System.Text.Encoding.Unicode.GetBytes ("</TEXT></RDL>")).Concat (new byte[] { 0 }).ToArray ();
+    _fixture.AddInfocardBytes (51, broken);
+    var entry = Texts ().Resolve (51, 1033);
+    Assert.Equal (ResourceStatus.DecodeError, entry.Status);
+    Assert.Equal ("<RDL><TEXT>A�</TEXT></RDL>", entry.RawText);
+    Assert.Equal (broken, entry.RawBytes);
   }
 
   [Fact]

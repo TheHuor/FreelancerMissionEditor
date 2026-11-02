@@ -110,7 +110,7 @@ internal static partial class Program
   private static void CheckResourceRepair (Window owner)
   {
     using var fixture = new ResourceDllFixture ();
-    byte[] malformed = System.Text.Encoding.Unicode.GetBytes ("\uFEFF" + ResourceDllFixture.Card + "  ").Concat (new byte[] { 0 }).ToArray ();
+    byte[] malformed = System.Text.Encoding.Unicode.GetBytes ("\uFEFF" + ResourceDllFixture.Card + "  ").Concat (new byte[] { 0x41 }).ToArray ();
     fixture.AddInfocardBytes (51, malformed);
     var game = GameData.Load (fixture.Root);
     var browser = new ResourceBrowserWindow { Owner = owner, Width = 1120, Height = 760 };
@@ -296,7 +296,7 @@ internal static partial class Program
   private static void CheckResourceProblems (Window owner)
   {
     using var fixture = new ResourceDllFixture ();
-    fixture.AddInfocardBytes (60, [.. System.Text.Encoding.Unicode.GetBytes ("﻿" + ResourceDllFixture.Card + "  "), 0]);
+    fixture.AddInfocardBytes (60, [.. System.Text.Encoding.Unicode.GetBytes ("﻿" + ResourceDllFixture.Card + "  "), 0x41]);
     fixture.AddInfocard (61, "<RDL><TEXT>Unclosed</RDL>");
     GameData game = GameData.Load (fixture.Root);
     ResourceWriter.Save ([ResourceDraft.Create (game.Texts!.Resolve (3, 1033), "<RDL><TEXT>Rich</TEXT></RDL>")]);
