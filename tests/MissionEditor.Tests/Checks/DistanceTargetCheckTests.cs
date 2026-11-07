@@ -138,7 +138,13 @@ public sealed class DistanceTargetCheckTests : IDisposable
   [Fact]
   public void ADeadTriggerOnlyGetsANote ()
   {
-    string text = Trigger ("Cnd_DistShip = inside, Player, Zone_CF20_nebula, 5000").Replace ("InitState = ACTIVE\n", string.Empty);
+    string text = """
+        [Trigger]
+        nickname = never
+        system = CF20
+        Cnd_DistShip = inside, Player, Zone_CF20_nebula, 5000
+        Act_ChangeState = SUCCEED
+        """;
     Assert.Equal (FindingSeverity.Info, Assert.Single (Run (text)).Severity);
   }
 
