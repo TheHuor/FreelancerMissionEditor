@@ -20,6 +20,14 @@ public sealed record SystemConnection (string Nickname, string System, string Ta
   public bool IsGate => Archetype.Contains ("gate", StringComparison.OrdinalIgnoreCase);
 }
 
+/// <summary>A nickname of a system INI: an [Object] (station, planet, jump gate, buoy …) or a [Zone].</summary>
+/// <param name="Nickname">The nickname as written there.</param>
+/// <param name="System">The system the INI belongs to.</param>
+/// <param name="IsZone">True for a [Zone], false for an [Object].</param>
+/// <param name="FilePath">The system INI.</param>
+/// <param name="LineNumber">The first line of the section.</param>
+public sealed record SpaceNickname (string Nickname, string System, bool IsZone, string FilePath, int LineNumber);
+
 public sealed partial class GameData
 {
   private readonly Dictionary<string, string> _systemFileOf = new (StringComparer.OrdinalIgnoreCase);
@@ -31,7 +39,7 @@ public sealed partial class GameData
   /// </summary>
   public IReadOnlyList<SystemConnection> Connections (string system) => _connections.GetOrAdd (system, name =>
   {
-    if (!_systemFileOf.TryGetValue (name, out string? file) || !File.Exists (file))
+    if (SystemFile (name) is not { } file)
       return [];
     try
     {
@@ -53,6 +61,70 @@ public sealed partial class GameData
       return [];
     }
   });
+
+  /// <summary>
+  /// The INI of a system as universe.ini names it, or null. Crossfire keeps several variants per system and lets its
+  /// launcher copy one of them over the named file when the game starts ("cf14sp.ini", "cf14mp.ini" → "cf14.ini"); in a
+  /// build folder only the variants exist. Then the single-player variant is taken, else the multiplayer one.
+  /// </summary>
+  public string? SystemFile (string system)
+  {
+    if (!_systemFileOf.TryGetValue (system, out string? file))
+      return null;
+    if (File.Exists (file))
+      return file;
+    string stem = Path.Combine (Path.GetDirectoryName (file)!, Path.GetFileNameWithoutExtension (file));
+    return new[] { stem + "sp.ini", stem + "mp.ini" }.FirstOrDefault (File.Exists);
+  }
+
+  /// <summary>
+  /// The [Object] and [Zone] sections of all system INIs with this nickname (any case). Empty when no system
+  /// defines it.
+  /// </summary>
+  public IReadOnlyList<SpaceNickname> FindSpaceNickname (string nickname) =>
+      SpaceNicknames.TryGetValue (nickname, out List<SpaceNickname>? found) ? found : [];
+
+  /// <summary>
+  /// True when every system of universe.ini has a readable INI. Otherwise (e.g. a build folder that holds only changed
+  /// files) a nickname missing from <see cref="FindSpaceNickname"/> may still exist in the game.
+  /// </summary>
+  public bool HasAllSystemFiles => _systemFileOf.Keys.All (system => SystemFile (system) is not null);
+
+  private Dictionary<string, List<SpaceNickname>>? _spaceNicknames;
+
+  private Dictionary<string, List<SpaceNickname>> SpaceNicknames
+  {
+    get
+    {
+      lock (_systemFileOf)
+        return _spaceNicknames ??= LoadSpaceNicknames ();
+    }
+  }
+
+  private Dictionary<string, List<SpaceNickname>> LoadSpaceNicknames ()
+  {
+    var index = new Dictionary<string, List<SpaceNickname>> (StringComparer.OrdinalIgnoreCase);
+    foreach (string system in _systemFileOf.Keys)
+    {
+      if (SystemFile (system) is not { } file)
+        continue;
+      try
+      {
+        foreach (IniSection section in IniDocument.Load (file).Sections.Where (section => section.Is ("Object") || section.Is ("Zone")))
+        {
+          if (section.Find ("nickname")?.GetValue (0) is not { Length: > 0 } nickname)
+            continue;
+          if (!index.TryGetValue (nickname, out List<SpaceNickname>? entries))
+            index[nickname] = entries = [];
+          entries.Add (new SpaceNickname (nickname, system, section.Is ("Zone"), Path.GetFullPath (file), section.FirstLineNumber));
+        }
+      }
+      catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
+      {
+      }
+    }
+    return index;
+  }
 
   /// <summary>Reads three numbers of a line from the given value index on (e.g. "pos = x, y, z").</summary>
   public static bool TryReadVector (IniLine line, int index, out Vector3 vector)
